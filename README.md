@@ -1,6 +1,6 @@
 # @citolab/qti-convert
 
-Welcome to **@citolab/qti-convert**, a tool for converting QTI 2.x (Question and Test Interoperability) to QTI 3. This package can be seamlessly integrated into your workflow as either a command line tool or a library for JavaScript/TypeScript applications.
+Welcome to **@citolab/qti-convert**, a tool for converting and transforming QTI. This package has scripts that can be executed from the command line and contains functions that can be integrated in JavaScript/TypeScript applications.
 
 ## Installation
 
@@ -19,7 +19,7 @@ And for more advanced usage @citolab/qti-convert can be integrate within your Ja
 
 Command Line Tool.
 
-The following commands can be used:
+The following commands can be run from the terminal:
 
 #### Converting a zip file
 
