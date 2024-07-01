@@ -211,7 +211,7 @@ The build-in functions that can be chained are:
 - `objectToVideo(): QtiTransformAPI`: Convert `<object>` elements to `<video>` elements..
 - `objectToImg(): QtiTransformAPI`: Convert `<object>` elements to `<img>` elements.
 - `stripStylesheets(): QtiTransformAPI`: Remove all stylesheet references from the XML.
-- `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used override default web-components. E.g. `<qti-choice-interaction class="type:custom"> will result in <qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
+- `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used override default web-components. E.g. `<qti-choice-interaction class="type:custom">` will result in `<qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
 - `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML
 - `qbCleanup(): QtiTransformAPI`: Clean-up for package created with the Quesify Platform
 - `minChoicesToOne(): QtiTransformAPI`: Ensure the minimum number of choices is one.
