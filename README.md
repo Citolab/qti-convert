@@ -45,7 +45,7 @@ It will convert all files inside the folder and copy the converted files to a ne
     npx -p=@citolab/qti-convert qti-create-assessment yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
 ```
 
-I you have 1 single item but no assessment test, this command will create a assessment test that contains all the items that are in the foldername.
+I you have a directory with one or more items but no assessment test, this command will create a assessment test that contains all the items that are in the foldername.
 It will override an existing assessment that's callled test.xml.
 
 Should have the path to a folder as input parameter. This folder should contain the content of a qti3 package
@@ -56,7 +56,7 @@ Should have the path to a folder as input parameter. This folder should contain 
     npx -p=@citolab/qti-convert qti-create-manifest yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
 ```
 
-This will create of update an existing manifest. It will look into the directory and search for all items, tests and resources.
+This will create or update an existing manifest. It will look into the directory and search for all items, tests and resources.
 Also it will add the resources that are used in an item as a dependency.
 
 ## API
