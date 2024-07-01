@@ -92,7 +92,7 @@
     "eslint-plugin-storybook": "^0.6.15",
     "jest-environment-jsdom": "^29.7.0",
     "nodemon": "^3.0.1",
-    "np": "^8.0.4",
+    "np": "^10.0.6",
     "path-browserify": "^1.0.1",
     "prettier": "3.1.0",
     "qti30upgrader": "github:Citolab/qti30Upgrader",
