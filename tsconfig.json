@@ -1,0 +1,35 @@
+{
+  "ts-node": {
+    "moduleTypes": {
+      "jest.config.ts": "cjs"
+    }
+  },
+  "compilerOptions": {
+    "target": "es2017",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./types",
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "useDefineForClassFields": false,
+    "skipLibCheck": true,
+    "baseUrl": "./",
+    "paths": {
+      "@citolab/qti-components/qti-convert": ["src/lib/qti-converter"]
+    }
+  },
+  "include": ["src/**/*.ts", "./jest.config.ts"]
+}

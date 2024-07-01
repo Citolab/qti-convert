@@ -1,0 +1,107 @@
+{
+  "name": "@citolab/qti-convert",
+  "repository": "https://github.com/Citolab/qti-convert",
+  "description": "QTI converter",
+  "author": "Marcel Hoekstra",
+  "contributors": [
+    "Sander Looise",
+    "Patrick de Klein",
+    "Marcel Hoekstra"
+  ],
+  "license": "Apache-2.0",
+  "private": false,
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "version": "0.0.2-54",
+  "type": "module",
+  "bin": {
+    "qti-convert-pkg": "./dist/qti-convert-pkg.mjs",
+    "qti-convert-folder": "./dist/qti-convert-folder.mjs",
+    "qti-create-manifest": "./dist/qti-package-manifest.mjs",
+    "qti-create-assessment": "./dist/qti-package-assessment.mjs"
+  },
+  "exports": {
+    "./qti-convert": "./dist/qti-converter/index.js",
+    "./qti-loader": "./dist/qti-loader/index.js",
+    "./qti-transformer": "./dist/qti-transformer/index.js",
+    "./qti-helper": "./dist/qti-helper/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      "qti-convert": [
+        "./dist/qti-converter/index.d.ts"
+      ],
+      "qti-loader": [
+        "./dist/qti-loader/index.d.ts"
+      ],
+      "qti-transformer": [
+        "./dist/qti-transformer/index.d.ts"
+      ],
+      "qti-helper": [
+        "./dist/helper/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "types"
+  ],
+  "scripts": {
+    "qti-convert-pkg": "npx qti-convert-pkg",
+    "qti-convert-folder": "npx qti-convert-folder",
+    "qti-package-manifest": "npx qti-create-manifest",
+    "qti-package-assessment": "npx qti-create-assessment",
+    "----dev----": "",
+    "test": "vitest",
+    "test:output": "jest --json --outputFile=.jest-test-results.json",
+    "test:watch-output": "jest --watch --json --outputFile=.jest-test-results.json || true",
+    "build-lib": "tsx scripts/build.ts",
+    "watch-lib": "nodemon --watch \"src/**\" --ext \"ts,json,css\" --ignore \"src/**/*.spec.ts\" --exec \"tsx scripts/build.ts\" watch",
+    "deploy": "firebase deploy --only hosting:qti-components",
+    "npm publish": "np",
+    "lint": "eslint src/lib/**",
+    "list-outdated-dependencies": "npx npm-check-updates --format repo --peer",
+    "update-dependencies": "npx npm-check-updates --peer -u && npm install",
+    "arethetypeswrong": "npm run build-lib && attw --pack",
+    "----hooks----": "",
+    "prepublishOnly": "echo 'calling prepublishOnly as npm lifecycle hook to build-lib!' && npm run build-lib",
+    "postpublish": "echo 'posthook for prosperity, does nothing for now!'"
+  },
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "cheerio": "^1.0.0-rc.12",
+    "saxon-js": "^2.6.0",
+    "unzipper": "^0.10.14",
+    "xml-formatter": "^3.6.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.13.2",
+    "@jest/globals": "^29.7.0",
+    "@types/archiver": "^6.0.2",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.9.2",
+    "@types/unzipper": "^0.10.9",
+    "@typescript-eslint/eslint-plugin": "^6.11.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.54.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-jest": "^27.6.0",
+    "eslint-plugin-lit-a11y": "^4.1.1",
+    "eslint-plugin-sort-imports-es6-autofix": "^0.6.0",
+    "eslint-plugin-storybook": "^0.6.15",
+    "jest-environment-jsdom": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "np": "^8.0.4",
+    "path-browserify": "^1.0.1",
+    "prettier": "3.1.0",
+    "qti30upgrader": "github:Citolab/qti30Upgrader",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.1",
+    "tsup": "^8.0.1",
+    "tsx": "^4.6.2",
+    "typescript": "^5.2.2",
+    "vitest": "^1.1.0",
+    "xml2js": "^0.6.2"
+  }
+}
