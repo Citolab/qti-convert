@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import { writeFileSync } from 'fs';
 import { createAssessmentTest } from '../qti-helper';
 

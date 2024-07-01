@@ -16,10 +16,10 @@
   "version": "0.2.0",
   "type": "module",
   "bin": {
-    "qti-convert-pkg": "./dist/qti-convert-pkg.mjs",
-    "qti-convert-folder": "./dist/qti-convert-folder.mjs",
-    "qti-create-manifest": "./dist/qti-package-manifest.mjs",
-    "qti-create-assessment": "./dist/qti-package-assessment.mjs"
+    "qti-convert-pkg": "dist/qti-convert-pkg.mjs",
+    "qti-convert-folder": "dist/qti-convert-folder.mjs",
+    "qti-create-manifest": "dist/qti-package-manifest.mjs",
+    "qti-create-assessment": "dist/qti-package-assessment.mjs"
   },
   "exports": {
     "./qti-convert": "./dist/qti-converter/index.js",
