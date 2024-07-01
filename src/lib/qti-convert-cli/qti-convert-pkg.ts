@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import { convertPackageFile } from '../qti-converter/converter/package-converter';
 
 const pkg = process.argv[2];

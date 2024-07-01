@@ -24,7 +24,7 @@ The following commands can be used:
 #### Converting a zip file
 
 ```sh
-    npx @citolab\qti-convert qti-convert-pkg yourpackage.zip
+    npx @citolab/qti-convert qti-convert-pkg yourpackage.zip
 ```
 
 Should have a qti2.x zip file as input parameter.
@@ -33,7 +33,7 @@ It will create a qti3 zip file in the same folder call yourpackage-qti3.zip
 #### Converting a folder
 
 ```sh
-    npx @citolab\qti-convert qti-convert-folder yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
+    npx @citolab/qti-convert qti-convert-folder yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
 ```
 
 Should have the path to a folder as input parameter. This folder should contain the content of a qti.2x package
@@ -42,7 +42,7 @@ It will convert all files inside the folder and copy the converted files to a ne
 #### Creating an assessment test
 
 ```sh
-    npx @citolab\qti-convert qti-create-assessment yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
+    npx @citolab/qti-convert qti-create-assessment yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
 ```
 
 I you have 1 single item but no assessment test, this command will create a assessment test that contains all the items that are in the foldername.
@@ -53,7 +53,7 @@ Should have the path to a folder as input parameter. This folder should contain 
 #### Creating or updating an manifest
 
 ```sh
-    npx @citolab\qti-convert qti-create-manifest yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
+    npx @citolab/qti-convert qti-create-manifest yourfolder (e.g c:\users\you\qti-folder or /Users/you/qti-folder)
 ```
 
 This will create of update an existing manifest. It will look into the directory and search for all items, tests and resources.

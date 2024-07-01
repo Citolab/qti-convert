@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import { existsSync, mkdirSync } from 'fs';
 import { convertPackageFolder } from '../qti-converter';
 
