@@ -130,7 +130,11 @@ export const createOrCompleteManifest = async (foldername: string) => {
       }
     }
   }
-  const xmlString = $manifestXml.xml();
+  let xmlString = $manifestXml.xml();
+  // Remove the BOM character if it exists: https://github.com/cheeriojs/cheerio/issues/1117
+  if (xmlString.startsWith('&#xfeff;')) {
+    xmlString = xmlString.replace('&#xfeff;', '');
+  }
   const formattedXML = xmlFormat(xmlString, {
     indentation: '  ',
     collapseContent: true,
