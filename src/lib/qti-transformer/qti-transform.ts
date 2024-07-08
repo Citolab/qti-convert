@@ -13,6 +13,8 @@ import {
 } from './transformers';
 import { stripStylesheets } from './transformers/strip-stylesheets';
 
+export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
+
 // Define the types for the API methods
 interface QtiTransformAPI {
   fnCh(fn: (xmlString: cheerio.CheerioAPI) => void): QtiTransformAPI;
