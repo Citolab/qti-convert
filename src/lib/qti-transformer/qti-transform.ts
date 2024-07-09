@@ -10,9 +10,9 @@ import {
   qbCleanup,
   minChoicesToOne,
   externalScored,
-  changeAssetLocation,
-  stripStylesheets
+  changeAssetLocation
 } from './transformers';
+import { stripStylesheets } from './transformers/strip-stylesheets';
 
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
