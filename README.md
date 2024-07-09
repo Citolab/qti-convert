@@ -194,7 +194,7 @@ convertPackageFolder(
 To use the qtiTransform function, import it and pass a QTI XML string. The returned API allows you to chain various transformation methods. There are some built-in functions but you can also create your own functions and chain these
 
 ```ts
-import { qtiTransform } from '@citolab/qti-convert/qti-transform';
+import { qtiTransform } from '@citolab/qti-convert/qti-transformer';
 
 const qtiXml = '<qti-assessment-item ...>...</qti-assessment-item>';
 const transformedXml = qtiTransform(qtiXml).stripStylesheets().objectToImg().customTypes().xml();

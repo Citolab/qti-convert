@@ -14,6 +14,8 @@ import {
 import { stripStylesheets } from './transformers/strip-stylesheets';
 import { changeAssetLocation } from './transformers/change-asset-location';
 
+export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
+
 // Define the types for the API methods
 interface QtiTransformAPI {
   fnCh(fn: (xmlString: cheerio.CheerioAPI) => void): QtiTransformAPI;
