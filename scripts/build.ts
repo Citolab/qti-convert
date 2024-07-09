@@ -31,7 +31,7 @@ const cliOptions = {
     './src/lib/qti-convert-cli/qti-convert-folder.ts',
     './src/lib/qti-convert-cli/qti-package-manifest.ts',
     './src/lib/qti-convert-cli/qti-package-assessment.ts',
-    './src/lib/qti-convert-cli/qti-strip-media.ts'
+    './src/lib/qti-convert-cli/qti-strip-media-pkg.ts'
   ],
   splitting: true,
   bundle: true,
