@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
 import { qtiTransform } from '../../qti-transform';
-import { areXmlEqual } from '../utils';
+import { areXmlEqual } from '../utils-node-only';
 import { externalScored } from '.';
 
 const xml = String.raw;
