@@ -42,6 +42,7 @@ It will convert all files inside the folder and copy the converted files to a ne
 #### Removing media files
 
 For test purposes it must sometimes be helpfull to remove large files from your qti-package.
+This works on both qti2x as qti3. It will create a new zip file called: {orginal-name}-stripped.zip
 
 ```sh
    npx -p=@citolab/qti-convert qti-strip-media-pkg yourpackage.zip
