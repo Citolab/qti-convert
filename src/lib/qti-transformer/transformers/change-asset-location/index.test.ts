@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { qtiTransform } from '../../qti-transform';
-import { areXmlEqual } from '../utils';
+import { areXmlEqual } from '../utils-node-only';
 
 const xml = String.raw;
 
