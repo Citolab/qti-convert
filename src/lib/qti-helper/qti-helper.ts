@@ -252,12 +252,12 @@ export const removeMediaFromPackage = async (
     } else if (filter === 'audio' || filter === 'video' || filter === 'image') {
       allFilesToRemove.push(...allMediaFiles.filter(file => file.type === filter).map(file => file.name));
     } else if (filter.startsWith('.')) {
-      filesToRemove.push(
+      allFilesToRemove.push(
         ...allMediaFiles.filter(file => path.extname(file.name).toLowerCase() === filter).map(file => file.name)
       );
     }
   });
-  const filesToRemove = [...new Set(allFilesToRemove)];
+  const filesToRemove = [...new Set(allFilesToRemove)].map(f => path.basename(f));
   const archive = archiver('zip', {
     zlib: { level: 9 }
   });
@@ -290,11 +290,19 @@ export const removeMediaFromPackage = async (
         ) {
           const fileTypesThatCannotBeReplaced = ['.css', '.xsd'];
           let contentText = formattedXML;
-          if (fileTypesThatCannotBeReplaced.includes(fileType)) {
-            contentText = removeReferencedTags(formattedXML, filesToRemove);
-          } else {
-            contentText = replaceReferencedTags(formattedXML, filesToRemove);
+          const filesToBeReplaced = filesToRemove.filter(
+            file => !fileTypesThatCannotBeReplaced.includes(path.extname(file))
+          );
+          const filesToBeRemoved = filesToRemove.filter(file =>
+            fileTypesThatCannotBeReplaced.includes(path.extname(file))
+          );
+          if (filesToBeReplaced.length > 0) {
+            contentText = replaceReferencedTags(formattedXML, filesToBeReplaced);
           }
+          if (filesToBeRemoved.length > 0) {
+            contentText = removeReferencedTags(formattedXML, filesToBeRemoved);
+          }
+
           archive.append(contentText, { name: entryName });
         } else if ($(`manifest`).length > 0) {
           const contentText = removeReferencedTags($.xml(), filesToRemove);
