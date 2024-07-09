@@ -24,3 +24,12 @@ export async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> 
     return false;
   }
 }
+
+export function removeDoubleSlashes(str: string) {
+  const singleForwardSlashes = str
+    .replace(/([^:]\/)\/+/g, '$1')
+    .replace(/\/\//g, '/')
+    .replace('http:/', 'http://')
+    .replace('https:/', 'https://');
+  return singleForwardSlashes;
+}

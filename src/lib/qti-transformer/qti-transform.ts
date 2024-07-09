@@ -12,6 +12,7 @@ import {
   externalScored
 } from './transformers';
 import { stripStylesheets } from './transformers/strip-stylesheets';
+import { changeAssetLocation } from './transformers/change-asset-location';
 
 // Define the types for the API methods
 interface QtiTransformAPI {
@@ -20,6 +21,11 @@ interface QtiTransformAPI {
   mathml(): QtiTransformAPI;
   objectToVideo(): QtiTransformAPI;
   objectToImg(): QtiTransformAPI;
+  changeAssetLocation(
+    getNewUrl: (oldUrl: string) => string,
+    srcAttribute?: string[],
+    skipBase64?: boolean
+  ): QtiTransformAPI;
   stripStylesheets(): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
@@ -58,6 +64,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     objectToImg() {
       objectToImg($);
+      return api;
+    },
+    changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true) {
+      changeAssetLocation($, getNewUrl, srcAttribute, skipBase64);
       return api;
     },
     stripStylesheets() {

@@ -1,6 +1,5 @@
 import { convertQti2toQti3 } from '../index';
 import { expect, test } from 'vitest';
-
 import * as xml2js from 'xml2js';
 
 async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {

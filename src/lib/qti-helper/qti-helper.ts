@@ -1,6 +1,10 @@
 import * as cheerio from 'cheerio';
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'fs';
+import { createReadStream, existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import xmlFormat from 'xml-formatter';
+import unzipper from 'unzipper';
+import path, { basename, extname } from 'path';
+import archiver from 'archiver';
+import { cleanXMLString } from '../qti-converter';
 
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -72,6 +76,250 @@ export const getAllResourcesRecursively = (allResouces: QtiResource[], foldernam
   } catch (error) {
     console.log(error);
   }
+};
+
+const getMediaTypeByExtension = (extension: string): 'audio' | 'video' | 'image' | 'unknown' => {
+  switch (extension.replace('.', '')) {
+    case 'mp3':
+    case 'wav':
+    case 'ogg':
+    case 'aac':
+    case 'flac':
+    case 'amr':
+    case 'wma':
+    case '3gp':
+      return 'audio';
+    case 'mp4':
+    case 'avi':
+    case 'mov':
+    case 'mkv':
+    case 'webm':
+    case 'flv':
+    case '3gpp':
+      return 'video';
+    case 'jpg':
+    case 'png':
+    case 'tiff':
+    case 'gif':
+    case 'jpeg':
+    case 'bmp':
+    case 'svg':
+      return 'image';
+    default:
+      return 'unknown';
+  }
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function listAllContent(zipStream: unzipper.ParseStream) {
+  const nonXMLFiles: {
+    type: 'audio' | 'video' | 'image' | 'unknown';
+    extension: string;
+    name: string;
+    sizeKb: number;
+  }[] = [];
+
+  for await (const entry of zipStream) {
+    const entryName = entry.path;
+    const fileType = extname(entryName);
+
+    if (fileType !== '.xml') {
+      const fileSizeKb = entry.vars.uncompressedSize / 1024; // File size in kilobytes
+      nonXMLFiles.push({
+        type: getMediaTypeByExtension(entryName),
+        name: entryName,
+        extension: fileType,
+        sizeKb: +fileSizeKb.toFixed(2) // Convert to 2 decimal places
+      });
+    } else {
+      try {
+        const content = await entry.buffer();
+        const $ = cheerio.load(cleanXMLString(content.toString('utf8')), { xmlMode: true, xml: true });
+        if (
+          $('qti-assessment-item').length > 0 ||
+          $('assessmentItem').length > 0 ||
+          $('qti-assessment-test').length > 0 ||
+          $('assessmentTest').length > 0
+        ) {
+          const attributes = qtiReferenceAttributes;
+          for (const attribute of attributes) {
+            for (const node of $(`[${attribute}]`)) {
+              const srcValue = $(node).attr(attribute)!;
+              if (srcValue) {
+                const filename = basename(srcValue);
+                const extension = extname(srcValue);
+                nonXMLFiles.push({
+                  type: getMediaTypeByExtension(extension),
+                  name: filename,
+                  extension,
+                  sizeKb: 0 // Convert to 2 decimal places
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // Do nothing
+      }
+    }
+    entry.autodrain();
+  }
+
+  return nonXMLFiles;
+}
+
+function removeReferencedTags(xmlContent: string, removedFiles: string[]) {
+  return findReferencedTags(xmlContent, removedFiles, node => {
+    node.remove();
+  });
+}
+
+function getAncestorWithTagName(
+  element: cheerio.Cheerio<cheerio.AnyNode>,
+  tagNames: string[]
+): cheerio.Cheerio<cheerio.Element> {
+  let parent = element.parent();
+  while (parent.length > 0) {
+    const tagName = parent[0].tagName.toLowerCase();
+    if (tagNames.includes(tagName)) {
+      return parent;
+    }
+    parent = parent.parent();
+  }
+  return null;
+}
+
+function replaceReferencedTags(xmlContent: string, removedFiles: string[]) {
+  return findReferencedTags(xmlContent, removedFiles, (node, removedFile) => {
+    const base64SVG = createBase64SVGPlaceholder(removedFile);
+    const mediaInteraction = getAncestorWithTagName(node, ['qti-media-interaction', 'mediaInteraction']);
+    const elementToReplace = mediaInteraction || node;
+    elementToReplace.replaceWith(`<img src="${base64SVG}" alt="File: ${removedFile} removed"/>`);
+  });
+}
+
+function findReferencedTags(
+  xmlContent: string,
+  removedFiles: string[],
+  handleFoundNode: (node: cheerio.Cheerio<cheerio.AnyNode>, removedFile: string) => void
+) {
+  // Load the XML content
+  const $ = cheerio.load(xmlContent, { xmlMode: true });
+
+  // Iterate through each node
+  $('*').each(function (i, node) {
+    const attributes = (node as cheerio.Element)?.attribs || [];
+    // Check each attribute of the node
+    for (const attr in attributes) {
+      // Check if the attribute value ends with any of the removed file names
+      const value = attributes[attr];
+      if (removedFiles.some(file => value.endsWith(file))) {
+        const removedFile = removedFiles.find(file => value.endsWith(file));
+        handleFoundNode($(node), removedFile);
+
+        break; // No need to check other attributes of this node
+      }
+    }
+  });
+  // Return the modified XML content
+  return $.xml();
+}
+
+// Function to create a Base64-encoded SVG placeholder
+function createBase64SVGPlaceholder(fileName: string): string {
+  const svgPlaceholder = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="200" height="50">
+      <rect width="200" height="50" style="fill:lightgray;stroke-width:1;stroke:gray" />
+      <text x="10" y="25" fill="red">File: ${fileName} removed</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;base64,${Buffer.from(svgPlaceholder).toString('base64')}`;
+}
+
+export const removeMediaFromPackage = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  unzipStream: any,
+  outputFileName: string,
+  filters: string[]
+) => {
+  let zipStream = createReadStream(unzipStream).pipe(unzipper.Parse({ forceStream: true }));
+  const allMediaFiles = await listAllContent(zipStream);
+  const allFilesToRemove: string[] = [];
+  filters.forEach(filter => {
+    if (filter.toLocaleLowerCase().endsWith('kb') || filter.toLocaleLowerCase().endsWith('mb')) {
+      const sizeInKb = filter.toLocaleLowerCase().endsWith('mb') ? +filter.slice(0, -2) * 1024 : +filter.slice(0, -2);
+      allFilesToRemove.push(...allMediaFiles.filter(file => file.sizeKb > sizeInKb).map(file => file.name));
+    } else if (filter === 'audio' || filter === 'video' || filter === 'image') {
+      allFilesToRemove.push(...allMediaFiles.filter(file => file.type === filter).map(file => file.name));
+    } else if (filter.startsWith('.')) {
+      filesToRemove.push(
+        ...allMediaFiles.filter(file => path.extname(file.name).toLowerCase() === filter).map(file => file.name)
+      );
+    }
+  });
+  const filesToRemove = [...new Set(allFilesToRemove)];
+  const archive = archiver('zip', {
+    zlib: { level: 9 }
+  });
+  const outputBuffers: Buffer[] = [];
+  // Collect data chunks in an array of buffers
+  archive.on('data', chunk => {
+    outputBuffers.push(chunk);
+  });
+  // create a new one to loop, otherwise it will not work
+  zipStream = createReadStream(unzipStream).pipe(unzipper.Parse({ forceStream: true }));
+  for await (const entry of zipStream) {
+    const entryName = entry.path;
+    const fileType = path.extname(entryName);
+    const basename = path.basename(entryName);
+    if (fileType === '.xml') {
+      const content = await entry.buffer();
+      const contentText = cleanXMLString(content.toString('utf8'));
+      const formattedXML = xmlFormat(contentText, {
+        indentation: '  ',
+        collapseContent: true,
+        lineSeparator: '\n'
+      });
+      try {
+        const $ = cheerio.load(formattedXML, { xmlMode: true, xml: true });
+        if (
+          $(`assessmentItem`).length > 0 ||
+          $(`qti-assessment-item`).length > 0 ||
+          $(`assessmentTest`).length > 0 ||
+          $(`qti-assessment-test`).length > 0
+        ) {
+          const fileTypesThatCannotBeReplaced = ['.css', '.xsd'];
+          let contentText = formattedXML;
+          if (fileTypesThatCannotBeReplaced.includes(fileType)) {
+            contentText = removeReferencedTags(formattedXML, filesToRemove);
+          } else {
+            contentText = replaceReferencedTags(formattedXML, filesToRemove);
+          }
+          archive.append(contentText, { name: entryName });
+        } else if ($(`manifest`).length > 0) {
+          const contentText = removeReferencedTags($.xml(), filesToRemove);
+          archive.append(contentText, { name: entryName });
+        } else {
+          archive.append(formattedXML, { name: entryName });
+        }
+      } catch {
+        // ignore
+      }
+    } else if (filesToRemove.includes(basename)) {
+      console.log(`File: ${entryName} removed`);
+      // do nothing
+    } else {
+      const content = await entry.buffer();
+      archive.append(content, { name: entryName });
+    }
+    entry.autodrain();
+  }
+  // Finalize the archive
+  await archive.finalize();
+
+  // Combine the collected data chunks into a single buffer
+  const outputBuffer = Buffer.concat(outputBuffers);
+  writeFileSync(outputFileName, outputBuffer);
 };
 
 export const createOrCompleteManifest = async (foldername: string) => {

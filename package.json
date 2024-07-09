@@ -19,7 +19,8 @@
     "qti-convert-pkg": "./dist/qti-convert-pkg.mjs",
     "qti-convert-folder": "./dist/qti-convert-folder.mjs",
     "qti-create-manifest": "./dist/qti-package-manifest.mjs",
-    "qti-create-assessment": "./dist/qti-package-assessment.mjs"
+    "qti-create-assessment": "./dist/qti-package-assessment.mjs",
+    "qti-strip-media-pkg": "./dist/qti-strip-media-pkg.mjs"
   },
   "exports": {
     "./qti-convert": "./dist/qti-converter/index.js",
@@ -52,6 +53,7 @@
     "qti-convert-folder": "npx qti-convert-folder",
     "qti-package-manifest": "npx qti-create-manifest",
     "qti-package-assessment": "npx qti-create-assessment",
+    "qti-strip-media-pkg": "npx qti-strip-media-pkg",
     "----dev----": "",
     "test": "vitest",
     "test:output": "jest --json --outputFile=.jest-test-results.json",

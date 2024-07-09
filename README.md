@@ -39,6 +39,25 @@ It will create a qti3 zip file in the same folder call yourpackage-qti3.zip
 Should have the path to a folder as input parameter. This folder should contain the content of a qti.2x package
 It will convert all files inside the folder and copy the converted files to a new folder called: yourfolder-qti3
 
+#### Removing media files
+
+For test purposes it must sometimes be helpfull to remove large files from your qti-package.
+
+```sh
+   npx -p=@citolab/qti-convert qti-strip-media-pkg yourpackage.zip
+```
+
+This will remove audio and video by default. But you can specify filetype/file size yourself as well:
+
+```sh
+   npx -p=@citolab/qti-convert qti-strip-media-pkg yourpackage.zip audio,.css,300kb
+```
+
+This will remove all audio file of any known extension, .css files and files larger than 300kb.
+audio,video,images are supported as type, for other files you should add the extension.
+
+Not only the files are remove but the reference in the item/test and manifest will be removed as well. In the item and test if will be replace by an image placeholder that indicates that there is a file removed. css and xsd references will just be deleted just like references in the manifest.
+
 #### Creating an assessment test
 
 ```sh
@@ -211,6 +230,7 @@ The build-in functions that can be chained are:
 - `objectToVideo(): QtiTransformAPI`: Convert `<object>` elements to `<video>` elements..
 - `objectToImg(): QtiTransformAPI`: Convert `<object>` elements to `<img>` elements.
 - `stripStylesheets(): QtiTransformAPI`: Remove all stylesheet references from the XML.
+- `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. Url can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overriden. Also by default you won't get a callback for base64 urls.
 - `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used override default web-components. E.g. `<qti-choice-interaction class="type:custom">` will result in `<qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
 - `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML
 - `qbCleanup(): QtiTransformAPI`: Clean-up for package created with the Quesify Platform
