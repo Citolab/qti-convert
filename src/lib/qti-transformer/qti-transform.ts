@@ -9,10 +9,10 @@ import {
   toMathMLWebcomponents,
   qbCleanup,
   minChoicesToOne,
-  externalScored
+  externalScored,
+  changeAssetLocation,
+  stripStylesheets
 } from './transformers';
-import { stripStylesheets } from './transformers/strip-stylesheets';
-import { changeAssetLocation } from './transformers/change-asset-location';
 
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
