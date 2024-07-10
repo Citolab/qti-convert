@@ -24,6 +24,16 @@ const transformAssetLocation = (xml: string) =>
     })
     .xml();
 
+// const transformAssetLocationAsync = async (xml: string) => {
+//   const transformedResult = await qtiTransform(xml).changeAssetLocation(async url => {
+//     const newUrl = makeAbsolutePath(baseUrl, url);
+//     await new Promise(resolve => setTimeout(resolve, 100));
+//     return newUrl;
+//   });
+
+//   return transformedResult.xml();
+// };
+
 test('transform asset image location', async () => {
   const input = xml`<?xml version="1.0" encoding="UTF-8"?>
         <img type="image/png" width="206" height="280" src="../../images/ukair.png" alt="UK Map" />`;
@@ -32,6 +42,24 @@ test('transform asset image location', async () => {
          <img type="image/png" width="206" height="280" src="https://example.com/images/ukair.png" alt="UK Map" />`;
 
   const result = await transformAssetLocation(input);
+  const areEqual = await areXmlEqual(result, xpect);
+  expect(areEqual).toEqual(true);
+});
+
+test('transform asset image async location', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+        <img type="image/png" width="206" height="280" src="../../images/ukair.png" alt="UK Map" />`;
+
+  const xpect = xml`<?xml version="1.0" encoding="UTF-8"?>
+         <img type="image/png" width="206" height="280" src="https://example.com/images/ukair.png" alt="UK Map" />`;
+
+  const result = (
+    await qtiTransform(input).changeAssetLocationAsync(async (url: string) => {
+      const newUrl = makeAbsolutePath(baseUrl, url);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return newUrl;
+    })
+  ).xml();
   const areEqual = await areXmlEqual(result, xpect);
   expect(areEqual).toEqual(true);
 });

@@ -232,6 +232,7 @@ The build-in functions that can be chained are:
 - `objectToImg(): QtiTransformAPI`: Convert `<object>` elements to `<img>` elements.
 - `stripStylesheets(): QtiTransformAPI`: Remove all stylesheet references from the XML.
 - `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. Url can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overriden. Also by default you won't get a callback for base64 urls.
+- `changeAssetLocationAsync(getNewUrl: (oldUrl: string) => Promise<string>, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Async function of changeAssetLocation
 - `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used override default web-components. E.g. `<qti-choice-interaction class="type:custom">` will result in `<qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
 - `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML
 - `qbCleanup(): QtiTransformAPI`: Clean-up for package created with the Quesify Platform

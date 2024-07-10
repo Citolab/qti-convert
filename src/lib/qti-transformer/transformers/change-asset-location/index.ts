@@ -1,23 +1,39 @@
 import * as cheerio from 'cheerio';
 import { qtiReferenceAttributes } from '../../qti-transform';
 import { removeDoubleSlashes } from '../utils';
-
 export function changeAssetLocation(
   $: cheerio.CheerioAPI,
   getNewUrl: (oldUrl: string) => string,
   srcAttributes = qtiReferenceAttributes,
   skipBase64 = true
 ) {
+  changeLocation($, getNewUrl, srcAttributes, skipBase64);
+}
+
+export async function changeAssetLocationAsync(
+  $: cheerio.CheerioAPI,
+  getNewUrlAsync: (oldUrl: string) => Promise<string>,
+  srcAttributes = qtiReferenceAttributes,
+  skipBase64 = true
+) {
+  await changeLocation($, getNewUrlAsync, srcAttributes, skipBase64);
+}
+
+async function changeLocation(
+  $: cheerio.CheerioAPI,
+  getNewUrl: ((oldUrl: string) => Promise<string>) | ((oldUrl: string) => string),
+  srcAttributes = qtiReferenceAttributes,
+  skipBase64 = true
+) {
   for (const attribute of srcAttributes) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    $(`[${attribute}]`).each((_: any, node: any) => {
+    for (const node of $(`[${attribute}]`)) {
       // change asset location
       const srcValue = $(node).attr(attribute)!;
       if (!(skipBase64 && srcValue.startsWith('data:'))) {
-        const url = getNewUrl(srcValue);
-        const newSrcValue = removeDoubleSlashes(srcValue.replace(srcValue, url));
-        $(node).attr(attribute, newSrcValue);
+        const urlPromiseOrValue = getNewUrl(srcValue);
+        const newSrcValue = typeof urlPromiseOrValue === 'string' ? urlPromiseOrValue : await urlPromiseOrValue;
+        $(node).attr(attribute, removeDoubleSlashes(newSrcValue));
       }
-    });
+    }
   }
 }

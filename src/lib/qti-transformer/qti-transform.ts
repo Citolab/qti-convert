@@ -11,6 +11,7 @@ import {
   minChoicesToOne,
   externalScored,
   changeAssetLocation,
+  changeAssetLocationAsync,
   stripStylesheets
 } from './transformers';
 
@@ -28,6 +29,11 @@ interface QtiTransformAPI {
     srcAttribute?: string[],
     skipBase64?: boolean
   ): QtiTransformAPI;
+  changeAssetLocationAsync(
+    getNewUrlAsync: (oldUrl: string) => Promise<string>,
+    srcAttribute?: string[],
+    skipBase64?: boolean
+  ): Promise<QtiTransformAPI>;
   stripStylesheets(): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
@@ -70,6 +76,14 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true) {
       changeAssetLocation($, getNewUrl, srcAttribute, skipBase64);
+      return api;
+    },
+    async changeAssetLocationAsync(
+      getNewUrlAsync: (oldUrl: string) => Promise<string>,
+      srcAttribute?: string[],
+      skipBase64 = true
+    ) {
+      await changeAssetLocationAsync($, getNewUrlAsync, srcAttribute, skipBase64);
       return api;
     },
     stripStylesheets() {
