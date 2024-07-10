@@ -229,8 +229,8 @@ function findReferencedTags(
 // Function to create a Base64-encoded SVG placeholder
 function createBase64SVGPlaceholder(fileName: string): string {
   const svgPlaceholder = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="75">
-      <rect width="200" height="50" style="fill:lightgray;stroke-width:1;stroke:gray" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="75">
+      <rect width="300" height="75" style="fill:lightgray;stroke-width:1;stroke:gray" />
       <text x="10" y="25" fill="red"  textLength="380">File: ${fileName} removed</text>
     </svg>
   `;
