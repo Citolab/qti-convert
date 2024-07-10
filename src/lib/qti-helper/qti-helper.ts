@@ -178,6 +178,7 @@ function getAncestorWithTagName(
   element: cheerio.Cheerio<cheerio.AnyNode>,
   tagNames: string[]
 ): cheerio.Cheerio<cheerio.Element> {
+  tagNames = tagNames.map(tagName => tagName.toLowerCase());
   let parent = element.parent();
   while (parent.length > 0) {
     const tagName = parent[0].tagName.toLowerCase();
@@ -189,7 +190,7 @@ function getAncestorWithTagName(
   return null;
 }
 
-function replaceReferencedTags(xmlContent: string, removedFiles: string[]) {
+export function replaceReferencedTags(xmlContent: string, removedFiles: string[]) {
   return findReferencedTags(xmlContent, removedFiles, (node, removedFile) => {
     const base64SVG = createBase64SVGPlaceholder(removedFile);
     const mediaInteraction = getAncestorWithTagName(node, ['qti-media-interaction', 'mediaInteraction']);
@@ -228,9 +229,9 @@ function findReferencedTags(
 // Function to create a Base64-encoded SVG placeholder
 function createBase64SVGPlaceholder(fileName: string): string {
   const svgPlaceholder = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="200" height="50">
+    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="75">
       <rect width="200" height="50" style="fill:lightgray;stroke-width:1;stroke:gray" />
-      <text x="10" y="25" fill="red">File: ${fileName} removed</text>
+      <text x="10" y="25" fill="red"  textLength="380">File: ${fileName} removed</text>
     </svg>
   `;
   return `data:image/svg+xml;base64,${Buffer.from(svgPlaceholder).toString('base64')}`;
