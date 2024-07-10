@@ -231,7 +231,7 @@ function createBase64SVGPlaceholder(fileName: string): string {
   const svgPlaceholder = `
     <svg xmlns="http://www.w3.org/2000/svg" width="300" height="75">
       <rect width="300" height="75" style="fill:lightgray;stroke-width:1;stroke:gray" />
-      <text x="10" y="25" fill="red"  textLength="380">File: ${fileName} removed</text>
+      <text x="10" y="25" fill="red"  textLength="280">File: ${fileName} removed</text>
     </svg>
   `;
   return `data:image/svg+xml;base64,${Buffer.from(svgPlaceholder).toString('base64')}`;
