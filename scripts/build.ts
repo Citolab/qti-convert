@@ -61,7 +61,7 @@ const convertOptions = {
     './src/lib/qti-helper/index.ts'
   ],
   // outDir: 'dist',
-  external: ['cheerio'], // peerdependencies
+  external: ['cheerio', 'saxon-js'], // peerdependencies
   splitting: true,
   define: {
     'process.env.NODE_ENV': command == 'watch' ? '"development"' : '"production"'
