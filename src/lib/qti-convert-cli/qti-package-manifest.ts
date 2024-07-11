@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { writeFileSync } from 'fs';
-import { createOrCompleteManifest } from '../qti-helper';
+import { createOrCompleteManifest } from '../qti-helper-node';
 
 const folderLocation = process.argv[2];
 

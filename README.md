@@ -250,7 +250,11 @@ The `testLoader` function fetches and processes the IMS manifest XML file from a
 
 ### Helper
 
-@citolab/qti-convert/qti-helper provides a set of helper functions for QTI padckages. It includes functions to recursively retrieve QTI resources, create or update IMS manifest files and generate QTI assessment tests.
+@citolab/qti-convert/qti-helper provides a set of helper functions for QTI padckage. E.g. removeMediaFromPackage is a helper to remove media files from a QTI-package
+
+### Helper Node
+
+@citolab/qti-convert/qti-helper-node provides a set of helper functions for QTI padckages. It includes functions to recursively retrieve QTI resources, create or update IMS manifest files and generate QTI assessment tests. These only work in NodeJS and wont work in the browser.
 
 #### Generate an assessement and manifest
 
