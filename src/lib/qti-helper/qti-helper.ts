@@ -1,7 +1,6 @@
 import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import xmlFormat from 'xml-formatter';
-import { saveAs } from 'file-saver';
 
 const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -133,7 +132,6 @@ function getAncestorWithTagName(
 export const removeMediaFromPackage = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   file: any,
-  outputFileName = 'output.zip',
   filters = ['audio', 'video']
 ) => {
   const zip = await JSZip.loadAsync(file);
@@ -202,13 +200,14 @@ export const removeMediaFromPackage = async (
         console.error(e);
       }
     } else if (!filesToRemove.includes(basename)) {
-      const content = await zipEntry.async('blob');
-      newZip.file(relativePath, content);
+      newZip.file(relativePath, zipEntry.nodeStream());
+      // const content = await zipEntry.async('blob');
+      // newZip.file(relativePath, content);
     }
   }
 
   const outputBlob = await newZip.generateAsync({ type: 'blob' });
-  saveAs(outputBlob, outputFileName);
+  return outputBlob;
 };
 
 function removeReferencedTags(xmlContent: string, removedFiles: string[]) {
@@ -244,6 +243,15 @@ function findReferencedTags(
       if (removedFiles.some(file => value.endsWith(file))) {
         const removedFile = removedFiles.find(file => value.endsWith(file));
         if (removedFile) {
+          if (node.type === 'tag' && node.name === 'resource') {
+            const identfier = $(node).attr('identifier');
+            const dependencies = $(`dependency[identifierref="${identfier}"]`);
+            if (dependencies.length > 0) {
+              for (const dependency of dependencies) {
+                handleFoundNode($(dependency), removedFile);
+              }
+            }
+          }
           handleFoundNode($(node), removedFile);
         }
 
