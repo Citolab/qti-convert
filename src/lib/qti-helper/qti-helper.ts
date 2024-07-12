@@ -200,7 +200,15 @@ export const removeMediaFromPackage = async (
         console.error(e);
       }
     } else if (!filesToRemove.includes(basename)) {
-      newZip.file(relativePath, zipEntry.nodeStream());
+      // check if we are inside nodejs or in the browser
+      if (typeof zipEntry.nodeStream === 'function') {
+        newZip.file(relativePath, zipEntry.nodeStream());
+      } else {
+        const content = await zipEntry.async('blob');
+        newZip.file(relativePath, content);
+      }
+
+      // newZip.file(relativePath, zipEntry.nodeStream());
       // const content = await zipEntry.async('blob');
       // newZip.file(relativePath, content);
     }
