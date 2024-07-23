@@ -35,6 +35,19 @@ export function qbCleanup($: cheerio.CheerioAPI) {
         $element.remove();
       }
     });
+
+    $('qti-rubric-block > qti-content-body div').each(function() {
+      const innerHtml = $(this).html().trim();
+      const textContent = $(this).text().trim();
+
+      if (!textContent || textContent === '&nbsp;' || innerHtml === '<br/>') {
+          $(this).remove();
+      } else {
+        if ($(this).contents().first().is('br')) {
+          $(this).contents().first().remove();
+        }
+      }
+    }); 
   }
 
   // $('div:has(qti-extended-text-interaction)').contents().unwrap();
