@@ -54,7 +54,7 @@ test('convert dep dialog to html popover', async () => {
 
   const result = await qtiTransform(qti).depConvert().xml();
   const $newQti = cheerio.load(result, { xmlMode: true, xml: true });
-  console.log(result);
+
   const triggerParent = $newQti('.dep-dialogTrigger').parent();
 
   expect(triggerParent.is('button')).toEqual(true);
