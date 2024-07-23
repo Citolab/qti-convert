@@ -8,6 +8,7 @@ import {
   suffixa,
   toMathMLWebcomponents,
   qbCleanup,
+  depConvert,
   minChoicesToOne,
   externalScored,
   changeAssetLocation,
@@ -38,6 +39,7 @@ interface QtiTransformAPI {
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
   qbCleanup(): QtiTransformAPI;
+  depConvert(): QtiTransformAPI;
   minChoicesToOne(): QtiTransformAPI;
   suffix(elements: string[], suffix: string): QtiTransformAPI;
   externalScored(): QtiTransformAPI;
@@ -100,6 +102,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     qbCleanup() {
       qbCleanup($);
+      return api;
+    },
+    depConvert() {
+      depConvert($);
       return api;
     },
     minChoicesToOne() {

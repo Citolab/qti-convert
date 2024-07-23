@@ -2,7 +2,6 @@ import { expect, test } from 'vitest';
 
 import { qtiTransform } from '../../qti-transform';
 import { areXmlEqual } from '../utils-node-only';
-import { qbCleanup } from '.';
 
 const xml = String.raw;
 test('cleanup QB qti', async () => {
@@ -86,7 +85,7 @@ test('cleanup QB qti', async () => {
     </div>
 </qti-item-body>
 `;
-  const result = await qtiTransform(input).fnCh(qbCleanup).xml();
+  const result = await qtiTransform(input).qbCleanup().xml();
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
