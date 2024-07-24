@@ -11,7 +11,7 @@ export const depConvert = ($: cheerio.CheerioAPI) => {
       const button = $(`<button popovertarget="${ref}">${triggerContent}</button>`);
       $(dialogTrigger).replaceWith(button);
       const dialog = $(`#${ref}`);
-      dialog.attr('popover', ref);
+      dialog.attr('popover', '');
     }
   }
 };
