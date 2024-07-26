@@ -89,3 +89,128 @@ test('cleanup QB qti', async () => {
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
+
+test('reset variables', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-assessment-item>
+  <qti-item-body class="defaultBody" xml:lang="nl-NL">
+   <div class="content">
+    </div>
+</qti-item-body>
+ <qti-response-processing>
+    <qti-set-outcome-value identifier="RAW_SCORE">
+      <qti-base-value base-type="integer">0</qti-base-value>
+    </qti-set-outcome-value>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-member>
+          <qti-base-value base-type="directedPair">y_A x_1</qti-base-value>
+          <qti-variable identifier="RESPONSE" />
+        </qti-member>
+        <qti-set-outcome-value identifier="RAW_SCORE">
+          <qti-sum>
+            <qti-base-value base-type="integer">1</qti-base-value>
+            <qti-variable identifier="RAW_SCORE" />
+          </qti-sum>
+        </qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-member>
+          <qti-base-value base-type="directedPair">y_B x_2</qti-base-value>
+          <qti-variable identifier="RESPONSE" />
+        </qti-member>
+        <qti-set-outcome-value identifier="RAW_SCORE">
+          <qti-sum>
+            <qti-base-value base-type="integer">1</qti-base-value>
+            <qti-variable identifier="RAW_SCORE" />
+          </qti-sum>
+        </qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-member>
+          <qti-base-value base-type="directedPair">y_C x_2</qti-base-value>
+          <qti-variable identifier="RESPONSE" />
+        </qti-member>
+        <qti-set-outcome-value identifier="RAW_SCORE">
+          <qti-sum>
+            <qti-base-value base-type="integer">1</qti-base-value>
+            <qti-variable identifier="RAW_SCORE" />
+          </qti-sum>
+        </qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+    <qti-lookup-outcome-value identifier="SCORE">
+      <qti-variable identifier="RAW_SCORE" />
+    </qti-lookup-outcome-value>
+  </qti-response-processing>
+   </qti-assessment-item>
+`;
+  const expectedOutput = xml`<qti-assessment-item>
+  <qti-item-body xml:lang="nl-NL">
+    <div class="container">
+    </div>
+  </qti-item-body>
+  <qti-response-processing>
+    <qti-set-outcome-value identifier="RAW_SCORE">
+      <qti-base-value base-type="integer">0</qti-base-value>
+    </qti-set-outcome-value>
+    <qti-set-outcome-value identifier="RAW_SCORE">
+      <qti-base-value base-type="integer">0</qti-base-value>
+    </qti-set-outcome-value>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-member>
+          <qti-base-value base-type="directedPair">y_A x_1</qti-base-value>
+          <qti-variable identifier="RESPONSE"/>
+        </qti-member>
+        <qti-set-outcome-value identifier="RAW_SCORE">
+          <qti-sum>
+            <qti-base-value base-type="integer">1</qti-base-value>
+            <qti-variable identifier="RAW_SCORE"/>
+          </qti-sum>
+        </qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-member>
+          <qti-base-value base-type="directedPair">y_B x_2</qti-base-value>
+          <qti-variable identifier="RESPONSE"/>
+        </qti-member>
+        <qti-set-outcome-value identifier="RAW_SCORE">
+          <qti-sum>
+            <qti-base-value base-type="integer">1</qti-base-value>
+            <qti-variable identifier="RAW_SCORE"/>
+          </qti-sum>
+        </qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-member>
+          <qti-base-value base-type="directedPair">y_C x_2</qti-base-value>
+          <qti-variable identifier="RESPONSE"/>
+        </qti-member>
+        <qti-set-outcome-value identifier="RAW_SCORE">
+          <qti-sum>
+            <qti-base-value base-type="integer">1</qti-base-value>
+            <qti-variable identifier="RAW_SCORE"/>
+          </qti-sum>
+        </qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+    <qti-lookup-outcome-value identifier="SCORE">
+      <qti-variable identifier="RAW_SCORE"/>
+    </qti-lookup-outcome-value>
+  </qti-response-processing>
+</qti-assessment-item>
+`;
+  const result = await qtiTransform(input).qbCleanup().xml();
+  console.log(result);
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});
