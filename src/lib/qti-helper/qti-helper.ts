@@ -132,7 +132,8 @@ function getAncestorWithTagName(
 export const removeMediaFromPackage = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   file: any,
-  filters = ['audio', 'video']
+  filters = ['audio', 'video'],
+  onResourceRemoved?: (name: string, fileContent: Blob | NodeJS.ReadableStream) => void
 ) => {
   const zip = await JSZip.loadAsync(file);
   const allMediaFiles = await listAllContent(zip);
@@ -211,9 +212,15 @@ export const removeMediaFromPackage = async (
       // newZip.file(relativePath, zipEntry.nodeStream());
       // const content = await zipEntry.async('blob');
       // newZip.file(relativePath, content);
+    } else if (onResourceRemoved && filesToRemove.includes(basename)) {
+      if (typeof zipEntry.nodeStream === 'function') {
+        onResourceRemoved(relativePath, zipEntry.nodeStream());
+      } else {
+        const content = await zipEntry.async('blob');
+        onResourceRemoved(relativePath, content);
+      }
     }
   }
-
   const outputBlob = await newZip.generateAsync({ type: 'blob' });
   return outputBlob;
 };

@@ -220,7 +220,7 @@ qtiTransform(xmlValue).fnCh($ => {
 Apply an asynchronous function to the XML.
 
 ```ts
-await qtiTransform(xmlValue).fnChAsync(async $ => {
+await(xmlValue).fnChAsync(async $ => {
   // Your custom asynchronous transformation logic
 });
 ```
@@ -234,11 +234,19 @@ The build-in functions that can be chained are:
 - `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. Url can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overriden. Also by default you won't get a callback for base64 urls.
 - `changeAssetLocationAsync(getNewUrl: (oldUrl: string) => Promise<string>, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Async function of changeAssetLocation
 - `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used override default web-components. E.g. `<qti-choice-interaction class="type:custom">` will result in `<qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
+- `customInteraction(baseRef: string, baseItem: string)` Transforms qti-custom-interactions that contain an object tag. Object tag will be removed and attributes will be merged in the qti-custom-interactions tag.
 - `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML
 - `qbCleanup(): QtiTransformAPI`: Clean-up for package created with the Quesify Platform
+- `depConvert(): QtiTransformAPI`: Converts qti from the Dutch Extension Profile. For now only dep-dialog to a html popover. With is basic support for these dialog.
 - `minChoicesToOne(): QtiTransformAPI`: Ensure the minimum number of choices is one.
 - `suffix(elements: string[], suffix: string)`: Add a suffix to specified elements.
 - `externalScored()`: Mark the XML as externally scored.
+
+Other function to get the output of the transformer:
+
+- `xml()`: returns the xml as string
+- `brower.htmlDoc()`: returns a DocumentFragment. Won't work on node.
+- `brower.xmlDoc()`: returns a XMLDocument. Won't work on node.
 
 ### Loader
 

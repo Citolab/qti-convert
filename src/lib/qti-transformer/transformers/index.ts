@@ -4,6 +4,7 @@ export * from './to-math-ml-webcomponents';
 export * from './suffix';
 export * from './custom-types';
 export * from './strip-material-info';
+export * from './dep-convert';
 export * from './qb-cleanup';
 export * from './min-choices-to-one';
 export * from './external-scored';

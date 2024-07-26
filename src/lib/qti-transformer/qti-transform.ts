@@ -8,12 +8,14 @@ import {
   suffixa,
   toMathMLWebcomponents,
   qbCleanup,
+  depConvert,
   minChoicesToOne,
   externalScored,
   changeAssetLocation,
   changeAssetLocationAsync,
   stripStylesheets
 } from './transformers';
+import { customInteraction } from './transformers/custom-interaction';
 
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -29,6 +31,7 @@ interface QtiTransformAPI {
     srcAttribute?: string[],
     skipBase64?: boolean
   ): QtiTransformAPI;
+  customInteraction(baseRef: string, baseItem: string): QtiTransformAPI;
   changeAssetLocationAsync(
     getNewUrlAsync: (oldUrl: string) => Promise<string>,
     srcAttribute?: string[],
@@ -38,10 +41,53 @@ interface QtiTransformAPI {
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
   qbCleanup(): QtiTransformAPI;
+  depConvert(): QtiTransformAPI;
   minChoicesToOne(): QtiTransformAPI;
   suffix(elements: string[], suffix: string): QtiTransformAPI;
   externalScored(): QtiTransformAPI;
   xml(): string;
+  browser: {
+    htmldoc: () => DocumentFragment;
+    xmldoc: () => XMLDocument;
+  };
+}
+const xml = String.raw;
+const xmlToHTML = xml`<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:output method="html" version="5.0" encoding="UTF-8" indent="yes" />
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+
+  <!-- remove existing namespaces -->
+  <xsl:template match="*">
+    <!-- remove element prefix -->
+    <xsl:element name="{local-name()}">
+      <!-- process attributes -->
+      <xsl:for-each select="@*">
+        <!-- remove attribute prefix -->
+        <xsl:attribute name="{local-name()}">
+          <xsl:value-of select="."/>
+        </xsl:attribute>
+      </xsl:for-each>
+    <xsl:apply-templates/>
+  </xsl:element>
+</xsl:template>
+</xsl:stylesheet>`;
+
+function toHTML(xmlFragment: Document): DocumentFragment {
+  const processor = new XSLTProcessor();
+  const xsltDocument = new DOMParser().parseFromString(xmlToHTML, 'text/xml');
+  processor.importStylesheet(xsltDocument);
+  const itemHTMLFragment = processor.transformToFragment(xmlFragment, document);
+  return itemHTMLFragment;
+}
+
+function parseXML(xmlDocument: string) {
+  const parser = new DOMParser();
+  const xmlFragment = parser.parseFromString(xmlDocument, 'text/xml');
+  return xmlFragment;
 }
 
 export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
@@ -94,12 +140,20 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       customTypes($);
       return api;
     },
+    customInteraction(baseRef: string, baseItem: string) {
+      customInteraction($, baseRef, baseItem);
+      return api;
+    },
     stripMaterialInfo() {
       stripMaterialInfo($);
       return api;
     },
     qbCleanup() {
       qbCleanup($);
+      return api;
+    },
+    depConvert() {
+      depConvert($);
       return api;
     },
     minChoicesToOne() {
@@ -126,6 +180,16 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
         lineSeparator: '\n'
       });
       return formattedXML;
+    },
+    browser: {
+      htmldoc() {
+        const xmlFragment = parseXML($.html());
+        return toHTML(xmlFragment);
+      },
+      xmldoc(): XMLDocument {
+        const xmlFragment = parseXML($.html());
+        return xmlFragment;
+      }
     }
   };
   return api;
