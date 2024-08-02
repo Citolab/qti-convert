@@ -5,6 +5,7 @@ import {
   customTypes,
   objectToImg,
   objectToVideo,
+  objectToAudio,
   suffixa,
   toMathMLWebcomponents,
   qbCleanup,
@@ -25,6 +26,7 @@ interface QtiTransformAPI {
   fnChAsync(fn: (xmlString: cheerio.CheerioAPI) => Promise<void>): Promise<QtiTransformAPI>;
   mathml(): QtiTransformAPI;
   objectToVideo(): QtiTransformAPI;
+  objectToAudio(): QtiTransformAPI;
   objectToImg(): QtiTransformAPI;
   changeAssetLocation(
     getNewUrl: (oldUrl: string) => string,

@@ -1,5 +1,6 @@
 export * from './object-to-img';
 export * from './object-to-video';
+export * from './object-to-audio';
 export * from './to-math-ml-webcomponents';
 export * from './suffix';
 export * from './custom-types';
