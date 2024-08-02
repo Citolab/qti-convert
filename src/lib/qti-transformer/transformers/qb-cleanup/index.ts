@@ -46,6 +46,9 @@ export function qbCleanup($: cheerio.CheerioAPI) {
         if ($(this).contents().first().is('br')) {
           $(this).contents().first().remove();
         }
+        if ($(this).contents().last().is('br')) {
+          $(this).contents().last().remove();
+        }
       }
     });
     // reset scores before response processing
