@@ -229,6 +229,7 @@ The build-in functions that can be chained are:
 
 - `mathml(): QtiTransformAPI`: Convert MathML elements to web components.
 - `objectToVideo(): QtiTransformAPI`: Convert `<object>` elements to `<video>` elements..
+- `objectToAudio(): QtiTransformAPI`: Convert `<object>` elements to `<audio>` elements..
 - `objectToImg(): QtiTransformAPI`: Convert `<object>` elements to `<img>` elements.
 - `stripStylesheets(): QtiTransformAPI`: Remove all stylesheet references from the XML.
 - `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. Url can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overriden. Also by default you won't get a callback for base64 urls.

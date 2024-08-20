@@ -118,6 +118,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       objectToVideo($);
       return api;
     },
+    objectToAudio() {
+      objectToAudio($);
+      return api;
+    },
     objectToImg() {
       objectToImg($);
       return api;
