@@ -43,6 +43,7 @@ interface QtiTransformAPI {
     skipBase64?: boolean
   ): Promise<QtiTransformAPI>;
   configurePciAsync(
+    baseUrl: string,
     getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
   ): Promise<QtiTransformAPI>;
   stripStylesheets(): QtiTransformAPI;
@@ -144,8 +145,11 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       await changeAssetLocationAsync($, getNewUrlAsync, srcAttribute, skipBase64);
       return api;
     },
-    async configurePciAsync(getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>) {
-      await configurePciAsync($, getModuleResolutionConfig);
+    async configurePciAsync(
+      baseUrl: string,
+      getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
+    ) {
+      await configurePciAsync($, baseUrl, getModuleResolutionConfig);
       return api;
     },
     stripStylesheets() {

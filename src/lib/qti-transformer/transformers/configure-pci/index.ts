@@ -17,9 +17,10 @@ export interface ModuleResolutionConfig {
 
 export async function configurePciAsync(
   $: cheerio.CheerioAPI,
+  baseUrl: string,
   getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
 ) {
-  await configurePCI($, getModuleResolutionConfig);
+  await configurePCI($, baseUrl, getModuleResolutionConfig);
   return $;
 }
 
@@ -28,6 +29,7 @@ export async function configurePciAsync(
 // Also, if there are multiple pci's with the same custom-interaction-type-identifier we'll make them unique.
 async function configurePCI(
   $: cheerio.CheerioAPI,
+  baseUrl: string,
   getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
 ) {
   const customInteractionTypeIdentifiers: string[] = [];
@@ -36,6 +38,8 @@ async function configurePCI(
   const moduleResolutionFallbackConfig = await getModuleResolutionConfig('/modules/fallback_module_resolution.js');
   if (portableCustomInteractions.length > 0) {
     for (const interaction of portableCustomInteractions) {
+      // set data-base-url
+      $(interaction).attr('data-base-url', baseUrl);
       let customInteractionTypeIdentifier = $(interaction).attr('custom-interaction-type-identifier');
       if (customInteractionTypeIdentifiers.includes(customInteractionTypeIdentifier)) {
         customInteractionTypeIdentifier = customInteractionTypeIdentifier + customInteractionTypeIdentifiers.length;
