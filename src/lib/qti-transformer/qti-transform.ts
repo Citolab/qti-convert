@@ -20,6 +20,7 @@ import {
 import { customInteraction } from './transformers/custom-interaction';
 import { ModuleResolutionConfig } from './transformers/configure-pci';
 
+export { type ModuleResolutionConfig } from './transformers/configure-pci';
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
 // Define the types for the API methods
