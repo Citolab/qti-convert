@@ -10,4 +10,5 @@ export * from './qb-cleanup';
 export * from './min-choices-to-one';
 export * from './external-scored';
 export * from './change-asset-location';
+export * from './configure-pci';
 export * from './strip-stylesheets';

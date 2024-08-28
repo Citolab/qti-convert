@@ -8,6 +8,7 @@ export function changeAssetLocation(
   skipBase64 = true
 ) {
   changeLocation($, getNewUrl, srcAttributes, skipBase64);
+  return $;
 }
 
 export async function changeAssetLocationAsync(
@@ -17,6 +18,7 @@ export async function changeAssetLocationAsync(
   skipBase64 = true
 ) {
   await changeLocation($, getNewUrlAsync, srcAttributes, skipBase64);
+  return $;
 }
 
 async function changeLocation(

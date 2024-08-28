@@ -14,9 +14,11 @@ import {
   externalScored,
   changeAssetLocation,
   changeAssetLocationAsync,
+  configurePciAsync,
   stripStylesheets
 } from './transformers';
 import { customInteraction } from './transformers/custom-interaction';
+import { ModuleResolutionConfig } from './transformers/configure-pci';
 
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -38,6 +40,9 @@ interface QtiTransformAPI {
     getNewUrlAsync: (oldUrl: string) => Promise<string>,
     srcAttribute?: string[],
     skipBase64?: boolean
+  ): Promise<QtiTransformAPI>;
+  configurePciAsync(
+    getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
   ): Promise<QtiTransformAPI>;
   stripStylesheets(): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
@@ -136,6 +141,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       skipBase64 = true
     ) {
       await changeAssetLocationAsync($, getNewUrlAsync, srcAttribute, skipBase64);
+      return api;
+    },
+    async configurePciAsync(getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>) {
+      await configurePciAsync($, getModuleResolutionConfig);
       return api;
     },
     stripStylesheets() {
