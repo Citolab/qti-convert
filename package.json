@@ -54,6 +54,8 @@
     "qti-convert-folder": "npx qti-convert-folder",
     "qti-package-manifest": "npx qti-create-manifest",
     "qti-package-assessment": "npx qti-create-assessment",
+    "qti-package": "npx qti-create-package",
+    "qti-package-per-item": "npx qti-create-package-per-item",
     "qti-strip-media-pkg": "npx qti-strip-media-pkg",
     "----dev----": "",
     "test": "vitest",

@@ -68,7 +68,7 @@ Not only the files are remove but the reference in the item/test and manifest wi
 I you have a directory with one or more items but no assessment test, this command will create a assessment test that contains all the items that are in the foldername.
 It will override an existing assessment that's callled test.xml.
 
-Should have the path to a folder as input parameter. This folder should contain the content of a qti3 package
+Should have the path to a folder as input parameter. This folder should contain the content of a qti3 or qti2x package
 
 #### Creating or updating an manifest
 
@@ -77,7 +77,23 @@ Should have the path to a folder as input parameter. This folder should contain 
 ```
 
 This will create or update an existing manifest. It will look into the directory and search for all items, tests and resources.
-Also it will add the resources that are used in an item as a dependency.
+Also it will add the resources that are used in an item as a dependency. This folder should contain the content of a qti3 or qti2x package
+
+#### Creating a package zip
+
+This create a package.zip based on all resources in a manifest. So it you have an existing package and you want to remove some items, you can extract the package.zip, remove the manifest, re-generate a manifest using qti-create-manifest and then run this command. The resources used in only the items you deleted, wont be packaged in the new zip.
+
+```sh
+   npx -p=@citolab/qti-convert qti-create-package yourpackage.zip
+```
+
+#### Creating a package zip per item
+
+This create a package.zip per item, for all items in a folder. The package will be called: package\_{item_title || item_identifer}.zip.
+
+```sh
+   npx -p=@citolab/qti-convert qti-create-package-per-item yourpackage.zip
+```
 
 ## API
 
