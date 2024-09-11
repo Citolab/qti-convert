@@ -6,6 +6,7 @@ import {
   objectToImg,
   objectToVideo,
   objectToAudio,
+  upgradePci,
   suffixa,
   toMathMLWebcomponents,
   qbCleanup,
@@ -46,6 +47,7 @@ interface QtiTransformAPI {
     baseUrl: string,
     getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
   ): Promise<QtiTransformAPI>;
+  upgradePci(): QtiTransformAPI;
   stripStylesheets(): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
@@ -150,6 +152,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
     ) {
       await configurePciAsync($, baseUrl, getModuleResolutionConfig);
+      return api;
+    },
+    upgradePci() {
+      upgradePci($);
       return api;
     },
     stripStylesheets() {

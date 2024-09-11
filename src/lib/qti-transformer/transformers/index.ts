@@ -11,4 +11,5 @@ export * from './min-choices-to-one';
 export * from './external-scored';
 export * from './change-asset-location';
 export * from './configure-pci';
+export * from './upgrade-pci';
 export * from './strip-stylesheets';
