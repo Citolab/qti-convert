@@ -4,6 +4,7 @@ import unzipper from 'unzipper';
 import archiver from 'archiver';
 import { convertQti2toQti3 } from './converter';
 import { copyFileSync, createReadStream, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { qtiTransform } from 'src/lib/qti-transformer';
 
 export const convertManifestFile = ($: cheerio.CheerioAPI) => {
   // Replace schemas
@@ -61,7 +62,19 @@ export async function convertPackageStream(
   convertItem: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $item => {
     if ($item('assessmentItem').length > 0) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
-      $item = cheerio.load(modifiedContent, { xmlMode: true, xml: true });
+      const transform = qtiTransform(modifiedContent);
+      const transformResult = await transform
+        // .stripStylesheets()
+        .objectToImg()
+        .objectToVideo()
+        .objectToAudio()
+        .stripMaterialInfo()
+        .minChoicesToOne()
+        .externalScored()
+        .qbCleanup()
+        .depConvert()
+        .upgradePci();
+      $item = cheerio.load(transformResult.xml(), { xmlMode: true, xml: true });
     }
     return $item;
   }
