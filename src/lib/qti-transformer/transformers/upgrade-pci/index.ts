@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { kebabToDashedNotation } from 'src/lib/qti-helper-node';
 
 export function upgradePci($: cheerio.CheerioAPI) {
   const customInteraction = $('qti-custom-interaction');
@@ -17,7 +18,8 @@ export function upgradePci($: cheerio.CheerioAPI) {
     const key = $(property).attr('key');
     const value = $(property).text();
     if (key && value) {
-      portableCustomInteraction.attr(`data-${key}`, value);
+      const dashedAttribute = kebabToDashedNotation(key);
+      portableCustomInteraction.attr(`data-${dashedAttribute}`, value);
     }
   });
   portableCustomInteraction.find('properties').remove();

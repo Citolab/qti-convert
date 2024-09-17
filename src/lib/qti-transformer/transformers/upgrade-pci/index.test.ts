@@ -23,6 +23,7 @@ test('upgrade tao exported pci', async () => {
                             <property key="colors">red, blue, yellow</property>
                             <property key="width">400</property>
                             <property key="height">400</property>
+                            <property key="kebabCase">true</property>
                         </properties>
                         <modules>
                             <module id="colorProportions/interaction/runtime/js/index"
@@ -57,6 +58,7 @@ test('upgrade tao exported pci', async () => {
                 data-colors="red, blue, yellow"
                 data-width="400"
                 data-height="400"
+                data-kebab-case="true"
                 module="colorProportions"
                 response-identifier="RESPONSE"
                 >
