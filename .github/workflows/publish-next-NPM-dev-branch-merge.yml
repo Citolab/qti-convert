@@ -27,7 +27,7 @@ jobs:
         run: npm ci
 
       - name: Version to prerelease
-        run: npm version prerelease
+        run: npm version prerelease --preid=beta
 
       # Push repository changes
       - name: Push changes to repository
