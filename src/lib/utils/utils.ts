@@ -1,5 +1,10 @@
 import * as cheerio from 'cheerio';
 
+export const kebabToDashedNotation = (input: string): string => {
+  // Use a regular expression to find uppercase letters and replace them with a dash followed by the lowercase equivalent
+  return input.replace(/[A-Z]/g, match => '-' + match.toLowerCase());
+};
+
 export const toDefaultNamespace = ($rootElement: cheerio.CheerioAPI) => {
   const root = $rootElement.root().children().first();
   const rootName = root[0].tagName;

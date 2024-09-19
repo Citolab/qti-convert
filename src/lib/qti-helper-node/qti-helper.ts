@@ -466,11 +466,6 @@ const formatTagByVersion = (tagName: string, version: '3.0' | '2.x') => {
   }
 };
 
-export const kebabToDashedNotation = (input: string): string => {
-  // Use a regular expression to find uppercase letters and replace them with a dash followed by the lowercase equivalent
-  return input.replace(/[A-Z]/g, match => '-' + match.toLowerCase());
-};
-
 const formatAttributesByVersion = (attributes: string, version: '3.0' | '2.x') => {
   if (version === '3.0') {
     return attributes;

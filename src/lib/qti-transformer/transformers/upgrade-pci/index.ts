@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { kebabToDashedNotation } from 'src/lib/qti-helper-node';
+import { kebabToDashedNotation } from 'src/lib/utils/utils';
 
 export function upgradePci($: cheerio.CheerioAPI) {
   const customInteraction = $('qti-custom-interaction');
