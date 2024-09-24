@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import xmlFormat from 'xml-formatter';
+import { Element } from 'domhandler';
 
 const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -114,9 +115,9 @@ async function listAllContent(zip: JSZip) {
 }
 
 function getAncestorWithTagName(
-  element: cheerio.Cheerio<cheerio.AnyNode>,
+  element: cheerio.Cheerio<Element>,
   tagNames: string[]
-): cheerio.Cheerio<cheerio.Element> | null {
+): cheerio.Cheerio<Element> | null {
   tagNames = tagNames.map(tagName => tagName.toLowerCase());
   let parent = element.parent();
   while (parent.length > 0) {
@@ -243,14 +244,15 @@ export function replaceReferencedTags(xmlContent: string, removedFiles: string[]
 function findReferencedTags(
   xmlContent: string,
   removedFiles: string[],
-  handleFoundNode: (node: cheerio.Cheerio<cheerio.AnyNode>, removedFile: string) => void
+  handleFoundNode: (node: cheerio.Cheerio<Element>, removedFile: string) => void
 ) {
   // Load the XML content
   const $ = cheerio.load(xmlContent, { xmlMode: true });
 
   // Iterate through each node
   $('*').each(function (i, node) {
-    const attributes = (node as cheerio.Element)?.attribs || [];
+    const element = $(node);
+    const attributes = (node as Element)?.attribs || [];
     // Check each attribute of the node
     for (const attr in attributes) {
       // Check if the attribute value ends with any of the removed file names
@@ -267,7 +269,7 @@ function findReferencedTags(
               }
             }
           }
-          handleFoundNode($(node), removedFile);
+          handleFoundNode(element as cheerio.Cheerio<Element>, removedFile);
         }
 
         break; // No need to check other attributes of this node

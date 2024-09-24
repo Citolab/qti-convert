@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import { createWriteStream, existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 import xmlFormat from 'xml-formatter';
+import { Element } from 'domhandler';
 
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -110,7 +111,7 @@ export const getAllXmlResourcesRecursivelyWithDependencies = (
   }
 };
 
-function getAttributeFromRawElement(element: cheerio.Element, attributeName: string): string | undefined {
+function getAttributeFromRawElement(element: Element, attributeName: string): string | undefined {
   // Check if the element has attributes and return the requested one if it exists
   return element.attribs ? element.attribs[attributeName] : undefined;
 }
@@ -130,11 +131,7 @@ export const createPackageZipsPerItem = async (foldername: string) => {
     xmlMode: true,
     xml: true
   });
-
-  // const allFiles = $manifestXml('file').toArray();
-  // const packageFile = `${foldername}/package.zip`;
-
-  const items: cheerio.Element[] = [];
+  const items: Element[] = [];
 
   $manifestXml('resource').each((_, element) => {
     const resourceType = $manifestXml(element).attr('type');
