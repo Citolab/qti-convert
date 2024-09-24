@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { Element } from 'cheerio';
+import { Element } from 'domhandler';
 
 export function toMathMLWebcomponents($: cheerio.CheerioAPI) {
   $('math')

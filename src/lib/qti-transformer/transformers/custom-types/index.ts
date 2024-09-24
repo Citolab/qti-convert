@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { Element } from 'cheerio';
+import { Element } from 'domhandler';
 
 export function customTypes($: cheerio.CheerioAPI, param: string = 'type') {
   $('*').each((i, element: Element) => {
