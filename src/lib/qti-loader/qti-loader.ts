@@ -27,7 +27,7 @@ const xmlFromAssessmentTest = async (href: string): Promise<cheerio.CheerioAPI> 
  * @param href - The URL of the assessment test.
  * @returns A Promise that resolves to an array of objects containing the identifier, href, and category of each item.
  */
-const itemsFromAssessmentTest = async (
+export const itemsFromAssessmentTest = async (
   xmlCheerio: cheerio.CheerioAPI
 ): Promise<{ identifier: string; href: string; category: string }[]> => {
   const items: { identifier: string; href: string; category: string }[] = [];
