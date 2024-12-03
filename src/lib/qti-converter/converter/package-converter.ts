@@ -19,7 +19,9 @@ export const convertManifestFile = ($: cheerio.CheerioAPI) => {
   // Add or replace schema version
   $('manifest > metadata').each((_, element) => {
     const schemaElement = $('schema', element);
-    if (schemaElement.length === 0) {
+    if (schemaElement.length > 0) {
+      schemaElement.text('QTI Package');
+    } else {
       $(element).append('<schema>QTI Package</schema>');
     }
     const schemaVersionElement = $('schemaversion', element);

@@ -312,7 +312,7 @@ const getEmptyManifest = (identifier: string, version: '2.x' | '3.0') => {
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://ltsc.ieee.org/xsd/LOM https://purl.imsglobal.org/spec/md/v1p3/schema/xsd/imsmd_loose_v1p3p2.xsd
                                             http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqtiv3p0_imscpv1p2_v1p0.xsd"
-                        identifier="${identifier}"
+                        identifier="MANIFEST-${identifier}"
                         xmlns="http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1">
                             <metadata>
                                 <schema>QTI Package</schema>
