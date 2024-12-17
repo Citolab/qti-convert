@@ -89,7 +89,7 @@ test('PCI - merge module resolution', async () => {
     }
   };
 
-  const result = await qtiTransform(qti).configurePciAsync(getConfig);
+  const result = await qtiTransform(qti).configurePciAsync('/assets/qti-portable-custom-interaction/', getConfig);
   const resultQti = result.xml();
   const areEqual = await areXmlEqual(resultQti, xpect);
   expect(areEqual).toEqual(true);
@@ -232,7 +232,7 @@ test('PCI - make custom-interaction-type-identifier unique', async () => {
     return Promise.resolve(null);
   };
 
-  const result = await qtiTransform(qti).configurePciAsync(getConfig);
+  const result = await qtiTransform(qti).configurePciAsync('/assets/qti-portable-custom-interaction/', getConfig);
   const resultQti = result.xml();
   const areEqual = await areXmlEqual(resultQti, xpect);
   expect(areEqual).toEqual(true);
