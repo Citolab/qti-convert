@@ -9,19 +9,39 @@ export function upgradePci($: cheerio.CheerioAPI) {
     return $;
   }
 
+  const parseProperties = (element, parentKey = '') => {
+    $(element)
+      .children()
+      .each((_, child) => {
+        const key = $(child).attr('key');
+        const value = $(child).text().trim();
+        if (key) {
+          const dashedAttribute = parentKey
+            ? `${parentKey}__${kebabToDashedNotation(key)}`
+            : kebabToDashedNotation(key);
+
+          if ($(child).children().length > 0) {
+            // Recursively parse children with the updated key prefix
+            parseProperties(child, dashedAttribute);
+          } else {
+            // Add attribute for the current property
+            portableCustomInteraction.attr(`data-${dashedAttribute}`, value);
+          }
+        }
+      });
+  };
+
   // 1. Remove the <style> tag
   portableCustomInteraction.find('style').remove();
 
   // 2. Move properties to data-attributes on qti-portable-custom-interaction
-  const properties = portableCustomInteraction.find('properties property');
-  properties.each((_, property) => {
-    const key = $(property).attr('key');
-    const value = $(property).text();
-    if (key && value) {
-      const dashedAttribute = kebabToDashedNotation(key);
-      portableCustomInteraction.attr(`data-${dashedAttribute}`, value);
-    }
+  // Start parsing from the root `properties` element
+  portableCustomInteraction.find('properties').each((_, root) => {
+    parseProperties(root);
   });
+  // properties.each((_, root) => {
+  //   parseProperties(root);
+  // });
   portableCustomInteraction.find('properties').remove();
 
   // 3. Fix tagnames and structure
