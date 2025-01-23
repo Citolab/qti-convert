@@ -54,29 +54,17 @@ test('upgrade tao exported pci', async () => {
                 </qti-custom-interaction>
 `;
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-              <qti-portable-custom-interaction
-                custom-interaction-type-identifier="colorProportions"
-                data-version="1.0.1"
-                data-colors="red, blue, yellow"
-                data-width="400"
-                data-height="400"
-                data-kebab-case="true"
-                module="colorProportions"
-                response-identifier="RESPONSE"
-                >
-                    <qti-interaction-modules>
-                        <qti-interaction-module
-                            id="colorProportions"
-                            primary-path="http://localhost:3333/application/convert-online/package/b11f2f15259a9289eab9ff1c8bb6b94bd503914b62da22668547d27855b5df5a/interaction/runtime/js/index.js"
-                        ></qti-interaction-module>
-                    </qti-interaction-modules>
-                    <qti-interaction-markup>
-                        <div class="pciInteraction">
-                            <div class="prompt" />
-                            <ul class="pci" />
-                        </div>
-                    </qti-interaction-markup>
-                </qti-portable-custom-interaction>`;
+<qti-portable-custom-interaction custom-interaction-type-identifier="colorProportions" data-version="1.0.1" data-colors="red, blue, yellow" data-width="400" data-height="400" data-kebab-case="true" module="colorProportions" response-identifier="RESPONSE">
+  <qti-interaction-modules>
+    <qti-interaction-module id="colorProportions" primary-path="http://localhost:3333/application/convert-online/package/b11f2f15259a9289eab9ff1c8bb6b94bd503914b62da22668547d27855b5df5a/interaction/runtime/js/index.js"/>
+  </qti-interaction-modules>
+  <qti-interaction-markup>
+    <div class="pciInteraction">
+      <div class="prompt"/>
+      <ul class="pci"/>
+    </div>
+  </qti-interaction-markup>
+</qti-portable-custom-interaction>`;
   const result = await transformObjectTags(input);
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);

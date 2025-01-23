@@ -71,20 +71,29 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
       }
     });
   }
-
   // -----------------------------------------------------------------------------------------------
-  // Add hook to modules
+  // Add module attribute to qti-portable-custom-interaction
   // -----------------------------------------------------------------------------------------------
-  const hook = portableCustomInteraction.attr('hook');
   const customInteractionTypeIdentifier = portableCustomInteraction.attr('custom-interaction-type-identifier');
-  if (hook && customInteractionTypeIdentifier) {
-    const modules = getOrAddModules();
-    const newModule = $('<qti-interaction-module></qti-interaction-module>');
-    const id = customInteractionTypeIdentifier;
-    newModule.attr('id', id || '');
-    newModule.attr('primary-path', hook); // remove .js from the hook
-    modules.append(newModule);
+  const module = portableCustomInteraction.attr('module');
+  if (!module) {
+    portableCustomInteraction.attr('module', customInteractionTypeIdentifier);
+  } else {
+    const attributes = ['hook', 'module'];
+    for (const attribute of attributes) {
+      const srcAttributes = $('[' + attribute + ']');
+      srcAttributes.each((_, node) => {
+        const $node = $(node);
+        const srcValue = $node.attr(attribute);
+
+        if (srcValue && !srcValue.startsWith('data:') && !srcValue.startsWith('http')) {
+          // Set attributes using Cheerio methods
+          $node.attr('module', `/${encodeURI(srcValue + (srcValue.endsWith('.js') ? '' : '.js'))}`);
+        }
+      });
+    }
   }
+  portableCustomInteraction.removeAttr('hook');
 
   // -----------------------------------------------------------------------------------------------
   // Fix tagnames and structure
@@ -93,12 +102,14 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   const modules = portableCustomInteraction.find('modules');
   if (modules.length > 0) {
     modules.find('module').each((_, module) => {
+      const qtiModules = getOrAddModules();
       const newModule = $('<qti-interaction-module></qti-interaction-module>');
       const id = $(module).attr('id')?.split('/')[0]; // Get the id up to the first slash
       newModule.attr('id', id || '');
       newModule.attr('primary-path', $(module).attr('primary-path'));
-      modules.append(newModule);
+      qtiModules.append(newModule);
     });
+    modules.remove();
   }
 
   // -----------------------------------------------------------------------------
@@ -127,27 +138,6 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
         // Remove the original <resources> element or just <stylesheet> if needed
         stylesheets.remove();
       }
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // Hooks to modules
-  // --------------------------------------------------------------------------
-  const attributes = ['hook', 'module'];
-  for (const attribute of attributes) {
-    const srcAttributes = $('[' + attribute + ']');
-    srcAttributes.each((_, node) => {
-      const $node = $(node);
-      const srcValue = $node.attr(attribute);
-
-      if (srcValue && !srcValue.startsWith('data:') && !srcValue.startsWith('http')) {
-        // Set attributes using Cheerio methods
-        $node.attr('module', `/${encodeURI(srcValue + (srcValue.endsWith('.js') ? '' : '.js'))}`);
-      }
-    });
-    // remove attribute if it's the hook attribute
-    if (attribute === 'hook') {
-      srcAttributes.removeAttr(attribute);
     }
   }
 
