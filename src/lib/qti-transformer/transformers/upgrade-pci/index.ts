@@ -75,23 +75,17 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   // Add module attribute to qti-portable-custom-interaction
   // -----------------------------------------------------------------------------------------------
   const customInteractionTypeIdentifier = portableCustomInteraction.attr('custom-interaction-type-identifier');
-  const module = portableCustomInteraction.attr('module');
+  let module = portableCustomInteraction.attr('module');
   if (!module) {
     portableCustomInteraction.attr('module', customInteractionTypeIdentifier);
-  } else {
-    const attributes = ['hook', 'module'];
-    for (const attribute of attributes) {
-      const srcAttributes = $('[' + attribute + ']');
-      srcAttributes.each((_, node) => {
-        const $node = $(node);
-        const srcValue = $node.attr(attribute);
-
-        if (srcValue && !srcValue.startsWith('data:') && !srcValue.startsWith('http')) {
-          // Set attributes using Cheerio methods
-          $node.attr('module', `/${encodeURI(srcValue + (srcValue.endsWith('.js') ? '' : '.js'))}`);
-        }
-      });
-    }
+    module = customInteractionTypeIdentifier;
+  }
+  if (portableCustomInteraction.attr('hook')) {
+    const qtiModules = getOrAddModules();
+    const newModule = $('<qti-interaction-module></qti-interaction-module>');
+    newModule.attr('id', module);
+    newModule.attr('primary-path', portableCustomInteraction.attr('hook'));
+    qtiModules.append(newModule);
   }
   portableCustomInteraction.removeAttr('hook');
 
