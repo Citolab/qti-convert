@@ -79,8 +79,7 @@ export async function convertPackageStream(
       $item = cheerio.load(transformResult.xml(), { xmlMode: true, xml: true });
     }
     return $item;
-  },
-  baseUrl?: string // Base URL need to resolve relative paths in PCI's can be empty
+  }
 ): Promise<Buffer> {
   const archive = archiver('zip', {
     zlib: { level: 9 }

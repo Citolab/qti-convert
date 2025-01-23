@@ -71,24 +71,19 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
     const resources = portableCustomInteraction.find('resources');
 
     if (resources.length > 0) {
-      const stylesheets = resources.find('stylesheet');
+      const stylesheets = resources.find('stylesheets');
 
       if (stylesheets.length > 0) {
         // Create a new <qti-stylesheets> element
-        const qtiStylesheets = $('<qti-stylesheets></qti-stylesheets>');
-
-        stylesheets.each((_, stylesheet) => {
+        stylesheets.find('link').each((_, stylesheet) => {
           const href = $(stylesheet).attr('href'); // Get the href attribute from the <stylesheet>
           if (href) {
             const newStylesheet = $('<qti-stylesheet></qti-stylesheet>');
             newStylesheet.attr('href', href);
             newStylesheet.attr('type', 'text/css');
-            qtiStylesheets.append(newStylesheet); // Append to <qti-stylesheets>
+            assessmentItem.prepend(newStylesheet); // Append to <qti-stylesheets>
           }
         });
-
-        // Add <qti-stylesheets> to <qti-assessment-item>
-        assessmentItem.append(qtiStylesheets);
 
         // Remove the original <resources> element or just <stylesheet> if needed
         stylesheets.remove();
