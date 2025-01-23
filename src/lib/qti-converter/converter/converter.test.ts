@@ -69,7 +69,6 @@ test('convert a TAO PCI', async () => {
       <div class="col-12">
         <customInteraction responseIdentifier="RESPONSE">
           <portableCustomInteraction xmlns="http://www.imsglobal.org/xsd/portableCustomInteraction"
-          class="type:tao"
           customInteractionTypeIdentifier="decisiontask" hook="decisiontask/runtime/decisiontask.amd.js" version="0.0.10">
             <resources>
               <libraries>
@@ -145,7 +144,12 @@ test('convert a TAO PCI', async () => {
     </div>
     <div class="grid-row">
       <div class="col-12">
-        <qti-portable-custom-interaction class="type:tao" custom-interaction-type-identifier="decisiontask" hook="decisiontask/runtime/decisiontask.amd.js" version="0.0.10" data-data__0__stimulusindex="1" data-data__0__stimulus="5 + 7 = 12" data-data__0__response="1" data-data__1__stimulusindex="2" data-data__1__stimulus="4 + 4 = 9" data-data__1__response="2" data-data__2__stimulusindex="3" data-data__2__stimulus="7 + 6 = 13" data-data__2__response="1" data-uploaded-fname="stimuli_IIL_item.csv" data-feedback="true" data-shufflestimuli="" data-respkey="" data-tlimit="0" data-level="2" data-buttonlabel0="True" data-buttonlabel1="False" data-buttonlabel2="" data-buttonlabel3="" data-buttonlabel4="" data-buttonlabel5="" data-buttonlabel6="" data-buttonlabel7="" data-0__stimulusindex="1" data-0__stimulus="5 + 7 = 12" data-0__response="1" data-1__stimulusindex="2" data-1__stimulus="4 + 4 = 9" data-1__response="2" data-2__stimulusindex="3" data-2__stimulus="7 + 6 = 13" data-2__response="1" data-stimulusindex="3" data-stimulus="7 + 6 = 13" data-response="1" module="decisiontask" response-identifier="RESPONSE">
+        <qti-portable-custom-interaction custom-interaction-type-identifier="decisiontask" version="0.0.10" data-data__0__stimulusindex="1" data-data__0__stimulus="5 + 7 = 12" data-data__0__response="1" data-data__1__stimulusindex="2" data-data__1__stimulus="4 + 4 = 9" data-data__1__response="2" data-data__2__stimulusindex="3" data-data__2__stimulus="7 + 6 = 13" data-data__2__response="1" data-uploaded-fname="stimuli_IIL_item.csv" data-feedback="true" data-shufflestimuli="" data-respkey="" data-tlimit="0" data-level="2" data-buttonlabel0="True" data-buttonlabel1="False" data-buttonlabel2="" data-buttonlabel3="" data-buttonlabel4="" data-buttonlabel5="" data-buttonlabel6="" data-buttonlabel7="" data-0__stimulusindex="1" data-0__stimulus="5 + 7 = 12" data-0__response="1" data-1__stimulusindex="2" data-1__stimulus="4 + 4 = 9" data-1__response="2" data-2__stimulusindex="3" data-2__stimulus="7 + 6 = 13" data-2__response="1" data-stimulusindex="3" data-stimulus="7 + 6 = 13" data-response="1" module="//decisiontask/runtime/decisiontask.amd.js" response-identifier="RESPONSE">
+          <qti-interaction-modules>
+            <qti-interaction-module id="IMSGlobal/jquery_2_1_1" primary-path="IMSGlobal/jquery_2_1_1"/>
+            <qti-interaction-module id="decisiontask/runtime/js/renderer" primary-path="decisiontask/runtime/js/renderer"/>
+            <qti-interaction-module id="decisiontask" primary-path="decisiontask/runtime/decisiontask.amd.js"/>
+          </qti-interaction-modules>
           <qti-interaction-markup>
             <div class="decisiontask">
               <div class="prompt"/>
@@ -172,6 +176,7 @@ test('convert a TAO PCI', async () => {
     .depConvert()
     .upgradePci();
   const transformedQti3 = transformResult.xml();
+  console.log(transformedQti3);
   const areEqual = await areXmlEqual(transformedQti3, expectedResult);
   expect(areEqual).toEqual(true);
 });

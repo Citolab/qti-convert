@@ -45,21 +45,60 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   });
   portableCustomInteraction.find('properties').remove();
 
+  const getOrAddModules = () => {
+    let modules = portableCustomInteraction.find('qti-interaction-modules');
+    if (modules.length === 0) {
+      portableCustomInteraction.prepend('<qti-interaction-modules></qti-interaction-modules>');
+      modules = portableCustomInteraction.find('qti-interaction-modules');
+    }
+    return modules;
+  };
+
+  // -----------------------------------------------------------------------------------------------
+  // Move libraries to qti-interaction-modules
+  // -----------------------------------------------------------------------------------------------
+  const libraries = portableCustomInteraction.find('libraries');
+  if (libraries.length > 0) {
+    const modules = getOrAddModules();
+    libraries.find('lib').each((_, module) => {
+      const id = $(module).attr('id'); // Get the id up to the first slash
+      // check if the module already exists
+      if (modules.find(`qti-interaction-module[id="${id}"]`).length === 0 && id) {
+        const newModule = $('<qti-interaction-module></qti-interaction-module>');
+        newModule.attr('id', id);
+        newModule.attr('primary-path', id);
+        modules.append(newModule);
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // Add hook to modules
+  // -----------------------------------------------------------------------------------------------
+  const hook = portableCustomInteraction.attr('hook');
+  const customInteractionTypeIdentifier = portableCustomInteraction.attr('custom-interaction-type-identifier');
+  if (hook && customInteractionTypeIdentifier) {
+    const modules = getOrAddModules();
+    const newModule = $('<qti-interaction-module></qti-interaction-module>');
+    const id = customInteractionTypeIdentifier;
+    newModule.attr('id', id || '');
+    newModule.attr('primary-path', hook); // remove .js from the hook
+    modules.append(newModule);
+  }
+
   // -----------------------------------------------------------------------------------------------
   // Fix tagnames and structure
   // Change <modules> to <qti-interaction-modules> and <module> to <qti-interaction-module>
   // -----------------------------------------------------------------------------------------------
   const modules = portableCustomInteraction.find('modules');
   if (modules.length > 0) {
-    const newModules = $('<qti-interaction-modules></qti-interaction-modules>');
     modules.find('module').each((_, module) => {
       const newModule = $('<qti-interaction-module></qti-interaction-module>');
       const id = $(module).attr('id')?.split('/')[0]; // Get the id up to the first slash
       newModule.attr('id', id || '');
       newModule.attr('primary-path', $(module).attr('primary-path'));
-      newModules.append(newModule);
+      modules.append(newModule);
     });
-    modules.replaceWith(newModules);
   }
 
   // -----------------------------------------------------------------------------
@@ -106,6 +145,10 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
         $node.attr('module', `/${encodeURI(srcValue + (srcValue.endsWith('.js') ? '' : '.js'))}`);
       }
     });
+    // remove attribute if it's the hook attribute
+    if (attribute === 'hook') {
+      srcAttributes.removeAttr(attribute);
+    }
   }
 
   // --------------------------------
@@ -115,16 +158,15 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   portableCustomInteraction.removeAttr('data-base-item');
   portableCustomInteraction.removeAttr('data-base-url');
 
-  // --------------------------------------------------------------------------------------------------------
-  // Fix the id of the qti-interaction-module to be the value of custom-interaction-type-identifier
-  // --------------------------------------------------------------------------------------------------------
-  const customInteractionTypeIdentifier = portableCustomInteraction.attr('custom-interaction-type-identifier');
-  if (customInteractionTypeIdentifier) {
-    portableCustomInteraction.find('qti-interaction-module').attr('id', customInteractionTypeIdentifier);
+  // // --------------------------------------------------------------------------------------------------------
+  // // Fix the id of the qti-interaction-module to be the value of custom-interaction-type-identifier
+  // // --------------------------------------------------------------------------------------------------------
+  // if (customInteractionTypeIdentifier) {
+  //   portableCustomInteraction.find('qti-interaction-module').attr('id', customInteractionTypeIdentifier);
 
-    // Add the module attribute with the same value as custom-interaction-type-identifier
-    portableCustomInteraction.attr('module', customInteractionTypeIdentifier);
-  }
+  //   // Add the module attribute with the same value as custom-interaction-type-identifier
+  //   portableCustomInteraction.attr('module', customInteractionTypeIdentifier);
+  // }
 
   // -------------------------------------------------------------------------------------------------
   // Copy response-identifier from qti-custom-interaction to qti-portable-custom-interaction
