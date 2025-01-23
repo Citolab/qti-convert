@@ -8,7 +8,7 @@ const xml = String.raw;
 
 const transformObjectTags = (xmlContent: string) => {
   const modifiedContent = qtiTransform(xmlContent)
-    .fnCh($ => upgradePci($, ''))
+    .fnCh($ => upgradePci($))
     .xml();
   return modifiedContent;
 };
@@ -109,6 +109,7 @@ test('upgrade tao exported pci with 2 levels', async () => {
                   <property key="stimulus">7 + 6 = 13</property>
                   <property key="response">1</property>
                 </properties>
+              </properties>
               <property key="uploadedFname">stimuli_IIL_item.csv</property>
               <property key="feedback">true</property>
               <property key="shufflestimuli"></property>
@@ -151,7 +152,16 @@ test('upgrade tao exported pci with 2 levels', async () => {
                 </qti-custom-interaction>
 `;
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-<qti-portable-custom-interaction custom-interaction-type-identifier="colorProportions" data-version="1.0.1" data-data__0__stimulusindex="1" data-data__0__stimulus="5 + 7 = 12" data-data__0__response="1" data-data__1__stimulusindex="2" data-data__1__stimulus="4 + 4 = 9" data-data__1__response="2" data-data__2__stimulusindex="3" data-data__2__stimulus="7 + 6 = 13" data-data__2__response="1" data-data__uploaded-fname="stimuli_IIL_item.csv" data-data__feedback="true" data-data__shufflestimuli="" data-data__respkey="" data-data__tlimit="0" data-data__level="2" data-data__buttonlabel0="True" data-data__buttonlabel1="False" data-data__buttonlabel2="" data-data__buttonlabel3="" data-data__buttonlabel4="" data-data__buttonlabel5="" data-data__buttonlabel6="" data-data__buttonlabel7="" data-0__stimulusindex="1" data-0__stimulus="5 + 7 = 12" data-0__response="1" data-1__stimulusindex="2" data-1__stimulus="4 + 4 = 9" data-1__response="2" data-2__stimulusindex="3" data-2__stimulus="7 + 6 = 13" data-2__response="1" data-uploaded-fname="stimuli_IIL_item.csv" data-feedback="true" data-shufflestimuli="" data-respkey="" data-tlimit="0" data-level="2" data-buttonlabel0="True" data-buttonlabel1="False" data-buttonlabel2="" data-buttonlabel3="" data-buttonlabel4="" data-buttonlabel5="" data-buttonlabel6="" data-buttonlabel7="" data-stimulusindex="3" data-stimulus="7 + 6 = 13" data-response="1" module="colorProportions" response-identifier="RESPONSE">
+<qti-portable-custom-interaction custom-interaction-type-identifier="colorProportions" data-version="1.0.1" data-data__0__stimulusindex="1" data-data__0__stimulus="5 + 7 = 12" data-data__0__response="1" data-data__1__stimulusindex="2" data-data__1__stimulus="4 + 4 = 9" data-data__1__response="2" data-data__2__stimulusindex="3" data-data__2__stimulus="7 + 6 = 13" data-data__2__response="1" data-uploaded-fname="stimuli_IIL_item.csv" data-feedback="true" data-shufflestimuli="" data-respkey="" data-tlimit="0" data-level="2" data-buttonlabel0="True" data-buttonlabel1="False" data-buttonlabel2="" data-buttonlabel3="" data-buttonlabel4="" data-buttonlabel5="" data-buttonlabel6="" data-buttonlabel7="" data-0__stimulusindex="1" data-0__stimulus="5 + 7 = 12" data-0__response="1" data-1__stimulusindex="2" data-1__stimulus="4 + 4 = 9" data-1__response="2" data-2__stimulusindex="3" data-2__stimulus="7 + 6 = 13" data-2__response="1" data-stimulusindex="3" data-stimulus="7 + 6 = 13" data-response="1" module="colorProportions" response-identifier="RESPONSE">
+  <qti-interaction-modules>
+    <qti-interaction-module id="colorProportions" primary-path="http://localhost:3333/application/convert-online/package/b11f2f15259a9289eab9ff1c8bb6b94bd503914b62da22668547d27855b5df5a/interaction/runtime/js/index.js"/>
+  </qti-interaction-modules>
+  <qti-interaction-markup>
+    <div class="pciInteraction">
+      <div class="prompt"/>
+      <ul class="pci"/>
+    </div>
+  </qti-interaction-markup>
 </qti-portable-custom-interaction>`;
   const result = await transformObjectTags(input);
   console.log(result);

@@ -47,7 +47,7 @@ interface QtiTransformAPI {
     baseUrl: string,
     getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
   ): Promise<QtiTransformAPI>;
-  upgradePci(baseUrl: string): QtiTransformAPI;
+  upgradePci(): QtiTransformAPI;
   stripStylesheets(): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
@@ -154,8 +154,8 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       await configurePciAsync($, baseUrl, getModuleResolutionConfig);
       return api;
     },
-    upgradePci(baseUrl: string) {
-      upgradePci($, baseUrl);
+    upgradePci() {
+      upgradePci($);
       return api;
     },
     stripStylesheets() {

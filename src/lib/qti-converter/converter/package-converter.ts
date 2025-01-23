@@ -61,10 +61,7 @@ export async function convertPackageStream(
     }
     return $assessment;
   },
-  convertItem: ($item: cheerio.CheerioAPI, baseUrl?: string) => Promise<cheerio.CheerioAPI> = async (
-    $item,
-    baseUrl
-  ) => {
+  convertItem: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $item => {
     if ($item('assessmentItem').length > 0) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
       const transform = qtiTransform(modifiedContent);
@@ -78,7 +75,7 @@ export async function convertPackageStream(
         .externalScored()
         .qbCleanup()
         .depConvert()
-        .upgradePci(baseUrl || '');
+        .upgradePci();
       $item = cheerio.load(transformResult.xml(), { xmlMode: true, xml: true });
     }
     return $item;
@@ -106,7 +103,7 @@ export async function convertPackageStream(
         $ = await convertAssessment($);
         modifiedContent = $.xml();
       } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
-        $ = await convertItem($, baseUrl || '');
+        $ = await convertItem($);
         modifiedContent = $.xml();
       } else if (entryName === 'imsmanifest.xml') {
         $ = await convertManifest($);

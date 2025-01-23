@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import { kebabToDashedNotation } from 'src/lib/utils/utils';
 
-export function upgradePci($: cheerio.CheerioAPI, baseUrl: string): cheerio.CheerioAPI {
+export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   const customInteraction = $('qti-custom-interaction');
   const portableCustomInteraction = customInteraction.find('qti-portable-custom-interaction');
 
@@ -97,10 +97,9 @@ export function upgradePci($: cheerio.CheerioAPI, baseUrl: string): cheerio.Chee
   }
 
   // --------------------------------------------------------------------------
-  // Hooks to modules and set base-url to be able to find the resources
+  // Hooks to modules
   // --------------------------------------------------------------------------
   const attributes = ['hook', 'module'];
-  const documentPath = baseUrl.substring(0, baseUrl.lastIndexOf('/'));
   for (const attribute of attributes) {
     const srcAttributes = $('[' + attribute + ']');
     srcAttributes.each((_, node) => {
@@ -109,8 +108,7 @@ export function upgradePci($: cheerio.CheerioAPI, baseUrl: string): cheerio.Chee
 
       if (srcValue && !srcValue.startsWith('data:') && !srcValue.startsWith('http')) {
         // Set attributes using Cheerio methods
-        $node.attr('base-url', baseUrl);
-        $node.attr('module', `${documentPath}/${encodeURI(srcValue + (srcValue.endsWith('.js') ? '' : '.js'))}`);
+        $node.attr('module', `/${encodeURI(srcValue + (srcValue.endsWith('.js') ? '' : '.js'))}`);
       }
     });
   }
