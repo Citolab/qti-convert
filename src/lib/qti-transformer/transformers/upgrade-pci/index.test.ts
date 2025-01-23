@@ -7,7 +7,9 @@ import { areXmlEqual } from '../utils-node-only';
 const xml = String.raw;
 
 const transformObjectTags = (xmlContent: string) => {
-  const modifiedContent = qtiTransform(xmlContent).fnCh(upgradePci).xml();
+  const modifiedContent = qtiTransform(xmlContent)
+    .fnCh($ => upgradePci($, ''))
+    .xml();
   return modifiedContent;
 };
 
