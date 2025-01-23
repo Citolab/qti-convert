@@ -61,7 +61,10 @@ export async function convertPackageStream(
     }
     return $assessment;
   },
-  convertItem: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $item => {
+  convertItem: ($item: cheerio.CheerioAPI, baseUrl?: string) => Promise<cheerio.CheerioAPI> = async (
+    $item,
+    baseUrl
+  ) => {
     if ($item('assessmentItem').length > 0) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
       const transform = qtiTransform(modifiedContent);
@@ -75,11 +78,12 @@ export async function convertPackageStream(
         .externalScored()
         .qbCleanup()
         .depConvert()
-        .upgradePci();
+        .upgradePci(baseUrl || '');
       $item = cheerio.load(transformResult.xml(), { xmlMode: true, xml: true });
     }
     return $item;
-  }
+  },
+  baseUrl?: string // Base URL need to resolve relative paths in PCI's can be empty
 ): Promise<Buffer> {
   const archive = archiver('zip', {
     zlib: { level: 9 }
@@ -102,7 +106,7 @@ export async function convertPackageStream(
         $ = await convertAssessment($);
         modifiedContent = $.xml();
       } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
-        $ = await convertItem($);
+        $ = await convertItem($, baseUrl || '');
         modifiedContent = $.xml();
       } else if (entryName === 'imsmanifest.xml') {
         $ = await convertManifest($);
