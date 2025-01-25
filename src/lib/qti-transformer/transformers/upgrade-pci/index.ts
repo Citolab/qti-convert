@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { kebabToDashedNotation } from 'src/lib/utils/utils';
+// import { kebabToDashedNotation } from 'src/lib/utils/utils';
 
 export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   const customInteraction = $('qti-custom-interaction');
@@ -16,9 +16,7 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
         const key = $(child).attr('key');
         const value = $(child).text().trim();
         if (key) {
-          const dashedAttribute = parentKey
-            ? `${parentKey}__${kebabToDashedNotation(key)}`
-            : kebabToDashedNotation(key);
+          const dashedAttribute = parentKey ? `${parentKey}__${key}` : key;
 
           if ($(child).children().length > 0) {
             // Recursively parse children with the updated key prefix
