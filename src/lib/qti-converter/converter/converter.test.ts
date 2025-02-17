@@ -19,23 +19,23 @@ async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
   }
 }
 
-test('convert package', async () => {
-  const zip = 'test.zip';
-  const zipStream = createReadStream(zip).pipe(unzipper.Parse({ forceStream: true }));
-  // zipStream.on('entry', entry => {
-  //   console.log('Processing:', entry.path);
-  //   entry.autodrain(); // Drain entry so the stream continues
-  // });
+// test('convert package', async () => {
+//   const zip = 'test.zip';
+//   const zipStream = createReadStream(zip).pipe(unzipper.Parse({ forceStream: true }));
+//   // zipStream.on('entry', entry => {
+//   //   console.log('Processing:', entry.path);
+//   //   entry.autodrain(); // Drain entry so the stream continues
+//   // });
 
-  // zipStream.on('finish', () => {
-  //   console.log('Finished reading ZIP');
-  // });
-  const updatedStream = await convertPackageStream(zipStream);
+//   // zipStream.on('finish', () => {
+//   //   console.log('Finished reading ZIP');
+//   // });
+//   const updatedStream = await convertPackageStream(zipStream);
 
-  writeFile('test-qti3.zip', updatedStream, () => {
-    console.log('done');
-  });
-});
+//   writeFile('test-qti3.zip', updatedStream, () => {
+//     console.log('done');
+//   });
+// });
 
 test('qti2 to qti3 convert should work', async () => {
   const input = `<?xml version="1.0" encoding="UTF-8"?>
