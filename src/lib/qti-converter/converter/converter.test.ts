@@ -1,7 +1,9 @@
 import { qtiTransform } from 'src/lib/qti-transformer';
-import { convertQti2toQti3 } from '../index';
+import { convertPackageStream, convertQti2toQti3 } from '../index';
 import { expect, test } from 'vitest';
 import * as xml2js from 'xml2js';
+import { createReadStream, writeFile } from 'fs';
+import unzipper from 'unzipper';
 
 async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
   const parser = new xml2js.Parser({ ignoreAttrs: true, trim: true, normalize: true });
@@ -17,23 +19,23 @@ async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
   }
 }
 
-// test('convert package', async () => {
-//   const zip = 'zipfile.zip';
-//   const zipStream = createReadStream(zip).pipe(unzipper.Parse({ forceStream: true }));
-//   // zipStream.on('entry', entry => {
-//   //   console.log('Processing:', entry.path);
-//   //   entry.autodrain(); // Drain entry so the stream continues
-//   // });
+test('convert package', async () => {
+  const zip = '/Users/marcelh/Downloads/bao/ho_bao_boekje_12_1687417924.zip';
+  const zipStream = createReadStream(zip).pipe(unzipper.Parse({ forceStream: true }));
+  // zipStream.on('entry', entry => {
+  //   console.log('Processing:', entry.path);
+  //   entry.autodrain(); // Drain entry so the stream continues
+  // });
 
-//   // zipStream.on('finish', () => {
-//   //   console.log('Finished reading ZIP');
-//   // });
-//   const updatedStream = await convertPackageStream(zipStream);
+  // zipStream.on('finish', () => {
+  //   console.log('Finished reading ZIP');
+  // });
+  const updatedStream = await convertPackageStream(zipStream);
 
-//   writeFile('output.zip', updatedStream, () => {
-//     console.log('done');
-//   });
-// });
+  writeFile('/Users/marcelh/Downloads/bao/ho_bao_boekje_12_1687417924-qti3.zip', updatedStream, () => {
+    console.log('done');
+  });
+});
 
 test('qti2 to qti3 convert should work', async () => {
   const input = `<?xml version="1.0" encoding="UTF-8"?>

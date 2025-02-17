@@ -108,8 +108,8 @@ export async function convertPackageStream(
           const relativePath = resolvePathFromRoot(hrefTest, hrefItem);
           const itemInManifest = findByHref($manifest, 'resource', relativePath);
           if (itemInManifest) {
-            const assessmentId = itemInManifest.attribs['identifier'];
-            assessmentRef.attribs['identifier'] = assessmentId || refId;
+            const assessmentItemId = itemInManifest.attribs['identifier'];
+            assessmentRef.attribs['identifier'] = assessmentItemId || refId;
           }
           changed = true;
         }
@@ -163,7 +163,7 @@ export async function convertPackageStream(
       // Append other files as they are to the archive
       const content = await entry.buffer();
       archive.append(content, { name: entryName });
-      processedFiles.push({ path: entryName, content: content.toString(), type: 'other' });
+      processedFiles.push({ path: entryName, content: content, type: 'other' });
     }
     entry.autodrain();
   }
