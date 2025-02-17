@@ -96,6 +96,7 @@ export async function convertPackageStream(
       }
       const $assessment = await cheerio.load(assessment.content, { xmlMode: true, xml: true });
       const assessmentRefs = $assessment('qti-assessment-item-ref');
+      const items = files.filter(file => file.type === 'item');
       const assessmentInManifest = $manifest('resource[type="imsqti_test_xmlv3p0"]');
       let changed = false;
       for (const assessmentRef of assessmentRefs) {
@@ -106,10 +107,21 @@ export async function convertPackageStream(
           const hrefItem = $assessment(assessmentRef).attr('href');
           const hrefTest = assessmentInManifest.attr('href');
           const relativePath = resolvePathFromRoot(hrefTest, hrefItem);
+          const matchingItem = items.find(item => {
+            const path1 = item.path.replace(/^(.\/|\/)/, '');
+            const path2 = relativePath.replace(/^(.\/|\/)/, '');
+            return path1 === path2;
+          });
           const itemInManifest = findByHref($manifest, 'resource', relativePath);
-          if (itemInManifest) {
-            const assessmentItemId = itemInManifest.attribs['identifier'];
-            assessmentRef.attribs['identifier'] = assessmentItemId || refId;
+          if (matchingItem) {
+            const $item = await cheerio.load(matchingItem.content, { xmlMode: true, xml: true });
+            if ($item('qti-assessment-item').length > 0) {
+              const assessmentItemId = $item('qti-assessment-item')[0]?.attribs['identifier'];
+              assessmentRef.attribs['identifier'] = assessmentItemId || refId;
+              if (itemInManifest) {
+                itemInManifest.attribs['identifier'] = assessmentItemId || refId;
+              }
+            }
           }
           changed = true;
         }
@@ -347,15 +359,27 @@ export async function convertPackageFolder(
       for (const assessmentRef of assessmentRefs) {
         const refId = $assessment(assessmentRef).attr('identifier');
         const matchingItem = findByAttribute($manifest, 'qti-assessment-item-ref', 'identifier', refId);
+        const items = files.filter(file => file.type === 'item');
         if (!matchingItem) {
           // some packages, especially those from TAO have identifiers in the assessment that don't match the identifier in the item
           const hrefItem = $assessment(assessmentRef).attr('href');
           const hrefTest = assessmentInManifest.attr('href');
           const relativePath = resolvePathFromRoot(hrefTest, hrefItem);
+          const matchingItem = items.find(item => {
+            const path1 = item.path.replace(/^(.\/|\/)/, '');
+            const path2 = relativePath.replace(/^(.\/|\/)/, '');
+            return path1 === path2;
+          });
           const itemInManifest = findByHref($manifest, 'resource', relativePath);
-          if (itemInManifest) {
-            const assessmentId = itemInManifest.attribs['identifier'];
-            assessmentRef.attribs['identifier'] = assessmentId || refId;
+          if (matchingItem) {
+            const $item = await cheerio.load(matchingItem.content, { xmlMode: true, xml: true });
+            if ($item('qti-assessment-item').length > 0) {
+              const assessmentItemId = $item('qti-assessment-item')[0]?.attribs['identifier'];
+              assessmentRef.attribs['identifier'] = assessmentItemId || refId;
+              if (itemInManifest) {
+                itemInManifest.attribs['identifier'] = assessmentItemId || refId;
+              }
+            }
           }
           changed = true;
         }

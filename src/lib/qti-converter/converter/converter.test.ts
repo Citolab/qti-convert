@@ -20,7 +20,7 @@ async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
 }
 
 test('convert package', async () => {
-  const zip = '/Users/marcelh/Downloads/bao/ho_bao_boekje_12_1687417924.zip';
+  const zip = 'test.zip';
   const zipStream = createReadStream(zip).pipe(unzipper.Parse({ forceStream: true }));
   // zipStream.on('entry', entry => {
   //   console.log('Processing:', entry.path);
@@ -32,7 +32,7 @@ test('convert package', async () => {
   // });
   const updatedStream = await convertPackageStream(zipStream);
 
-  writeFile('/Users/marcelh/Downloads/bao/ho_bao_boekje_12_1687417924-qti3.zip', updatedStream, () => {
+  writeFile('test-qti3.zip', updatedStream, () => {
     console.log('done');
   });
 });
