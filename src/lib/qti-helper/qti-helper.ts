@@ -280,13 +280,46 @@ function findReferencedTags(
   return $.xml();
 }
 
-// Function to create a Base64-encoded SVG placeholder
+/**
+ * Creates a Base64-encoded SVG placeholder that works in both Node.js and browser environments
+ * @param fileName The name of the file to display in the placeholder
+ * @returns A data URL containing the base64-encoded SVG
+ */
 function createBase64SVGPlaceholder(fileName: string): string {
   const svgPlaceholder = `
     <svg xmlns="http://www.w3.org/2000/svg" width="300" height="75">
       <rect width="300" height="75" style="fill:lightgray;stroke-width:1;stroke:gray" />
-      <text x="10" y="25" fill="red"  textLength="280">File: ${fileName} removed</text>
+      <text x="10" y="25" fill="red" textLength="280">File: ${fileName} removed</text>
     </svg>
   `;
-  return `data:image/svg+xml;base64,${Buffer.from(svgPlaceholder).toString('base64')}`;
+
+  // Check if running in Node.js environment
+  if (typeof Buffer !== 'undefined') {
+    // Node.js environment - use Buffer
+    return `data:image/svg+xml;base64,${Buffer.from(svgPlaceholder).toString('base64')}`;
+  } else {
+    // Browser environment - use TextEncoder and btoa
+    try {
+      // Modern browsers with TextEncoder support for handling Unicode
+      const utf8Encoder = new TextEncoder();
+      const utf8Bytes = utf8Encoder.encode(svgPlaceholder);
+
+      const base64 = btoa(
+        Array.from(utf8Bytes)
+          .map(byte => String.fromCharCode(byte))
+          .join('')
+      );
+
+      return `data:image/svg+xml;base64,${base64}`;
+    } catch (error) {
+      // Fallback for older browsers without TextEncoder
+      // Note: This will fail with non-ASCII characters
+      try {
+        return `data:image/svg+xml;base64,${btoa(svgPlaceholder)}`;
+      } catch (e) {
+        console.error('Error encoding SVG:', e);
+        return ''; // Return empty string or some default on error
+      }
+    }
+  }
 }
