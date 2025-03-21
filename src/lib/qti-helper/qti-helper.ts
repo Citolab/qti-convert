@@ -203,16 +203,22 @@ export const removeMediaFromPackage = async (
       }
     } else if (!filesToRemove.includes(basename)) {
       // check if we are inside nodejs or in the browser
-      if (typeof zipEntry.nodeStream === 'function') {
-        newZip.file(relativePath, zipEntry.nodeStream());
-      } else {
-        const content = await zipEntry.async('blob');
-        newZip.file(relativePath, content);
+      // Universal approach that works in both Node.js and browser environments
+      try {
+        // Check if nodeStream exists AND we're in a Node.js environment
+        // Using optional chaining (?.) to avoid the "not supported" error
+        if (zipEntry?.nodeStream && typeof process !== 'undefined' && process.versions && process.versions.node) {
+          // Node.js environment with nodeStream support
+          newZip.file(relativePath, zipEntry.nodeStream());
+        } else {
+          // Browser environment or Node.js without nodeStream
+          const content = await zipEntry.async('blob');
+          newZip.file(relativePath, content);
+        }
+      } catch (error) {
+        console.error(`Error processing zip entry ${relativePath}:`, error);
+        // Handle the error or continue with next entry
       }
-
-      // newZip.file(relativePath, zipEntry.nodeStream());
-      // const content = await zipEntry.async('blob');
-      // newZip.file(relativePath, content);
     } else if (onResourceRemoved && filesToRemove.includes(basename)) {
       if (typeof zipEntry.nodeStream === 'function') {
         onResourceRemoved(relativePath, zipEntry.nodeStream());
