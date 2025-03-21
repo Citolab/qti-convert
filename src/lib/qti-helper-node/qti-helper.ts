@@ -5,7 +5,25 @@ import { dirname } from 'path';
 import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 
-export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
+export const qtiReferenceAttributes = [
+  'src',
+  'href',
+  'data',
+  'primary-path',
+  'fallback-path',
+  'template-location',
+  'value',
+  'backgroundimg',
+  'background-img',
+  'file',
+  'templateSrc',
+  'template-src',
+  'templateurl',
+  'template-url',
+  'sound',
+  'video',
+  'image'
+];
 
 export type QtiResource = {
   type:

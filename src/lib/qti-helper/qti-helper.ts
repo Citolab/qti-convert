@@ -3,7 +3,25 @@ import JSZip from 'jszip';
 import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 
-const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
+export const qtiReferenceAttributes = [
+  'src',
+  'href',
+  'data',
+  'primary-path',
+  'fallback-path',
+  'template-location',
+  'value',
+  'backgroundimg',
+  'background-img',
+  'file',
+  'templateSrc',
+  'template-src',
+  'templateurl',
+  'template-url',
+  'sound',
+  'video',
+  'image'
+];
 
 export function cleanXMLString(xmlString: string): string {
   if (!xmlString) {
@@ -24,8 +42,339 @@ export function cleanXMLString(xmlString: string): string {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const removeItemsFromPackage = async (file: any, startIndex: number, endIndex: number) => {
+  const zip = await JSZip.loadAsync(file);
+  const newZip = new JSZip();
+
+  // Track which assessment items to remove
+  const itemsToRemove: string[] = [];
+  const itemIdentifiersToRemove: string[] = [];
+  let testFilePath: string | null = null;
+  let manifestFilePath: string | null = null;
+
+  // Step 1: Identify the assessment test file and which items to remove
+  for (const relativePath of Object.keys(zip.files)) {
+    if (zip.files[relativePath].dir) continue;
+
+    const zipEntry = zip.files[relativePath];
+    const fileType = relativePath.split('.').pop()?.toLowerCase();
+
+    if (fileType === 'xml') {
+      const content = await zipEntry.async('string');
+
+      // Check if this is a manifest file
+      if (content.includes('<manifest') || content.includes('<imsmanifest')) {
+        manifestFilePath = relativePath;
+        continue;
+      }
+
+      const contentText = cleanXMLString(content);
+      const formattedXML = xmlFormat(contentText, {
+        indentation: '  ',
+        collapseContent: true,
+        lineSeparator: '\n'
+      });
+
+      try {
+        const $ = cheerio.load(formattedXML, { xmlMode: true, xml: true });
+
+        // Check if this is an assessment test
+        if ($(`qti-assessment-test`).length > 0 || $(`assessmentTest`).length > 0) {
+          testFilePath = relativePath;
+
+          // Get all assessment item refs
+          const itemRefs = $('qti-assessment-item-ref, assessmentItemRef');
+          const allItems: { index: number; href: string; identifier: string }[] = [];
+
+          itemRefs.each((index, element) => {
+            const href = $(element).attr('href');
+            const identifier = $(element).attr('identifier');
+            if (href) {
+              allItems.push({ index, href, identifier: identifier || '' });
+            }
+          });
+
+          // Determine which items to remove based on indices
+          for (let i = 0; i < allItems.length; i++) {
+            if (i < startIndex || i > endIndex) {
+              const itemPath = allItems[i].href;
+              // Get just the filename without path
+              const itemFileName = itemPath.split('/').pop();
+              if (itemFileName) {
+                itemsToRemove.push(itemFileName);
+                if (allItems[i].identifier) {
+                  itemIdentifiersToRemove.push(allItems[i].identifier);
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`Error processing XML file ${relativePath}:`, e);
+      }
+    }
+  }
+
+  if (!manifestFilePath) {
+    console.error('No manifest file found in the package');
+    return {
+      package: await zip.generateAsync({ type: 'blob' }),
+      removedItems: [],
+      removedFiles: 0,
+      removedResources: 0,
+      totalRemoved: 0
+    };
+  }
+
+  // Step 2: Process the manifest to identify dependencies
+  const manifestContent = await zip.files[manifestFilePath].async('string');
+  const resourceMap = new Map<
+    string,
+    {
+      href: string;
+      type: string;
+      files: string[];
+      dependencies: string[];
+      isItem: boolean;
+      isTest: boolean;
+      toKeep: boolean;
+    }
+  >();
+
+  try {
+    const $ = cheerio.load(manifestContent, { xmlMode: true, xml: true });
+
+    // First pass: collect all resources
+    $('resource').each((_, element) => {
+      const identifier = $(element).attr('identifier') || '';
+      const href = $(element).attr('href') || '';
+      const type = $(element).attr('type') || '';
+      const files: string[] = [];
+      const dependencies: string[] = [];
+
+      // Get the main file
+      if (href) {
+        files.push(href);
+      }
+
+      // Get all additional files
+      $(element)
+        .find('file')
+        .each((_, fileEl) => {
+          const fileHref = $(fileEl).attr('href');
+          if (fileHref) {
+            files.push(fileHref);
+          }
+        });
+
+      // Get dependencies
+      $(element)
+        .find('dependency')
+        .each((_, dep) => {
+          const identifierref = $(dep).attr('identifierref');
+          if (identifierref) {
+            dependencies.push(identifierref);
+          }
+        });
+
+      // Determine if it's an item or test
+      const isTest = type.includes('test');
+      const isItem = type.includes('item');
+
+      // Initially mark as not to keep
+      resourceMap.set(identifier, {
+        href,
+        type,
+        files,
+        dependencies,
+        isItem,
+        isTest,
+        toKeep: false
+      });
+    });
+
+    // Second pass: mark resources to keep
+    // Start by marking the test resource
+    const testResource = Array.from(resourceMap.values()).find(r => r.isTest);
+    if (testResource) {
+      markResourceToKeep(
+        resourceMap,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        Array.from(resourceMap.entries()).find(([_, res]) => res.isTest)?.[0] || '',
+        false
+      );
+    }
+
+    // Mark items we want to keep
+    resourceMap.forEach((resource, identifier) => {
+      if (resource.isItem) {
+        const fileName = resource.href.split('/').pop() || '';
+        // If it's not in the removal list, mark it to keep
+        if (!itemsToRemove.includes(fileName) && !itemIdentifiersToRemove.includes(identifier)) {
+          markResourceToKeep(resourceMap, identifier);
+        }
+      }
+    });
+  } catch (e) {
+    console.error(`Error processing manifest file:`, e);
+  }
+
+  // Collect files to keep and remove
+  const filesToKeep = new Set<string>();
+  const resourcesToRemove: string[] = [];
+
+  resourceMap.forEach((resource, identifier) => {
+    if (resource.toKeep) {
+      // Add all files from this resource to the keep list
+      resource.files.forEach(file => filesToKeep.add(file));
+    } else {
+      resourcesToRemove.push(identifier);
+    }
+  });
+
+  // Step 3: Process all files, keeping only what's needed
+  for (const relativePath of Object.keys(zip.files)) {
+    const zipEntry = zip.files[relativePath];
+
+    // Always keep directories
+    if (zipEntry.dir) {
+      newZip.folder(relativePath);
+      continue;
+    }
+
+    const fileName = relativePath.split('/').pop() || '';
+
+    if (relativePath === testFilePath) {
+      // Handle the test file - remove references to items being removed
+      const content = await zipEntry.async('string');
+      const contentText = cleanXMLString(content);
+      const formattedXML = xmlFormat(contentText, {
+        indentation: '  ',
+        collapseContent: true,
+        lineSeparator: '\n'
+      });
+
+      try {
+        const $ = cheerio.load(formattedXML, { xmlMode: true, xml: true });
+        const itemRefs = $('qti-assessment-item-ref, assessmentItemRef');
+
+        itemRefs.each((index, element) => {
+          const href = $(element).attr('href');
+          const identifier = $(element).attr('identifier');
+
+          if (href) {
+            const itemFileName = href.split('/').pop();
+            if (
+              (itemFileName && itemsToRemove.includes(itemFileName)) ||
+              (identifier && itemIdentifiersToRemove.includes(identifier))
+            ) {
+              $(element).remove();
+            }
+          }
+        });
+
+        // Save the modified test XML
+        newZip.file(relativePath, $.xml());
+      } catch (e) {
+        console.error(`Error processing test file:`, e);
+        // If there's an error, still include the original file
+        newZip.file(relativePath, content);
+      }
+    } else if (relativePath === manifestFilePath) {
+      // Handle the manifest file - remove resources for items being removed
+      const content = await zipEntry.async('string');
+
+      try {
+        const $ = cheerio.load(content, { xmlMode: true, xml: true });
+
+        // Remove resources that are marked for removal
+        $('resource').each((_, element) => {
+          const identifier = $(element).attr('identifier') || '';
+          if (resourcesToRemove.includes(identifier)) {
+            $(element).remove();
+          }
+        });
+
+        // Save the modified manifest
+        newZip.file(relativePath, $.xml());
+      } catch (e) {
+        console.error(`Error processing manifest file:`, e);
+        // If there's an error, still include the original file
+        newZip.file(relativePath, content);
+      }
+    } else {
+      // Handle regular files - only include if they're in the "to keep" list
+      // or if they're XML files (for safety)
+      const fileExt = fileName.split('.').pop()?.toLowerCase();
+
+      if (fileExt === 'xml' || filesToKeep.has(relativePath)) {
+        // Copy the file
+        try {
+          const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+
+          if (isNode && zipEntry?.nodeStream) {
+            // Node.js environment
+            newZip.file(relativePath, zipEntry.nodeStream());
+          } else {
+            // Browser environment
+            const content = await zipEntry.async('blob');
+            newZip.file(relativePath, content);
+          }
+        } catch (error) {
+          console.error(`Error processing zip entry ${relativePath}:`, error);
+        }
+      }
+    }
+  }
+
+  const outputBlob = await newZip.generateAsync({ type: 'blob' });
+
+  // Count how many files were removed
+  const originalFileCount = Object.keys(zip.files).filter(path => !zip.files[path].dir).length;
+  const newFileCount = Object.keys(newZip.files).filter(path => !newZip.files[path].dir).length;
+  const removedFilesCount = originalFileCount - newFileCount;
+
+  return {
+    package: outputBlob,
+    removedItems: itemsToRemove,
+    removedFiles: removedFilesCount,
+    removedResources: resourcesToRemove.length,
+    totalRemoved: removedFilesCount
+  };
+};
+
+// Helper function to mark a resource and all its dependencies to keep
+function markResourceToKeep(
+  resourceMap: Map<
+    string,
+    {
+      href: string;
+      type: string;
+      files: string[];
+      dependencies: string[];
+      isItem: boolean;
+      isTest: boolean;
+      toKeep: boolean;
+    }
+  >,
+  resourceId: string,
+  keepXml = true
+) {
+  const resource = resourceMap.get(resourceId);
+  if (!resource || resource.toKeep) return;
+  if (resource.href.endsWith('.xml') && !keepXml) return;
+  // Mark this resource to keep
+  resource.toKeep = true;
+
+  // Recursively mark all dependencies
+  resource.dependencies.forEach(depId => {
+    markResourceToKeep(resourceMap, depId);
+  });
+}
+
 const getMediaTypeByExtension = (extension: string) => {
-  switch (extension.replace('.', '')) {
+  switch (extension.replace('.', '').toLowerCase()) {
     case 'mp3':
     case 'wav':
     case 'ogg':
@@ -65,7 +414,7 @@ async function listAllContent(zip: JSZip) {
   }[] = [];
 
   await zip.forEach(async (relativePath, zipEntry) => {
-    const fileType = relativePath.split('.').pop();
+    const fileType = relativePath.split('.').pop().toLocaleLowerCase();
     if (fileType !== 'xml') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fileSizeKb = (zipEntry as any)._data.uncompressedSize / 1024;
@@ -138,14 +487,16 @@ export const removeMediaFromPackage = async (
 ) => {
   const zip = await JSZip.loadAsync(file);
   const allMediaFiles = await listAllContent(zip);
-
   const allFilesToRemove: string[] = [];
   filters.forEach(filter => {
+    filter = filter.trim().toLowerCase();
     if (filter.toLocaleLowerCase().endsWith('kb') || filter.toLocaleLowerCase().endsWith('mb')) {
       const sizeInKb = filter.toLocaleLowerCase().endsWith('mb') ? +filter.slice(0, -2) * 1024 : +filter.slice(0, -2);
       allFilesToRemove.push(...allMediaFiles.filter(file => file.sizeKb > sizeInKb).map(file => file.name));
     } else if (filter === 'audio' || filter === 'video' || filter === 'image') {
-      allFilesToRemove.push(...allMediaFiles.filter(file => file.type === filter).map(file => file.name));
+      // Add debug logging to see what's being filtered
+      const matchingFiles = allMediaFiles.filter(file => file.type.trim().toLowerCase() === filter);
+      allFilesToRemove.push(...matchingFiles.map(file => file.name));
     } else if (filter.startsWith('.')) {
       allFilesToRemove.push(
         ...allMediaFiles.filter(file => file.name.toLowerCase().endsWith(filter)).map(file => file.name)
@@ -190,7 +541,6 @@ export const removeMediaFromPackage = async (
           if (filesToBeRemoved.length > 0) {
             contentText = removeReferencedTags(formattedXML, filesToBeRemoved);
           }
-
           newZip.file(relativePath, contentText);
         } else if ($(`manifest`).length > 0) {
           const contentText = removeReferencedTags($.xml(), filesToRemove);
@@ -202,13 +552,13 @@ export const removeMediaFromPackage = async (
         console.error(e);
       }
     } else if (!filesToRemove.includes(basename)) {
-      // check if we are inside nodejs or in the browser
-      // Universal approach that works in both Node.js and browser environments
       try {
-        // Check if nodeStream exists AND we're in a Node.js environment
+        // Check if we're in Node.js (where process.versions exists) AND nodeStream is available
         // Using optional chaining (?.) to avoid the "not supported" error
-        if (zipEntry?.nodeStream && typeof process !== 'undefined' && process.versions && process.versions.node) {
-          // Node.js environment with nodeStream support
+        const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+
+        if (isNode && zipEntry?.nodeStream) {
+          // Node.js environment
           newZip.file(relativePath, zipEntry.nodeStream());
         } else {
           // Browser environment or Node.js without nodeStream
@@ -217,14 +567,24 @@ export const removeMediaFromPackage = async (
         }
       } catch (error) {
         console.error(`Error processing zip entry ${relativePath}:`, error);
-        // Handle the error or continue with next entry
+        // Handle the error or skip this file
       }
     } else if (onResourceRemoved && filesToRemove.includes(basename)) {
-      if (typeof zipEntry.nodeStream === 'function') {
-        onResourceRemoved(relativePath, zipEntry.nodeStream());
-      } else {
-        const content = await zipEntry.async('blob');
-        onResourceRemoved(relativePath, content);
+      try {
+        // Same environment check for the resource removal branch
+        const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+
+        if (isNode && zipEntry?.nodeStream) {
+          // Node.js environment
+          onResourceRemoved(relativePath, zipEntry.nodeStream());
+        } else {
+          // Browser environment or Node.js without nodeStream
+          const content = await zipEntry.async('blob');
+          onResourceRemoved(relativePath, content);
+        }
+      } catch (error) {
+        console.error(`Error handling removed resource ${relativePath}:`, error);
+        // Handle the error or skip this file
       }
     }
   }
