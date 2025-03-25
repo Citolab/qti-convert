@@ -264,8 +264,8 @@ The build-in functions that can be chained are:
 Other function to get the output of the transformer:
 
 - `xml()`: returns the xml as string
-- `brower.htmlDoc()`: returns a DocumentFragment. Won't work on node.
-- `brower.xmlDoc()`: returns a XMLDocument. Won't work on node.
+- `browser.htmlDoc()`: returns a DocumentFragment. Won't work on node.
+- `browser.xmlDoc()`: returns a XMLDocument. Won't work on node.
 
 ### Loader
 
@@ -277,11 +277,11 @@ The `testLoader` function fetches and processes the IMS manifest XML file from a
 
 ### Helper
 
-@citolab/qti-convert/qti-helper provides a set of helper functions for QTI padckage. E.g. removeMediaFromPackage is a helper to remove media files from a QTI-package
+@citolab/qti-convert/qti-helper provides a set of helper functions for QTI package. E.g. removeMediaFromPackage is a helper to remove media files from a QTI-package
 
 ### Helper Node
 
-@citolab/qti-convert/qti-helper-node provides a set of helper functions for QTI padckages. It includes functions to recursively retrieve QTI resources, create or update IMS manifest files and generate QTI assessment tests. These only work in NodeJS and wont work in the browser.
+@citolab/qti-convert/qti-helper-node provides a set of helper functions for QTI packages. It includes functions to recursively retrieve QTI resources, create or update IMS manifest files and generate QTI assessment tests. These only work in NodeJS and wont work in the browser.
 
 #### Generate an assessement and manifest
 
