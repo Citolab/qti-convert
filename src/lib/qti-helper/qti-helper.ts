@@ -2,6 +2,9 @@ import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
+import { convertQti2toQti3 } from '../qti-converter';
+import { qtiTransform } from '../qti-transformer';
+import { css } from 'cheerio/dist/commonjs/api/css';
 
 export const qtiReferenceAttributes = [
   'src',
@@ -344,6 +347,323 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
   };
 };
 
+/**
+ * Processes a package file, extracting and converting assessment items and tests
+ * @param file - The package file (zip) to process
+ * @param processItemCallback - Callback function that handles each processed assessment item
+ * @param processTestCallback - Callback function that handles the processed assessment test
+ * @returns Promise with processing results
+ */
+export const processPackage = async (
+  file: Blob,
+  xsltJson: string,
+  localMedia: boolean,
+  processItemCallback: (itemData: {
+    identifier: string;
+    content: string;
+    originalContent: string;
+    relativePath: string;
+  }) => void,
+  processTestCallback: (testData: {
+    identifier: string;
+    content: string;
+    originalContent: string;
+    relativePath: string;
+    itemRefs: string[];
+  }) => void
+) => {
+  const JSZip = await import('jszip');
+  const zip = await JSZip.default.loadAsync(file);
+
+  // Results tracking
+  const results = {
+    itemsProcessed: 0,
+    testsProcessed: 0,
+    totalFilesProcessed: 0,
+    errors: [] as string[]
+  };
+
+  // Utility to clean and format XML
+  const cleanXMLString = (xml: string) => {
+    return xml
+      .replace(/>\s+</g, '><')
+      .replace(/\r?\n|\r/g, '')
+      .trim();
+  };
+  // Track manifest and test file paths
+  let manifestFilePath: string | null = null;
+  let testFilePath: string | null = null;
+  let testIdentifier: string | null = null;
+  const itemPaths = new Map<string, string>(); // Maps identifiers to paths
+
+  // Step 1: First pass - identify manifest and test files
+  for (const relativePath of Object.keys(zip.files)) {
+    if (zip.files[relativePath].dir) continue;
+
+    const zipEntry = zip.files[relativePath];
+    const fileType = relativePath.split('.').pop()?.toLowerCase();
+
+    if (fileType === 'xml') {
+      try {
+        const content = await zipEntry.async('string');
+
+        // Check if this is a manifest file
+        if (content.includes('<manifest') || content.includes('<imsmanifest')) {
+          manifestFilePath = relativePath;
+          continue;
+        }
+
+        const cleanedContent = cleanXMLString(content);
+
+        // Use cheerio (or another XML parser) to analyze content
+        const cheerio = await import('cheerio');
+        const $ = cheerio.load(cleanedContent, { xmlMode: true, xml: true });
+
+        // Check if this is an assessment test
+        if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
+          testFilePath = relativePath;
+          testIdentifier =
+            $('qti-assessment-test').attr('identifier') || $('assessmentTest').attr('identifier') || null;
+        }
+
+        // Check if this is an assessment item
+        if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
+          const identifier =
+            $('qti-assessment-item').attr('identifier') || $('assessmentItem').attr('identifier') || '';
+          if (identifier) {
+            itemPaths.set(identifier, relativePath);
+          }
+        }
+      } catch (e) {
+        results.errors.push(`Error analyzing ${relativePath}: ${e}`);
+      }
+    }
+  }
+
+  // Step 2: Process manifest to build dependencies map
+  const resourceMap = new Map<
+    string,
+    {
+      href: string;
+      type: string;
+      files: string[];
+      dependencies: string[];
+      isItem: boolean;
+      isTest: boolean;
+    }
+  >();
+
+  if (manifestFilePath) {
+    try {
+      const manifestContent = await zip.files[manifestFilePath].async('string');
+      const $ = cheerio.load(manifestContent, { xmlMode: true, xml: true });
+
+      // Build resource map
+      $('resource').each((_, element) => {
+        const identifier = $(element).attr('identifier') || '';
+        const href = $(element).attr('href') || '';
+        const type = $(element).attr('type') || '';
+        const files: string[] = [];
+        const dependencies: string[] = [];
+
+        // Get the main file
+        if (href) {
+          files.push(href);
+        }
+
+        // Get all additional files
+        $(element)
+          .find('file')
+          .each((_, fileEl) => {
+            const fileHref = $(fileEl).attr('href');
+            if (fileHref) {
+              files.push(fileHref);
+            }
+          });
+
+        // Get dependencies
+        $(element)
+          .find('dependency')
+          .each((_, dep) => {
+            const identifierref = $(dep).attr('identifierref');
+            if (identifierref) {
+              dependencies.push(identifierref);
+            }
+          });
+
+        // Determine if it's an item or test
+        const isTest = type.includes('test');
+        const isItem = type.includes('item');
+
+        resourceMap.set(identifier, {
+          href,
+          type,
+          files,
+          dependencies,
+          isItem,
+          isTest
+        });
+      });
+    } catch (e) {
+      results.errors.push(`Error processing manifest: ${e}`);
+    }
+  }
+
+  // Step 3: Process items and test
+  // First, process assessment items
+  for (const [identifier, relativePath] of itemPaths.entries()) {
+    try {
+      const zipEntry = zip.files[relativePath];
+      if (!zipEntry) continue;
+
+      const originalContent = await zipEntry.async('string');
+
+      // Convert QTI 2.x to QTI 3 or perform other processing
+      // For this example, we're just passing through the content
+      // In a real implementation, you would perform the conversion here
+      // const convertedContent = await convertQti2toQti3(originalContent, xsltJson);
+      const convertedContent = await convertAndTransform(originalContent);
+      processItemCallback({
+        identifier,
+        content: convertedContent.xml(),
+        originalContent,
+        relativePath
+      });
+
+      results.itemsProcessed++;
+    } catch (e) {
+      results.errors.push(`Error processing item ${identifier}: ${e}`);
+    }
+  }
+
+  // Then, process assessment test
+  if (testFilePath && testIdentifier) {
+    try {
+      const zipEntry = zip.files[testFilePath];
+      if (zipEntry) {
+        const originalContent = await zipEntry.async('string');
+
+        // Get item references from test
+        const cheerio = await import('cheerio');
+        const $ = cheerio.load(originalContent, { xmlMode: true, xml: true });
+
+        const itemRefs: string[] = [];
+        $('qti-assessment-item-ref, assessmentItemRef').each((_, element) => {
+          const identifier = $(element).attr('identifier');
+          if (identifier) {
+            itemRefs.push(identifier);
+          }
+        });
+
+        // Convert test format
+        const transformResult = await convertAndTransform(originalContent);
+
+        processTestCallback({
+          identifier: testIdentifier,
+          content: transformResult.xml(),
+          originalContent,
+          relativePath: testFilePath,
+          itemRefs
+        });
+
+        results.testsProcessed++;
+      }
+    } catch (e) {
+      results.errors.push(`Error processing test ${testIdentifier}: ${e}`);
+    }
+  }
+
+  results.totalFilesProcessed = results.itemsProcessed + results.testsProcessed;
+
+  return results;
+
+  async function convertAndTransform(originalContent: string) {
+    const convertedContent = await convertQti2toQti3(originalContent, xsltJson);
+    const transform = qtiTransform(convertedContent);
+    let transformResult = await transform
+      .objectToImg()
+      .objectToVideo()
+      .objectToAudio()
+      .stripMaterialInfo()
+      .minChoicesToOne()
+      .externalScored()
+      .qbCleanup()
+      .depConvert()
+      .upgradePci();
+
+    if (localMedia) {
+      // Check if file API is supported
+      const supportFileApi = 'File' in window && 'URL' in window && 'createObjectURL' in URL;
+      if (supportFileApi) {
+        // File API is available, we'll use it to handle the files
+        transformResult = await transformResult.changeAssetLocationAsync(async srcValue => {
+          const normalizedPath = srcValue.startsWith('./') ? srcValue.substring(2) : srcValue;
+          let filePath = normalizedPath;
+          if (!normalizedPath.startsWith('/')) {
+            const testDir = testFilePath?.substring(0, testFilePath.lastIndexOf('/') + 1) || '';
+            filePath = simplifyPath(testDir + normalizedPath);
+          }
+
+          // Remove any leading slash
+          filePath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+          const mediaFile = zip.files[filePath];
+
+          if (mediaFile) {
+            try {
+              // Get file as array buffer
+              let blob = await mediaFile.async('blob');
+              blob = new Blob([blob], {
+                type: getMimeTypeFromFileName(filePath)
+              });
+              const objectUrl = URL.createObjectURL(blob);
+              return objectUrl;
+            } catch (e) {
+              console.error(`Error processing media file ${srcValue}:`, e);
+              return srcValue; // Return original source if there's an error
+            }
+          }
+
+          return srcValue; // Return original source if file not found in zip
+        });
+      } else {
+        // File API not supported, fallback to base64 encoding
+        transformResult = await transformResult.changeAssetLocationAsync(async srcValue => {
+          const normalizedPath = srcValue.startsWith('./') ? srcValue.substring(2) : srcValue;
+          let filePath = normalizedPath;
+          if (!normalizedPath.startsWith('/')) {
+            const testDir = testFilePath?.substring(0, testFilePath.lastIndexOf('/') + 1) || '';
+            filePath = simplifyPath(testDir + normalizedPath);
+          }
+
+          // Remove any leading slash
+          filePath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+          const mediaFile = zip.files[filePath];
+
+          if (mediaFile) {
+            try {
+              // Get file as array buffer
+              const arrayBuffer = await mediaFile.async('arraybuffer');
+
+              // Create base64 data
+              const base64 = arrayBufferToBase64(arrayBuffer);
+              const mimeType = getMimeTypeFromFileName(filePath);
+              const dataUrl = `data:${mimeType};base64,${base64}`;
+
+              return dataUrl;
+            } catch (e) {
+              console.error(`Error processing media file ${srcValue}:`, e);
+              return srcValue;
+            }
+          }
+
+          return srcValue;
+        });
+      }
+    }
+    return transformResult;
+  }
+};
+
 // Helper function to mark a resource and all its dependencies to keep
 function markResourceToKeep(
   resourceMap: Map<
@@ -404,6 +724,73 @@ const getMediaTypeByExtension = (extension: string) => {
       return 'unknown';
   }
 };
+
+function simplifyPath(path: string): string {
+  const parts = path.split('/');
+  const stack: string[] = [];
+
+  for (const part of parts) {
+    if (part === '' || part === '.') {
+      // Skip empty or current directory
+      continue;
+    } else if (part === '..') {
+      if (stack.length > 0 && stack[stack.length - 1] !== '..') {
+        stack.pop(); // Go up one directory
+      } else {
+        // If at root or already outside, keep the '..'
+        stack.push('..');
+      }
+    } else {
+      stack.push(part); // Add valid path part
+    }
+  }
+
+  const simplified = stack.join('/');
+
+  // Preserve leading './' if it was present
+  if (path.startsWith('./')) {
+    return './' + simplified;
+  }
+
+  // Or return just the simplified path
+  return simplified;
+}
+
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+
+  return window.btoa(binary);
+}
+
+// Helper function to determine MIME type from filename
+function getMimeTypeFromFileName(filename) {
+  const extension = filename.split('.').pop().toLowerCase();
+  const mimeTypes = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    svg: 'image/svg+xml',
+    webp: 'image/webp',
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    ogg: 'audio/ogg',
+    pdf: 'application/pdf',
+    json: 'application/json',
+    css: 'text/css'
+    // Add more mime types as needed
+  };
+
+  return mimeTypes[extension] || 'application/octet-stream';
+}
 
 async function listAllContent(zip: JSZip) {
   const nonXMLFiles: {
@@ -688,4 +1075,53 @@ function createBase64SVGPlaceholder(fileName: string): string {
       }
     }
   }
+}
+
+// This is a more aggressive approach to free memory
+// Note: This doesn't specifically target only blobs, but helps with overall memory cleanup
+export function forceMemoryCleanup() {
+  // Step 1: Try to run garbage collection if in a debug environment
+  if (window.gc) {
+    try {
+      window.gc();
+      console.log('Manual garbage collection triggered');
+    } catch (e) {
+      console.log('Manual GC not available in this browser');
+    }
+  }
+
+  // Step 2: Clear browser caches that might be holding references
+  if (window.caches) {
+    caches.keys().then(cacheNames => {
+      cacheNames.forEach(cacheName => {
+        if (cacheName.includes('blob')) {
+          caches
+            .delete(cacheName)
+            .then(() => console.log(`Cache ${cacheName} deleted`))
+            .catch(err => console.error(`Failed to delete cache ${cacheName}:`, err));
+        }
+      });
+    });
+  }
+
+  // Step 3: Clear any session storage items that might reference blobs
+  try {
+    const blobKeys = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      const value = sessionStorage.getItem(key);
+      if (value && (value.includes('blob:') || key.includes('blob'))) {
+        blobKeys.push(key);
+      }
+    }
+
+    blobKeys.forEach(key => {
+      sessionStorage.removeItem(key);
+      console.log(`Removed session storage item: ${key}`);
+    });
+  } catch (e) {
+    console.error('Error clearing session storage:', e);
+  }
+
+  console.log('Memory cleanup operations completed');
 }

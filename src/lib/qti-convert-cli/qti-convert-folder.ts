@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, mkdirSync } from 'fs';
-import { convertPackageFolder } from '../qti-converter';
+import { convertPackageFolder } from '../qti-converter-node';
 
 const folderLocation = process.argv[2];
 

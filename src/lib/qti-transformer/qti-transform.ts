@@ -20,14 +20,13 @@ import {
 } from './transformers';
 import { customInteraction } from './transformers/custom-interaction';
 import { ModuleResolutionConfig } from './transformers/configure-pci';
-
 export { type ModuleResolutionConfig } from './transformers/configure-pci';
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
 // Define the types for the API methods
 interface QtiTransformAPI {
-  fnCh(fn: (xmlString: cheerio.CheerioAPI) => void): QtiTransformAPI;
-  fnChAsync(fn: (xmlString: cheerio.CheerioAPI) => Promise<void>): Promise<QtiTransformAPI>;
+  fnCh(fn: (xml: cheerio.CheerioAPI) => void): QtiTransformAPI;
+  fnChAsync(fn: (xml: cheerio.CheerioAPI) => Promise<void>): Promise<QtiTransformAPI>;
   mathml(): QtiTransformAPI;
   objectToVideo(): QtiTransformAPI;
   objectToAudio(): QtiTransformAPI;
