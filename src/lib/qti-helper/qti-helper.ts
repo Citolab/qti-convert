@@ -395,6 +395,8 @@ export const processPackage = async (
   let testFilePath: string | null = null;
   let testIdentifier: string | null = null;
   const itemPaths = new Map<string, string>(); // Maps identifiers to paths
+  const processedItems: Array<{ identifier: string; content: string; originalContent: string; relativePath: string }> =
+    [];
 
   // Step 1: First pass - identify manifest and test files
   for (const relativePath of Object.keys(zip.files)) {
@@ -456,6 +458,7 @@ export const processPackage = async (
   if (manifestFilePath) {
     try {
       const manifestContent = await zip.files[manifestFilePath].async('string');
+      const cheerio = await import('cheerio');
       const $ = cheerio.load(manifestContent, { xmlMode: true, xml: true });
 
       // Build resource map
@@ -519,16 +522,17 @@ export const processPackage = async (
       const originalContent = await zipEntry.async('string');
 
       // Convert QTI 2.x to QTI 3 or perform other processing
-      // For this example, we're just passing through the content
-      // In a real implementation, you would perform the conversion here
-      // const convertedContent = await convertQti2toQti3(originalContent, xsltJson);
-      const convertedContent = await convertAndTransform(originalContent);
-      processItemCallback({
+      const convertedContent = await convertAndTransform(originalContent, relativePath);
+
+      const itemData = {
         identifier,
         content: convertedContent.xml(),
         originalContent,
         relativePath
-      });
+      };
+
+      processItemCallback(itemData);
+      processedItems.push(itemData);
 
       results.itemsProcessed++;
     } catch (e) {
@@ -537,6 +541,7 @@ export const processPackage = async (
   }
 
   // Then, process assessment test
+  let hasProcessedTest = false;
   if (testFilePath && testIdentifier) {
     try {
       const zipEntry = zip.files[testFilePath];
@@ -566,6 +571,7 @@ export const processPackage = async (
           itemRefs
         });
 
+        hasProcessedTest = true;
         results.testsProcessed++;
       }
     } catch (e) {
@@ -573,11 +579,67 @@ export const processPackage = async (
     }
   }
 
+  // Create a fake assessment if no assessments were found but items exist
+  if (!hasProcessedTest && processedItems.length > 0) {
+    try {
+      // Create a synthetic test XML that includes all items
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+        <qti-assessment-test xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd"
+            identifier="All" title="ALL items"
+            tool-name="CitoLab" tool-version="3.10"
+            xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0">
+            <qti-outcome-declaration identifier="SCORE" cardinality="single" base-type="float">
+                <qti-default-value>
+                    <qti-value>0</qti-value>
+                </qti-default-value>
+            </qti-outcome-declaration>
+            <qti-test-part identifier="RES-b901b8e7-b516-47cc-8adc-165d065f13c7" title="Tespart-1"
+                navigation-mode="nonlinear" submission-mode="simultaneous">
+                <qti-assessment-section identifier="section_1" title="section 1"
+                    visible="true" keep-together="false">
+                    ${processedItems
+                      .map(item => {
+                        return `<qti-assessment-item-ref identifier="${item.identifier}" href="${item.identifier}.xml">
+                          <qti-weight identifier="WEIGHT" value="1" />
+                        </qti-assessment-item-ref>`;
+                      })
+                      .join('')}
+                </qti-assessment-section>
+            </qti-test-part>
+            <qti-outcome-processing>
+                <qti-set-outcome-value identifier="SCORE">
+                    <qti-sum>
+                        <qti-test-variables variable-identifier="SCORE"
+                            weight-identifier="WEIGHT" />
+                    </qti-sum>
+                </qti-set-outcome-value>
+            </qti-outcome-processing>
+        </qti-assessment-test>`;
+
+      // Generate item references for the synthetic test
+      const itemRefs = processedItems.map(item => item.identifier);
+
+      // Call the test callback with our synthetic assessment
+      processTestCallback({
+        identifier: 'All',
+        content: xml,
+        originalContent: xml, // Original and transformed are the same since we created it in QTI 3 format
+        relativePath: 'all-items.xml', // Virtual path
+        itemRefs
+      });
+
+      results.testsProcessed++;
+    } catch (e) {
+      results.errors.push(`Error creating synthetic assessment: ${e}`);
+    }
+  }
+
   results.totalFilesProcessed = results.itemsProcessed + results.testsProcessed;
 
   return results;
 
-  async function convertAndTransform(originalContent: string) {
+  async function convertAndTransform(originalContent: string, relativePath?: string) {
     const convertedContent = await convertQti2toQti3(originalContent, xsltJson);
     const transform = qtiTransform(convertedContent);
     let transformResult = await transform
@@ -600,8 +662,8 @@ export const processPackage = async (
           const normalizedPath = srcValue.startsWith('./') ? srcValue.substring(2) : srcValue;
           let filePath = normalizedPath;
           if (!normalizedPath.startsWith('/')) {
-            const testDir = testFilePath?.substring(0, testFilePath.lastIndexOf('/') + 1) || '';
-            filePath = simplifyPath(testDir + normalizedPath);
+            const itemDir = relativePath?.substring(0, relativePath.lastIndexOf('/') + 1) || '';
+            filePath = simplifyPath(itemDir + normalizedPath);
           }
 
           // Remove any leading slash
@@ -785,7 +847,8 @@ function getMimeTypeFromFileName(filename) {
     ogg: 'audio/ogg',
     pdf: 'application/pdf',
     json: 'application/json',
-    css: 'text/css'
+    css: 'text/css',
+    js: 'application/javascript'
     // Add more mime types as needed
   };
 
