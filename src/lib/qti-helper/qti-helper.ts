@@ -556,8 +556,10 @@ export const processPackage = async (
         $('qti-assessment-item-ref, assessmentItemRef').each((_, element) => {
           const identifier = $(element).attr('identifier');
           const href = $(element).attr('href');
+          // Resolve the href relative to the test file path
+          const resolvedHref = new URL(href, `https://example.com/${testFilePath}`).pathname.replace(/^\/+/, '');
           itemPaths.forEach((itemPath, itemIdentifier) => {
-            if (itemPath === href) {
+            if (itemPath === resolvedHref) {
               itemRefs.push({ itemRefIdentifier: identifier, identifier: itemIdentifier });
             }
           });
