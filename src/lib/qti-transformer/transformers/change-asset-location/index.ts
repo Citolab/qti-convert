@@ -29,6 +29,10 @@ async function changeLocation(
 ) {
   for (const attribute of srcAttributes) {
     for (const node of $(`[${attribute}]`)) {
+      // check if node is not qti-assessment-item-ref
+      if ($(node).is('qti-assessment-item-ref')) {
+        continue;
+      }
       // change asset location
       const srcValue = $(node).attr(attribute)!;
       if (!(skipBase64 && srcValue.startsWith('data:'))) {
