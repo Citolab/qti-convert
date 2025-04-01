@@ -369,7 +369,7 @@ export const processPackage = async (
     content: string;
     originalContent: string;
     relativePath: string;
-    itemRefs: string[];
+    itemRefs: { itemRefIdentifier: string; identifier: string }[];
   }) => void
 ) => {
   const JSZip = await import('jszip');
@@ -552,12 +552,15 @@ export const processPackage = async (
         const cheerio = await import('cheerio');
         const $ = cheerio.load(originalContent, { xmlMode: true, xml: true });
 
-        const itemRefs: string[] = [];
+        const itemRefs: { itemRefIdentifier: string; identifier: string }[] = [];
         $('qti-assessment-item-ref, assessmentItemRef').each((_, element) => {
           const identifier = $(element).attr('identifier');
-          if (identifier) {
-            itemRefs.push(identifier);
-          }
+          const href = $(element).attr('href');
+          itemPaths.forEach((itemPath, itemIdentifier) => {
+            if (itemPath === href) {
+              itemRefs.push({ itemRefIdentifier: identifier, identifier: itemIdentifier });
+            }
+          });
         });
 
         // Convert test format
@@ -618,7 +621,12 @@ export const processPackage = async (
         </qti-assessment-test>`;
 
       // Generate item references for the synthetic test
-      const itemRefs = processedItems.map(item => item.identifier);
+      const itemRefs = processedItems.map(item => {
+        return {
+          itemRefIdentifier: item.identifier,
+          identifier: item.identifier
+        };
+      });
 
       // Call the test callback with our synthetic assessment
       processTestCallback({
