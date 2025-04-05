@@ -350,6 +350,9 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
 /**
  * Processes a package file, extracting and converting assessment items and tests
  * @param file - The package file (zip) to process
+ * @param xsltJson - The XSLT transformation in JSON format
+ * @param localMedia - Whether to process media files locally
+ * @param options - Additional processing options
  * @param processItemCallback - Callback function that handles each processed assessment item
  * @param processTestCallback - Callback function that handles the processed assessment test
  * @returns Promise with processing results
@@ -358,19 +361,22 @@ export const processPackage = async (
   file: Blob,
   xsltJson: string,
   localMedia: boolean,
-  processItemCallback: (itemData: {
-    identifier: string;
-    content: string;
-    originalContent: string;
-    relativePath: string;
-  }) => void,
-  processTestCallback: (testData: {
-    identifier: string;
-    content: string;
-    originalContent: string;
-    relativePath: string;
-    itemRefs: { itemRefIdentifier: string; identifier: string }[];
-  }) => void
+  options: {
+    removeStylesheets?: boolean;
+    skipValidation?: boolean;
+  } = {},
+  processItemCallback?:
+    | ((itemData: { identifier: string; content: string; originalContent: string; relativePath: string }) => void)
+    | null,
+  processTestCallback?:
+    | ((testData: {
+        identifier: string;
+        content: string;
+        originalContent: string;
+        relativePath: string;
+        itemRefs: { itemRefIdentifier: string; identifier: string }[];
+      }) => void)
+    | null
 ) => {
   const JSZip = await import('jszip');
   const zip = await JSZip.default.loadAsync(file);
@@ -380,7 +386,20 @@ export const processPackage = async (
     itemsProcessed: 0,
     testsProcessed: 0,
     totalFilesProcessed: 0,
-    errors: [] as string[]
+    errors: [] as string[],
+    processedItems: [] as {
+      identifier: string;
+      content: string;
+      originalContent: string;
+      relativePath: string;
+    }[],
+    processedTests: [] as {
+      identifier: string;
+      content: string;
+      originalContent: string;
+      relativePath: string;
+      itemRefs: { itemRefIdentifier: string; identifier: string }[];
+    }[]
   };
 
   // Utility to clean and format XML
@@ -390,13 +409,118 @@ export const processPackage = async (
       .replace(/\r?\n|\r/g, '')
       .trim();
   };
+  // Utility to validate XML structure (basic validation, no XSD)
+  const validateXML = async (xml: string, filename: string): Promise<{ isValid: boolean; errors: string[] }> => {
+    try {
+      const cheerio = await import('cheerio');
+      const $ = cheerio.load(xml, { xmlMode: true, xml: true });
+
+      // Basic XML parsing validation (will throw if XML is malformed)
+
+      // Check for common QTI structure issues
+      const errors: string[] = [];
+      // Check for proper XML declaration
+      if (!xml.trim().startsWith('<?xml')) {
+        errors.push('Missing XML declaration. XML should start with <?xml version="1.0"?>');
+      } else {
+        // Check if declaration is properly closed with ?>
+        const firstLine = xml.trim().split('\n')[0];
+        if (!firstLine.includes('?>')) {
+          errors.push('XML declaration is not properly closed with ?>');
+        } else {
+          const declarationMatch = xml.match(/^<\?xml\s+([^?]+)\?>/);
+          if (declarationMatch) {
+            if (!declarationMatch[1].includes('version=')) {
+              errors.push('XML declaration missing required version attribute');
+            }
+            if (!declarationMatch[1].includes('encoding=')) {
+              errors.push('XML declaration missing encoding attribute (recommended: UTF-8)');
+            }
+          }
+        }
+      }
+
+      // Check for duplicate identifiers within the document
+      const identifiers = new Set<string>();
+      $('[identifier]').each((_, el) => {
+        const id = $(el).attr('identifier');
+        if (id && identifiers.has(id)) {
+          errors.push(`Duplicate identifier found: "${id}"`);
+        }
+        if (id) identifiers.add(id);
+      });
+
+      // Check for required elements in QTI items
+      if ($('qti-assessment-item').length > 0) {
+        if ($('qti-assessment-item').attr('identifier') === undefined) {
+          errors.push('Missing required "identifier" attribute on assessment item');
+        }
+
+        // Check for response declarations in interactive items
+        const interactions = [];
+        $('*').each((_, el) => {
+          const tagName = $(el).prop('tagName');
+          if (tagName && tagName.toLowerCase().endsWith('-interaction')) {
+            interactions.push(tagName);
+          }
+        });
+
+        if (interactions.length > 0 && $('qti-response-declaration').length === 0) {
+          errors.push(`Interactive item with ${interactions.join(', ')} missing response declaration`);
+        }
+      }
+
+      // Check for QTI test structure
+      if ($('qti-assessment-test').length > 0) {
+        if ($('qti-assessment-test').attr('identifier') === undefined) {
+          errors.push('Missing required "identifier" attribute on assessment test');
+        }
+
+        if ($('qti-test-part').length === 0) {
+          errors.push('Assessment test missing required test part');
+        }
+
+        if ($('qti-assessment-section').length === 0) {
+          errors.push('Assessment test missing required assessment section');
+        }
+        // Check that qti-assessment-item-ref identifiers are unique
+        const itemRefIdentifiers = new Set<string>();
+        const duplicateItemRefIdentifiers = new Set<string>();
+
+        $('qti-assessment-item-ref, assessmentItemRef').each((_, el) => {
+          const id = $(el).attr('identifier');
+          if (id) {
+            if (itemRefIdentifiers.has(id)) {
+              duplicateItemRefIdentifiers.add(id);
+            } else {
+              itemRefIdentifiers.add(id);
+            }
+          }
+        });
+
+        if (duplicateItemRefIdentifiers.size > 0) {
+          errors.push(
+            `Duplicate qti-assessment-item-ref identifiers found: ${Array.from(duplicateItemRefIdentifiers).join(', ')}`
+          );
+        }
+      }
+      return {
+        isValid: errors.length === 0,
+        errors
+      };
+    } catch (e) {
+      return {
+        isValid: false,
+        errors: [`Failed to parse XML: ${e instanceof Error ? e.message : String(e)}`]
+      };
+    }
+  };
+
   // Track manifest and test file paths
   let manifestFilePath: string | null = null;
   let testFilePath: string | null = null;
   let testIdentifier: string | null = null;
   const itemPaths = new Map<string, string>(); // Maps identifiers to paths
-  const processedItems: Array<{ identifier: string; content: string; originalContent: string; relativePath: string }> =
-    [];
 
   // Step 1: First pass - identify manifest and test files
   for (const relativePath of Object.keys(zip.files)) {
@@ -408,6 +532,14 @@ export const processPackage = async (
     if (fileType === 'xml') {
       try {
         const content = await zipEntry.async('string');
+
+        // Basic XML structure validation if validation is not skipped
+        if (!options.skipValidation) {
+          const basicValidationResult = await validateXML(content, relativePath);
+          if (!basicValidationResult.isValid) {
+            results.errors.push(`Invalid XML structure in ${relativePath}: ${basicValidationResult.errors.join(', ')}`);
+          }
+        }
 
         // Check if this is a manifest file
         if (content.includes('<manifest') || content.includes('<imsmanifest')) {
@@ -531,8 +663,11 @@ export const processPackage = async (
         relativePath
       };
 
-      processItemCallback(itemData);
-      processedItems.push(itemData);
+      // Use callback if provided, otherwise store in results
+      if (typeof processItemCallback === 'function') {
+        processItemCallback(itemData);
+      }
+      results.processedItems.push(itemData);
 
       results.itemsProcessed++;
     } catch (e) {
@@ -568,14 +703,19 @@ export const processPackage = async (
         // Convert test format
         const transformResult = await convertAndTransform(originalContent);
 
-        processTestCallback({
+        const testData = {
           identifier: testIdentifier,
           content: transformResult.xml(),
           originalContent,
           relativePath: testFilePath,
           itemRefs
-        });
+        };
 
+        // Use callback if provided, otherwise store in results
+        if (typeof processTestCallback === 'function') {
+          processTestCallback(testData);
+        }
+        results.processedTests.push(testData);
         hasProcessedTest = true;
         results.testsProcessed++;
       }
@@ -585,7 +725,7 @@ export const processPackage = async (
   }
 
   // Create a fake assessment if no assessments were found but items exist
-  if (!hasProcessedTest && processedItems.length > 0) {
+  if (!hasProcessedTest && results.processedItems.length > 0) {
     try {
       // Create a synthetic test XML that includes all items
       const xml = `<?xml version="1.0" encoding="utf-8"?>
@@ -603,7 +743,7 @@ export const processPackage = async (
                 navigation-mode="nonlinear" submission-mode="simultaneous">
                 <qti-assessment-section identifier="section_1" title="section 1"
                     visible="true" keep-together="false">
-                    ${processedItems
+                    ${results.processedItems
                       .map(item => {
                         return `<qti-assessment-item-ref identifier="${item.identifier}" href="${item.identifier}.xml">
                           <qti-weight identifier="WEIGHT" value="1" />
@@ -623,21 +763,26 @@ export const processPackage = async (
         </qti-assessment-test>`;
 
       // Generate item references for the synthetic test
-      const itemRefs = processedItems.map(item => {
+      const itemRefs = results.processedItems.map(item => {
         return {
           itemRefIdentifier: item.identifier,
           identifier: item.identifier
         };
       });
 
-      // Call the test callback with our synthetic assessment
-      processTestCallback({
+      const testData = {
         identifier: 'All',
         content: xml,
         originalContent: xml, // Original and transformed are the same since we created it in QTI 3 format
         relativePath: 'all-items.xml', // Virtual path
         itemRefs
-      });
+      };
+
+      // Use callback if provided, otherwise store in results
+      if (typeof processTestCallback === 'function') {
+        processTestCallback(testData);
+      }
+      results.processedTests.push(testData);
 
       results.testsProcessed++;
     } catch (e) {
@@ -663,6 +808,9 @@ export const processPackage = async (
       .depConvert()
       .upgradePci();
 
+    if (options.removeStylesheets) {
+      transformResult = transformResult.stripStylesheets();
+    }
     if (localMedia) {
       // Check if file API is supported
       const supportFileApi = 'File' in window && 'URL' in window && 'createObjectURL' in URL;
