@@ -55,14 +55,15 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
   const itemIdentifiersToRemove: string[] = [];
   let testFilePath: string | null = null;
   let manifestFilePath: string | null = null;
-
+  const zipFileToProcess = Object.keys(zip.files).filter(
+    path => !zip.files[path].dir && !path.includes('__MACOSX') && !path.includes('.DS_Store')
+  );
   // Step 1: Identify the assessment test file and which items to remove
-  for (const relativePath of Object.keys(zip.files)) {
-    if (zip.files[relativePath].dir) continue;
+  for (const relativePath of Object.keys(zipFileToProcess)) {
+    if (zipFileToProcess[relativePath].dir) continue;
 
-    const zipEntry = zip.files[relativePath];
+    const zipEntry = zipFileToProcess[relativePath];
     const fileType = relativePath.split('.').pop()?.toLowerCase();
-
     if (fileType === 'xml') {
       const content = await zipEntry.async('string');
 
@@ -131,7 +132,7 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
   }
 
   // Step 2: Process the manifest to identify dependencies
-  const manifestContent = await zip.files[manifestFilePath].async('string');
+  const manifestContent = await zipFileToProcess[manifestFilePath].async('string');
   const resourceMap = new Map<
     string,
     {
@@ -237,8 +238,11 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
   });
 
   // Step 3: Process all files, keeping only what's needed
-  for (const relativePath of Object.keys(zip.files)) {
-    const zipEntry = zip.files[relativePath];
+  for (const relativePath of Object.keys(zipFileToProcess)) {
+    if (relativePath.includes('__MACOSX') || relativePath.includes('.DS_Store')) {
+      continue;
+    }
+    const zipEntry = zipFileToProcess[relativePath];
 
     // Always keep directories
     if (zipEntry.dir) {
@@ -334,8 +338,12 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
   const outputBlob = await newZip.generateAsync({ type: 'blob' });
 
   // Count how many files were removed
-  const originalFileCount = Object.keys(zip.files).filter(path => !zip.files[path].dir).length;
-  const newFileCount = Object.keys(newZip.files).filter(path => !newZip.files[path].dir).length;
+  const originalFileCount = Object.keys(zip.files).filter(
+    path => !zip.files[path].dir && !path.includes('__MACOSX') && !path.includes('.DS_Store')
+  ).length;
+  const newFileCount = Object.keys(newZip.files).filter(
+    path => !newZip.files[path].dir && !path.includes('__MACOSX') && !path.includes('.DS_Store')
+  ).length;
   const removedFilesCount = originalFileCount - newFileCount;
 
   return {
@@ -442,7 +450,7 @@ export const processPackage = async (
 
       // Check for duplicate identifiers within the document
       const identifiers = new Set<string>();
-      $('[identifier]').each((_, el) => {
+      $('qti-outcome-declaration[identifier], qti-response-declaration[identifier]').each((_, el) => {
         const id = $(el).attr('identifier');
         if (id && identifiers.has(id)) {
           errors.push(`Duplicate identifier found: "${id}"`);
@@ -521,9 +529,11 @@ export const processPackage = async (
   let testFilePath: string | null = null;
   let testIdentifier: string | null = null;
   const itemPaths = new Map<string, string>(); // Maps identifiers to paths
-
+  const zipFileToProcess = Object.keys(zip.files).filter(
+    path => !path.includes('__MACOSX') && !path.includes('.DS_Store')
+  );
   // Step 1: First pass - identify manifest and test files
-  for (const relativePath of Object.keys(zip.files)) {
+  for (const relativePath of zipFileToProcess) {
     if (zip.files[relativePath].dir) continue;
 
     const zipEntry = zip.files[relativePath];
