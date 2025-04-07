@@ -755,7 +755,7 @@ export const processPackage = async (
                     visible="true" keep-together="false">
                     ${results.processedItems
                       .map(item => {
-                        return `<qti-assessment-item-ref identifier="${item.identifier}" href="${item.identifier}.xml">
+                        return `<qti-assessment-item-ref identifier="${item.identifier}" href="${item.relativePath}">
                           <qti-weight identifier="WEIGHT" value="1" />
                         </qti-assessment-item-ref>`;
                       })
