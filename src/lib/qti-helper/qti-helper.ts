@@ -441,9 +441,9 @@ export const processPackage = async (
             if (!declarationMatch[1].includes('version=')) {
               errors.push('XML declaration missing required version attribute');
             }
-            if (!declarationMatch[1].includes('encoding=')) {
-              errors.push('XML declaration missing encoding attribute (recommended: UTF-8)');
-            }
+            // if (!declarationMatch[1].includes('encoding=')) {
+            //   errors.push('XML declaration missing encoding attribute (recommended: UTF-8)');
+            // }
           }
         }
       }
