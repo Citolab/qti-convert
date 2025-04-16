@@ -807,6 +807,7 @@ export const processPackage = async (
   async function convertAndTransform(originalContent: string, relativePath?: string) {
     const convertedContent = await convertQti2toQti3(originalContent, xsltJson);
     const transform = qtiTransform(convertedContent);
+    const folderPath = relativePath?.substring(0, relativePath.lastIndexOf('/') + 1) || '';
     let transformResult = await transform
       .objectToImg()
       .objectToVideo()
@@ -814,6 +815,7 @@ export const processPackage = async (
       .stripMaterialInfo()
       .minChoicesToOne()
       .externalScored()
+      .customInteraction('/', folderPath)
       .qbCleanup()
       .depConvert()
       .upgradePci();
@@ -836,6 +838,17 @@ export const processPackage = async (
 
           // Remove any leading slash
           filePath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+
+          // Special handling for manifest.json
+          if (filePath.endsWith('manifest.json')) {
+            return await processManifestJson(filePath, zip, relativePath);
+          }
+
+          return await createBlobUrl(filePath, zip, srcValue);
+        });
+
+        // Function to create blob URL for a file
+        async function createBlobUrl(filePath, zip, originalSrcValue) {
           const mediaFile = zip.files[filePath];
 
           if (mediaFile) {
@@ -848,13 +861,62 @@ export const processPackage = async (
               const objectUrl = URL.createObjectURL(blob);
               return objectUrl;
             } catch (e) {
-              console.error(`Error processing media file ${srcValue}:`, e);
-              return srcValue; // Return original source if there's an error
+              console.error(`Error processing media file ${filePath}:`, e);
+              return originalSrcValue; // Return original source if there's an error
             }
           }
 
-          return srcValue; // Return original source if file not found in zip
-        });
+          return originalSrcValue; // Return original source if file not found in zip
+        }
+
+        // Function to process manifest.json
+        async function processManifestJson(manifestPath, zip, relativePath) {
+          const manifestFile = zip.files[manifestPath];
+          debugger;
+
+          if (!manifestFile) {
+            console.error(`Manifest file not found: ${manifestPath}`);
+            return manifestPath; // Return original path if file not found
+          }
+
+          try {
+            // Read and parse the manifest
+            const manifestContent = await manifestFile.async('text');
+            const manifest = JSON.parse(manifestContent);
+
+            // Process each type of reference in the manifest
+            for (const type of ['script', 'style', 'media']) {
+              if (Array.isArray(manifest[type])) {
+                // Process each file reference
+                for (let i = 0; i < manifest[type].length; i++) {
+                  const refPath = manifest[type][i];
+
+                  // Normalize and resolve the referenced file path
+                  let resolvedPath = refPath;
+                  resolvedPath = resolvedPath.startsWith('/') ? resolvedPath.substring(1) : resolvedPath;
+
+                  // Create blob URL for the referenced file
+                  const blobUrl = await createBlobUrl(resolvedPath, zip, refPath);
+
+                  // Update the manifest with the blob URL
+                  manifest[type][i] = blobUrl;
+                }
+              }
+            }
+
+            // Create a new blob for the modified manifest
+            const modifiedManifestContent = JSON.stringify(manifest);
+            const blob = new Blob([modifiedManifestContent], {
+              type: 'application/json'
+            });
+
+            // Return the blob URL for the modified manifest
+            return URL.createObjectURL(blob);
+          } catch (e) {
+            console.error(`Error processing manifest.json ${manifestPath}:`, e);
+            return manifestPath; // Return original path if there's an error
+          }
+        }
       } else {
         // File API not supported, fallback to base64 encoding
         transformResult = await transformResult.changeAssetLocationAsync(async srcValue => {
