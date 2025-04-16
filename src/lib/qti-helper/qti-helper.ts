@@ -5,6 +5,7 @@ import { Element } from 'domhandler';
 import { convertQti2toQti3 } from '../qti-converter';
 import { qtiTransform } from '../qti-transformer';
 import { css } from 'cheerio/dist/commonjs/api/css';
+import { ciBootstrap, registerCES } from './ci-bootstap';
 
 export const qtiReferenceAttributes = [
   'src',
@@ -839,9 +840,20 @@ export const processPackage = async (
           // Remove any leading slash
           filePath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
 
+          // Check for special files that need custom handling
+          const lowerFilePath = filePath.toLowerCase();
+
           // Special handling for manifest.json
-          if (filePath.endsWith('manifest.json')) {
+          if (lowerFilePath.endsWith('manifest.json')) {
             return await processManifestJson(filePath, zip, relativePath);
+          }
+          // Special handling for bootstrap.js
+          else if (lowerFilePath.endsWith('bootstrap.js')) {
+            return await processBootstrapJs(filePath, zip, srcValue);
+          }
+          // Special handling for index.html
+          else if (lowerFilePath.endsWith('index.html')) {
+            return await processIndexHtml(filePath, zip, srcValue);
           }
 
           return await createBlobUrl(filePath, zip, srcValue);
@@ -869,10 +881,106 @@ export const processPackage = async (
           return originalSrcValue; // Return original source if file not found in zip
         }
 
+        // Function to process bootstrap.js file
+        async function processBootstrapJs(filePath, zip, originalSrcValue) {
+          const bootstrapFile = zip.files[filePath];
+
+          if (!bootstrapFile) {
+            console.error(`Bootstrap file not found: ${filePath}`);
+            return originalSrcValue;
+          }
+
+          try {
+            // Read the content of the bootstrap.js file
+            const contentBuffer = await bootstrapFile.async('uint8array');
+            const contentString = new TextDecoder().decode(contentBuffer);
+
+            // Check if it contains 'CES'
+            if (contentString.indexOf('CES') < 0) {
+              // If it doesn't contain 'CES', just return the normal blob URL
+              return await createBlobUrl(filePath, zip, originalSrcValue);
+            }
+
+            // Create the .org file
+            const orgFilePath = filePath.replace('bootstrap.js', 'bootstrap.org.js');
+
+            // Create a blob URL for the original content
+            const orgBlob = new Blob([contentBuffer], {
+              type: 'application/javascript'
+            });
+            const orgBlobUrl = URL.createObjectURL(orgBlob);
+
+            // Store the original URL in the zip object for future reference
+            zip.orgBootstrapUrl = orgBlobUrl;
+
+            // Create a blob with the new content
+            const newBlob = new Blob([ciBootstrap], {
+              type: 'application/javascript'
+            });
+
+            // Return the blob URL for the modified content
+            return URL.createObjectURL(newBlob);
+          } catch (e) {
+            console.error(`Error processing bootstrap.js ${filePath}:`, e);
+            return await createBlobUrl(filePath, zip, originalSrcValue);
+          }
+        }
+
+        // Function to process index.html file
+        async function processIndexHtml(filePath, zip, originalSrcValue) {
+          const indexFile = zip.files[filePath];
+
+          if (!indexFile) {
+            console.error(`Index file not found: ${filePath}`);
+            return originalSrcValue;
+          }
+
+          try {
+            // Read the content of the index.html file
+            const contentBuffer = await indexFile.async('uint8array');
+            const contentString = new TextDecoder().decode(contentBuffer);
+
+            // Check for <head> tag and CES
+            const headIndex = contentString.indexOf('<head>');
+            if (headIndex < 0 || contentString.indexOf('CES') < 0) {
+              // If it doesn't meet the criteria, just return the normal blob URL
+              return await createBlobUrl(filePath, zip, originalSrcValue);
+            }
+
+            // Create the .org file
+            const orgFilePath = filePath.replace('index.html', 'index.org.html');
+
+            // Create a blob URL for the original content
+            const orgBlob = new Blob([contentBuffer], {
+              type: 'text/html'
+            });
+            const orgBlobUrl = URL.createObjectURL(orgBlob);
+
+            // Store the original URL in the zip object for future reference
+            zip.orgIndexUrl = orgBlobUrl;
+
+            // Create the modified content with the registerCES script
+            const newContent = contentString
+              .slice(0, headIndex + 6)
+              .concat(`<script>${registerCES}</script>`)
+              .concat(contentString.slice(headIndex + 6));
+
+            // Create a blob with the new content
+            const newBlob = new Blob([newContent], {
+              type: 'text/html'
+            });
+
+            // Return the blob URL for the modified content
+            return URL.createObjectURL(newBlob);
+          } catch (e) {
+            console.error(`Error processing index.html ${filePath}:`, e);
+            return await createBlobUrl(filePath, zip, originalSrcValue);
+          }
+        }
+
         // Function to process manifest.json
         async function processManifestJson(manifestPath, zip, relativePath) {
           const manifestFile = zip.files[manifestPath];
-          debugger;
 
           if (!manifestFile) {
             console.error(`Manifest file not found: ${manifestPath}`);
@@ -895,8 +1003,39 @@ export const processPackage = async (
                   let resolvedPath = refPath;
                   resolvedPath = resolvedPath.startsWith('/') ? resolvedPath.substring(1) : resolvedPath;
 
-                  // Create blob URL for the referenced file
-                  const blobUrl = await createBlobUrl(resolvedPath, zip, refPath);
+                  const lowerPath = resolvedPath.toLowerCase();
+                  let blobUrl;
+
+                  // Handle special cases for bootstrap.js and index.html
+                  if (lowerPath.endsWith('bootstrap.js')) {
+                    blobUrl = await processBootstrapJs(resolvedPath, zip, refPath);
+
+                    // Also add the original bootstrap.js URL if it exists
+                    if (zip.orgBootstrapUrl && type === 'script') {
+                      // Create a path for the .org file
+                      const orgPath = refPath.replace('bootstrap.js', 'bootstrap.org.js');
+
+                      // Only add if not already in the array
+                      if (!manifest[type].includes(orgPath) && !manifest[type].includes(zip.orgBootstrapUrl)) {
+                        manifest[type].push(zip.orgBootstrapUrl);
+                      }
+                    }
+                  } else if (lowerPath.endsWith('index.html')) {
+                    blobUrl = await processIndexHtml(resolvedPath, zip, refPath);
+
+                    // Also add the original index.html URL if it exists
+                    if (zip.orgIndexUrl && type === 'media') {
+                      // Create a path for the .org file
+                      const orgPath = refPath.replace('index.html', 'index.org.html');
+
+                      // Only add if not already in the array
+                      if (!manifest[type].includes(orgPath) && !manifest[type].includes(zip.orgIndexUrl)) {
+                        manifest[type].push(zip.orgIndexUrl);
+                      }
+                    }
+                  } else {
+                    blobUrl = await createBlobUrl(resolvedPath, zip, refPath);
+                  }
 
                   // Update the manifest with the blob URL
                   manifest[type][i] = blobUrl;
