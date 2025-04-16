@@ -21,12 +21,10 @@ test('transform object type="audio to audio tag', async () => {
 `;
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
     <qti-media-interaction response-identifier="AUDIORESPONSE" autostart="false" max-plays="0" id="I6f9b9b94-5a79-477a-a462-19db78f7ebf1">
-      <audio controls="true">
+      <audio width="240" height="28" controls="true" >
         <source src="../audio/India_BB.opus" type="audio/ogg" />
       </audio>
-    </qti-media-interaction>
-
-`;
+    </qti-media-interaction>`;
   const result = await transformObjectTags(input);
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
