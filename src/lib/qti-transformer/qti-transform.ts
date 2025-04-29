@@ -6,6 +6,7 @@ import {
   objectToImg,
   objectToVideo,
   objectToAudio,
+  ssmlSubToSpan,
   upgradePci,
   suffixa,
   toMathMLWebcomponents,
@@ -31,6 +32,7 @@ interface QtiTransformAPI {
   objectToVideo(): QtiTransformAPI;
   objectToAudio(): QtiTransformAPI;
   objectToImg(): QtiTransformAPI;
+  ssmlSubToSpan(): QtiTransformAPI;
   changeAssetLocation(
     getNewUrl: (oldUrl: string) => string,
     srcAttribute?: string[],
@@ -132,6 +134,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     objectToImg() {
       objectToImg($);
+      return api;
+    },
+    ssmlSubToSpan() {
+      ssmlSubToSpan($);
       return api;
     },
     changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true) {

@@ -813,6 +813,7 @@ export const processPackage = async (
       .objectToImg()
       .objectToVideo()
       .objectToAudio()
+      .ssmlSubToSpan()
       .stripMaterialInfo()
       .minChoicesToOne()
       .externalScored()

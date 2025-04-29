@@ -192,6 +192,7 @@ export async function convertPackage(
         .objectToImg()
         .objectToVideo()
         .objectToAudio()
+        .ssmlSubToSpan()
         .stripMaterialInfo()
         .minChoicesToOne()
         .externalScored()

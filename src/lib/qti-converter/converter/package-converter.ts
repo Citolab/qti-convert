@@ -72,6 +72,7 @@ export async function convertPackageStream(
         .objectToImg()
         .objectToVideo()
         .objectToAudio()
+        .ssmlSubToSpan()
         .stripMaterialInfo()
         .minChoicesToOne()
         .externalScored()

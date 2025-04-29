@@ -236,7 +236,7 @@ qtiTransform(xmlValue).fnCh($ => {
 Apply an asynchronous function to the XML.
 
 ```ts
-await(xmlValue).fnChAsync(async $ => {
+await xmlValue.fnChAsync(async $ => {
   // Your custom asynchronous transformation logic
 });
 ```
@@ -247,6 +247,7 @@ The build-in functions that can be chained are:
 - `objectToVideo(): QtiTransformAPI`: Convert `<object>` elements to `<video>` elements..
 - `objectToAudio(): QtiTransformAPI`: Convert `<object>` elements to `<audio>` elements..
 - `objectToImg(): QtiTransformAPI`: Convert `<object>` elements to `<img>` elements.
+- `ssmlSubToSpan(): QtiTransformAPI`: Convert <ssml:sub> to data-ssml attributes
 - `stripStylesheets(): QtiTransformAPI`: Remove all stylesheet references from the XML.
 - `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. Url can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overriden. Also by default you won't get a callback for base64 urls.
 - `changeAssetLocationAsync(getNewUrl: (oldUrl: string) => Promise<string>, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Async function of changeAssetLocation
