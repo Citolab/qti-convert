@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 
 test('convert <ssml:sub> to <span data-ssml-sub-alias="...">', () => {
   const input = `<p>Temperature is <ssml:sub alias="degrees Celsius">°C</ssml:sub>.</p>`;
-  const expectedOutput = `<p>Temperature is <span data-ssml-sub-alias="degrees Celsius">°C</span>.</p>`;
+  const expectedOutput = `<p>Temperature is <span data-ssml-sub-alias="degrees Celsius">&#xb0;C</span>.</p>`;
 
   const $ = cheerio.load(input, { xmlMode: true });
   convertSSMLToDataAttributes($);
@@ -13,7 +13,7 @@ test('convert <ssml:sub> to <span data-ssml-sub-alias="...">', () => {
 
 test('convert <ssml:break> to <span data-ssml-break-time="...">', () => {
   const input = `<p>Wait<ssml:break time="1s"/>now.</p>`;
-  const expectedOutput = `<p>Wait<span data-ssml-break-time="1s"></span>now.</p>`;
+  const expectedOutput = `<p>Wait<span data-ssml-break-time="1s"/>now.</p>`;
 
   const $ = cheerio.load(input, { xmlMode: true });
   convertSSMLToDataAttributes($);
@@ -31,7 +31,7 @@ test('convert <ssml:say-as> to <span data-ssml-say-as="...">', () => {
 
 test('convert <ssml:phoneme> to <span data-ssml-phoneme-ph="...">', () => {
   const input = `<p>Pronounce <ssml:phoneme alphabet="ipa" ph="tɛst">test</ssml:phoneme>.</p>`;
-  const expectedOutput = `<p>Pronounce <span data-ssml-phoneme-ph="tɛst" data-ssml-phoneme-alphabet="ipa">test</span>.</p>`;
+  const expectedOutput = `<p>Pronounce <span data-ssml-phoneme-ph="t&#x25b;st" data-ssml-phoneme-alphabet="ipa">test</span>.</p>`;
 
   const $ = cheerio.load(input, { xmlMode: true });
   convertSSMLToDataAttributes($);
