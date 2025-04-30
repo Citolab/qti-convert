@@ -11,7 +11,8 @@ export function objectToVideo($: cheerio.CheerioAPI) {
       videoEl.attr('controls') === 'true' ||
       (videoEl.attr('controls') !== null && videoEl.attr('controls') !== undefined);
     if (shouldHaveControls) {
-      videoEl.attr('controls', 'controls');
+      // add the controls attribute without a value
+      videoEl.attr('controls', '');
     } else {
       videoEl.removeAttr('controls');
     }

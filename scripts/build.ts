@@ -58,6 +58,7 @@ const convertOptions = {
   // tsconfig: '../tsconfig.node.json',
   entry: [
     './src/lib/qti-converter/index.ts',
+    './src/lib/qti-converter-node/index.ts',
     './src/lib/qti-transformer/index.ts',
     './src/lib/qti-loader/index.ts',
     './src/lib/qti-helper/index.ts'

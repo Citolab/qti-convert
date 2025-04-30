@@ -4,7 +4,6 @@ import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 import { convertQti2toQti3 } from '../qti-converter';
 import { qtiTransform } from '../qti-transformer';
-import { css } from 'cheerio/dist/commonjs/api/css';
 import { ciBootstrap, registerCES } from './ci-bootstap';
 
 export const qtiReferenceAttributes = [

@@ -11,7 +11,7 @@ export function objectToAudio($: cheerio.CheerioAPI) {
       audioEl.attr('controls') === 'true' ||
       (audioEl.attr('controls') !== null && audioEl.attr('controls') !== undefined);
     if (shouldHaveControls) {
-      audioEl.attr('controls', 'controls');
+      audioEl.attr('controls', '');
     } else {
       audioEl.removeAttr('controls');
     }
