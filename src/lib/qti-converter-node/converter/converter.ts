@@ -1,9 +1,21 @@
 // import convert from 'qti30upgrader';
 
-import saxon from 'saxon-js';
-
 import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json' assert { type: 'json' };
 import { cleanXMLString } from 'src/lib/qti-helper';
+
+// Attempt to access a global SaxonJS first
+let saxon = globalThis.SaxonJS;
+
+if (!saxon) {
+  try {
+    // Dynamically import saxon-js only if not already loaded
+    const module = await import('saxon-js');
+    saxon = module.default || module;
+    globalThis.SaxonJS = saxon; // cache it globally if you want
+  } catch (err) {
+    throw new Error('SaxonJS could not be loaded: ' + err.message);
+  }
+}
 
 const convert = (qti2: string) => {
   // const env = saxon.getPlatform();
