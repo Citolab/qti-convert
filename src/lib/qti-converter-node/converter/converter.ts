@@ -6,16 +6,16 @@ import { cleanXMLString } from 'src/lib/qti-helper';
 // Attempt to access a global SaxonJS first
 let saxon = globalThis.SaxonJS;
 
-if (!saxon) {
-  try {
-    // Dynamically import saxon-js only if not already loaded
-    const module = await import('saxon-js');
-    saxon = module.default || module;
-    globalThis.SaxonJS = saxon; // cache it globally if you want
-  } catch (err) {
-    throw new Error('SaxonJS could not be loaded: ' + err.message);
-  }
-}
+// if (!saxon) {
+//   try {
+//     // Dynamically import saxon-js only if not already loaded
+//     const module = await import('saxon-js');
+//     saxonJS = module.default || module;
+//     globalThis.SaxonJS = saxonJS; // cache it globally if you want
+//   } catch (err) {
+//     throw new Error('SaxonJS could not be loaded: ' + err.message);
+//   }
+// }
 
 const convert = (qti2: string) => {
   // const env = saxon.getPlatform();
