@@ -3,9 +3,6 @@
 import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json' assert { type: 'json' };
 import { cleanXMLString } from 'src/lib/qti-helper';
 
-// Attempt to access a global SaxonJS first
-let saxon = globalThis.SaxonJS;
-
 // if (!saxon) {
 //   try {
 //     // Dynamically import saxon-js only if not already loaded
@@ -24,17 +21,15 @@ const convert = (qti2: string) => {
   // const sef = saxon.compile(doc);
   qti2 = cleanXMLString(qti2);
 
-  return saxon
-    .transform(
-      {
-        stylesheetText: JSON.stringify(styleSheetString), // './node_modules/qti30upgrader/qti2xTo30.sef.json',
-        sourceType: 'xml',
-        sourceText: qti2,
-        destination: 'serialized'
-      },
-      'async'
-    )
-    .then(output => output.principalResult);
+  return globalThis.SaxonJS.transform(
+    {
+      stylesheetText: JSON.stringify(styleSheetString), // './node_modules/qti30upgrader/qti2xTo30.sef.json',
+      sourceType: 'xml',
+      sourceText: qti2,
+      destination: 'serialized'
+    },
+    'async'
+  ).then(output => output.principalResult);
 };
 
 export const convertQti2toQti3 = async (qti2: string): Promise<string> => {

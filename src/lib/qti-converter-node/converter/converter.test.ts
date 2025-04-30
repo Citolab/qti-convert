@@ -38,6 +38,8 @@ async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
 // });
 
 test('qti2 to qti3 convert should work', async () => {
+  const saxonModule = await import('saxon-js'); // Ensure saxon-js is installed
+  globalThis.SaxonJS = saxonModule.default || saxonModule;
   const input = `<?xml version="1.0" encoding="UTF-8"?>
   <assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -73,6 +75,8 @@ test('qti2 to qti3 convert should work', async () => {
 });
 
 test('convert a TAO PCI', async () => {
+  const saxonModule = await import('saxon-js'); // Ensure saxon-js is installed
+  globalThis.SaxonJS = saxonModule.default || saxonModule;
   const qti2 = `<?xml version="1.0" encoding="UTF-8"?>
 <assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p2" xmlns:html5="html5" xmlns:m="http://www.w3.org/1998/Math/MathML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p2 http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd" identifier="i605b50d60c465892a88c0651ffd390" title="decisiontask" label="decisiontask" xml:lang="en-US" adaptive="false" timeDependent="false" toolName="TAO" toolVersion="3.4.0-sprint134">
   <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>
