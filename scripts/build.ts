@@ -51,7 +51,7 @@ const cliOptions = {
 
 const convertOptions = {
   clean: false,
-  target: 'es2017',
+  target: 'ES2022',
   dts: true,
   format: ['esm'],
   sourcemap: 'inline',
