@@ -960,10 +960,30 @@ export const processPackage = async (
             zip.orgIndexUrl = orgBlobUrl;
 
             // Create the modified content with the registerCES script
-            const newContent = contentString
-              .slice(0, headIndex + 6)
-              .concat(`<script>${registerCES}</script>`)
-              .concat(contentString.slice(headIndex + 6));
+            const scriptTag = `<script>${registerCES}</script>`;
+
+            // Remove duplicate script tags if any
+            const scriptTagRegex = new RegExp(
+              `<script>${registerCES.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&')}</script>`,
+              'g'
+            );
+            const matches = [...contentString.matchAll(scriptTagRegex)];
+            let cleanedContent = contentString.replace(scriptTagRegex, '');
+
+            // If the script tag was found at least once, keep one copy
+            if (matches.length > 0) {
+              cleanedContent = cleanedContent.replace('</head>', `${scriptTag}</head>`);
+            } else {
+              const headIndex = cleanedContent.indexOf('<head>');
+              if (headIndex !== -1) {
+                cleanedContent = cleanedContent
+                  .slice(0, headIndex + 6)
+                  .concat(scriptTag)
+                  .concat(cleanedContent.slice(headIndex + 6));
+              }
+            }
+
+            const newContent = cleanedContent;
 
             // Create a blob with the new content
             const newBlob = new Blob([newContent], {
