@@ -1,5 +1,4 @@
 export const CES = `
-
 const postToParentWindows = (type, data) => {
     window.top.postMessage(data ? { type, data } : { type }, '*');
     let w = window.parent;
@@ -15,44 +14,56 @@ const postToParentWindows = (type, data) => {
     }
 };
 
-window.CES = {
-  media: null,
-  response: null,
-  load: () => {
-    let resolveCount = 0;
+ window.CES = {
+    media: null,
+    response: null,
+    load: () => {
+      let resolveCount = 0;
 
-    const handleMessage = (event) => {
-      if (event.data.type === "mediaData") {
-        const media = event.data.data;
-        CES.media = media;
-        resolveCount++;
-      } else if (event.data.type === "responseData") {
-        const response = event.data.data;
-
-        CES.response = response;
-        resolveCount++;
-      }
-      if (resolveCount === 2) {
-        window.removeEventListener("message", handleMessage);
-      }
-    };
-    window.addEventListener("message", handleMessage);
-    postToParentWindows("getMedia");
-    postToParentWindows("getResponse");
-  },
-  setResponse: (data) => {
-    postToParentWindows("setResponse", data);
-  },
-  getResponse: () => {
-    return CES.response;
-  },
-  getMedia: () => {
-    return CES.media;
-  },
-  setStageHeight: () => {
-    postToParentWindows("setResponse");
-  },
-};
+      const handleMessage = (event) => {
+        if (event.data.type === "mediaData") {
+          const media = event.data.data;
+          CES.media = media;
+          resolveCount++;
+        } else if (event.data.type === "responseData") {
+          const response = event.data.data;
+          if (response && Array.isArray(response) && response.length > 0) {
+            // state is stored in the first element of the array
+            CES.response = response[0];
+                  // Wait a short moment to ensure CES.response is set
+            setTimeout(() => {
+              // Re-create the Controller instance if it exists
+              if (typeof Controller === 'function') {
+                console.log("Re-creating Controller instance");
+                ctrl = new Controller();
+              }
+            }, 50);
+          } else {  
+          CES.response = response;
+          }
+          resolveCount++;
+        }
+        if (resolveCount === 2) {
+          //window.removeEventListener("message", handleMessage);
+        }
+      };
+      window.addEventListener("message", handleMessage);
+      postToParentWindows("getMedia");
+      postToParentWindows("getResponse");
+    },
+    setResponse: (data) => {
+      postToParentWindows("setResponse", data);
+    },
+    getResponse: () => {
+      return CES.response;
+    },
+    getMedia: () => {
+      return CES.media;
+    },
+    setStageHeight: () => {
+      postToParentWindows("setResponse");
+    },
+  };
 `;
 
 export const ciBootstrap = `
