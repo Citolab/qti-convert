@@ -1,7 +1,7 @@
 import archiver from 'archiver';
 import * as cheerio from 'cheerio';
 import { createWriteStream, existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { dirname } from 'path';
+import path, { dirname } from 'path';
 import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 
@@ -50,7 +50,7 @@ export const determineQtiVersion = (foldername: string): '2.x' | '3.0' => {
       if (file === '.DS_Store') {
         continue;
       }
-      const subfolder = `${foldername}/${file}`;
+      const subfolder = path.resolve(foldername, file);
       if (lstatSync(subfolder).isDirectory()) {
         const subResult = determineQtiVersion(subfolder);
         if (subResult !== undefined) {
