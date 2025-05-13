@@ -1,15 +1,15 @@
 // import { readFileSync, writeFile } from 'fs';
 // import { removeMediaFromPackage } from './qti-helper';
 import { expect, test } from 'vitest';
-import {
-  createAssessmentTest,
-  createOrCompleteManifest,
-  createPackageZip,
-  createPackageZipsPerItem
-} from '../qti-helper-node';
-import { writeFileSync } from 'fs';
+// import {
+//   createAssessmentTest,
+//   createOrCompleteManifest,
+//   createPackageZip,
+//   createPackageZipsPerItem
+// } from '../qti-helper-node';
+// import { writeFileSync } from 'fs';
 
-const pkg = '';
+// const pkg = '';
 
 // test(
 //   'strip media',
