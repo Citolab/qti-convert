@@ -9,7 +9,7 @@ import {
 } from '../qti-helper-node';
 import { writeFileSync } from 'fs';
 
-const pkg = '/Users/marcelh/Downloads/examen_single/select-point';
+const pkg = '';
 
 // test(
 //   'strip media',
@@ -26,27 +26,27 @@ const pkg = '/Users/marcelh/Downloads/examen_single/select-point';
 //   { timeout: 100000 }
 // );
 
-test(
-  'create test',
-  async () => {
-    const assessment = await createAssessmentTest(pkg);
-    writeFileSync(`${pkg}/test.xml`, assessment);
-    console.log('Successfully added/completed the test.');
-    expect(false).toEqual(false);
-  },
-  { timeout: 100000 }
-);
+// test(
+//   'create test',
+//   async () => {
+//     const assessment = await createAssessmentTest(pkg);
+//     writeFileSync(`${pkg}/test.xml`, assessment);
+//     console.log('Successfully added/completed the test.');
+//     expect(false).toEqual(false);
+//   },
+//   { timeout: 100000 }
+// );
 
-test(
-  'create manifest',
-  async () => {
-    const manifest = await createOrCompleteManifest(pkg);
-    writeFileSync(`${pkg}/imsmanifest.xml`, manifest);
-    console.log('Successfully added/completed the manifest.');
-    expect(false).toEqual(false);
-  },
-  { timeout: 100000 }
-);
+// test(
+//   'create manifest',
+//   async () => {
+//     const manifest = await createOrCompleteManifest(pkg);
+//     writeFileSync(`${pkg}/imsmanifest.xml`, manifest);
+//     console.log('Successfully added/completed the manifest.');
+//     expect(false).toEqual(false);
+//   },
+//   { timeout: 100000 }
+// );
 
 // test(
 //   'create package',
