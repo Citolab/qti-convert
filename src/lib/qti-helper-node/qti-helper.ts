@@ -494,7 +494,27 @@ export const createAssessmentTest = async (foldername: string) => {
   const version = determineQtiVersion(foldername);
   getAllXmlResourcesRecursivelyWithDependencies(allResouces, foldername, version);
   const items = allResouces.filter(item => item.type.includes('imsqti_item'));
+  items.sort((a, b) => {
+    const getLeadingNumber = (filename: string): number | null => {
+      const match = path.basename(filename).match(/^(\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    };
 
+    const aNum = getLeadingNumber(a.href);
+    const bNum = getLeadingNumber(b.href);
+
+    // Both have numbers → compare numerically
+    if (aNum !== null && bNum !== null) return aNum - bNum;
+
+    // Only a has number → it comes first
+    if (aNum !== null) return -1;
+
+    // Only b has number → it comes first
+    if (bNum !== null) return 1;
+
+    // Neither has number → sort alphabetically
+    return path.basename(a.href).localeCompare(path.basename(b.href));
+  });
   const formatTag = (tagName: string) => {
     return formatTagByVersion(tagName, version);
   };
@@ -502,7 +522,7 @@ export const createAssessmentTest = async (foldername: string) => {
   const formatAttributes = (attributes: string) => {
     return formatAttributesByVersion(attributes, version);
   };
-
+  const identifierCounts: Record<string, number> = {};
   const xmlString = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 ${
   version === '3.0'
@@ -529,12 +549,26 @@ ${
       'submission-mode="simultaneous" navigation-mode="nonlinear" identifier="TP"'
     )}>
         <${formatTag('assessment-section')} title="Section 1" visible="true" identifier="S1">
-            ${items
-              .map(item => {
-                const relativePath = item.href.replace(foldername + '/', '').replace(foldername, '');
-                return `<${formatTag('assessment-item-ref')} href="${relativePath}" identifier="${item.identifier}"/>`;
-              })
-              .join('\n')}
+        ${items
+          .map(item => {
+            const relativePath = path.relative(foldername, item.href);
+
+            // Ensure unique identifier
+            let uniqueIdentifier = item.identifier;
+            if (!uniqueIdentifier) {
+              uniqueIdentifier = path.basename(relativePath, '.xml'); // fallback if identifier is missing
+            }
+
+            if (identifierCounts[uniqueIdentifier] != null) {
+              identifierCounts[uniqueIdentifier]++;
+              uniqueIdentifier = `${uniqueIdentifier}_${identifierCounts[uniqueIdentifier]}`;
+            } else {
+              identifierCounts[uniqueIdentifier] = 0;
+            }
+
+            return `<${formatTag('assessment-item-ref')} href="${relativePath}" identifier="${uniqueIdentifier}"/>`;
+          })
+          .join('\n')}
         </${formatTag('assessment-section')}>
     </${formatTag('test-part')}>
     <${formatTag('outcome-processing')}>
