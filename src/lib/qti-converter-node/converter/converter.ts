@@ -13,23 +13,33 @@ import { cleanXMLString } from 'src/lib/qti-helper';
 //     throw new Error('SaxonJS could not be loaded: ' + err.message);
 //   }
 // }
+// const env = saxon.getPlatform();
+// const doc = env.parseXmlFromString(env.readFile('./node_modules/qti30upgrader/qti2xTo30.xsl'));
+// doc._saxonBaseUri = 'dummy';
+// const sef = saxon.compile(doc);
 
-const convert = (qti2: string) => {
-  // const env = saxon.getPlatform();
-  // const doc = env.parseXmlFromString(env.readFile('./node_modules/qti30upgrader/qti2xTo30.xsl'));
-  // doc._saxonBaseUri = 'dummy';
-  // const sef = saxon.compile(doc);
-  qti2 = cleanXMLString(qti2);
-
-  return globalThis.SaxonJS.transform(
-    {
-      stylesheetText: JSON.stringify(styleSheetString), // './node_modules/qti30upgrader/qti2xTo30.sef.json',
-      sourceType: 'xml',
-      sourceText: qti2,
-      destination: 'serialized'
-    },
-    'async'
-  ).then(output => output.principalResult);
+const convert = async (qti2: string) => {
+  try {
+    qti2 = cleanXMLString(qti2);
+    if (!globalThis.SaxonJS) {
+      console.error('SaxonJS is not loaded in the global scope.');
+      throw new Error('SaxonJS is not available.');
+    }
+    const result = await globalThis.SaxonJS.transform(
+      {
+        stylesheetText: JSON.stringify(styleSheetString),
+        sourceType: 'xml',
+        sourceText: qti2,
+        destination: 'serialized'
+      },
+      'async'
+    );
+    const qti3 = result.principalResult;
+    return qti3;
+  } catch (error) {
+    console.error('Error during QTI conversion:', error);
+    throw error;
+  }
 };
 
 export const convertQti2toQti3 = async (qti2: string): Promise<string> => {

@@ -1,9 +1,10 @@
 import { qtiTransform } from 'src/lib/qti-transformer';
-import { convertPackageStream, convertQti2toQti3 } from '../index';
+import { convertManifestFile, convertPackageStream, convertQti2toQti3 } from '../index';
 import { expect, test } from 'vitest';
 import * as xml2js from 'xml2js';
 import { createReadStream, writeFile } from 'fs';
 import unzipper from 'unzipper';
+import * as cheerio from 'cheerio';
 
 async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
   const parser = new xml2js.Parser({ ignoreAttrs: true, trim: true, normalize: true });
@@ -203,4 +204,85 @@ test('convert a TAO PCI', async () => {
   console.log(transformedQti3);
   const areEqual = await areXmlEqual(transformedQti3, expectedResult);
   expect(areEqual).toEqual(true);
+});
+
+test('should convert manifest file with imscp prefix to default namespace', () => {
+  const inputXml = `<?xml version="1.0" encoding="UTF-8"?>
+<imscp:manifest identifier="MANIFEST-QTI-1" 
+  xmlns:xml="http://www.w3.org/XML/1998/namespace" 
+  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2" 
+  xmlns:imsqti="http://www.imsglobal.org/xsd/imsqti_v2p0" 
+  xmlns:xhtml="http://www.w3.org/1999/xhtml" 
+  xmlns:imscp="http://www.imsglobal.org/xsd/imscp_v1p1"
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+  <imscp:organizations/>
+  <imscp:resources>
+    <imscp:resource identifier="Q80000" type="imsqti_item_xmlv2p1" href="questions/Q80000.xml">
+      <imscp:metadata>
+        <imsmd:lom>
+          <imsmd:general>
+            <imsmd:title>Test Question</imsmd:title>
+          </imsmd:general>
+        </imsmd:lom>
+      </imscp:metadata>
+      <imscp:file href="questions/Q80000.xml"/>
+    </imscp:resource>
+    <imscp:resource identifier="Q80001" type="imsqti_item_xmlv2p1" href="questions/Q80001.xml">
+      <imscp:file href="questions/Q80001.xml"/>
+    </imscp:resource>
+  </imscp:resources>
+</imscp:manifest>`;
+
+  const expectedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="MANIFEST-QTI-1" 
+  xmlns:xml="http://www.w3.org/XML/1998/namespace" 
+  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2" 
+  xmlns:imsqti="http://www.imsglobal.org/xsd/imsqti_v2p0" 
+  xmlns:xhtml="http://www.w3.org/1999/xhtml" 
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+  <organizations/>
+  <resources>
+    <resource identifier="Q80000" type="imsqti_item_xmlv2p1" href="questions/Q80000.xml">
+      <metadata>
+        <imsmd:lom>
+          <imsmd:general>
+            <imsmd:title>Test Question</imsmd:title>
+          </imsmd:general>
+        </imsmd:lom>
+      </metadata>
+      <file href="questions/Q80000.xml"/>
+    </resource>
+    <resource identifier="Q80001" type="imsqti_item_xmlv2p1" href="questions/Q80001.xml">
+      <file href="questions/Q80001.xml"/>
+    </resource>
+  </resources>
+</manifest>`;
+
+  // Load the XML with cheerio
+  const $ = cheerio.load(inputXml, { xmlMode: true, xml: true });
+
+  // Call the function under test
+  const $result = convertManifestFile($);
+  const result = $result.xml();
+
+  // Log the actual result for debugging
+  console.log('Input XML:');
+  console.log(inputXml);
+  console.log('\nActual Result:');
+  console.log(result);
+  console.log('\nExpected Result:');
+  console.log(expectedXml);
+
+  // Basic assertions to help debug
+  expect(result).toContain('<manifest');
+  expect(result).not.toContain('<imscp:manifest');
+  expect(result).toContain('<organizations/>');
+  expect(result).not.toContain('<imscp:organizations/>');
+  expect(result).toContain('<resources>');
+  expect(result).not.toContain('<imscp:resources>');
+  expect(result).toContain('<resource identifier="Q80000"');
+  expect(result).not.toContain('<imscp:resource');
+
+  // You can add more specific assertions based on what you expect
+  // For now, let's see what the function actually produces
 });

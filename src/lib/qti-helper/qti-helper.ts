@@ -1154,6 +1154,8 @@ const getMediaTypeByExtension = (extension: string) => {
     case 'amr':
     case 'wma':
     case '3gp':
+    case 'opus':
+    case 'm4a':
       return 'audio';
     case 'mp4':
     case 'avi':
@@ -1161,6 +1163,10 @@ const getMediaTypeByExtension = (extension: string) => {
     case 'mkv':
     case 'webm':
     case 'flv':
+    case '3gp':
+    case 'mpeg':
+    case 'mpg':
+    case 'wmv':
     case '3gpp':
       return 'video';
     case 'jpg':
@@ -1234,6 +1240,17 @@ function getMimeTypeFromFileName(filename) {
     mp3: 'audio/mpeg',
     wav: 'audio/wav',
     ogg: 'audio/ogg',
+    opus: 'audio/opus',
+    aac: 'audio/aac',
+    flac: 'audio/flac',
+    amr: 'audio/amr',
+    wma: 'audio/x-ms-wma',
+    '3gp': 'video/3gpp',
+    avi: 'video/x-msvideo',
+    mov: 'video/quicktime',
+    mkv: 'video/x-matroska',
+    flv: 'video/x-flv',
+    '3gpp': 'video/3gpp',
     pdf: 'application/pdf',
     json: 'application/json',
     css: 'text/css',
@@ -1346,7 +1363,10 @@ export const removeMediaFromPackage = async (
   const filesToRemove = [...new Set(allFilesToRemove)].map(f => f.split('/').pop() || '');
 
   const newZip = new JSZip();
-  for (const relativePath of Object.keys(zip.files)) {
+  const zipFileToProcess = Object.keys(zip.files).filter(
+    path => !path.includes('__MACOSX') && !path.includes('.DS_Store')
+  );
+  for (const relativePath of zipFileToProcess) {
     const zipEntry = zip.files[relativePath];
     const fileType = relativePath.split('.').pop();
     const basename = relativePath.split('/').pop() || '';

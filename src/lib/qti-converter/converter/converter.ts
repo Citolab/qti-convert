@@ -112,6 +112,7 @@ export const convertManifestFile = ($: cheerio.CheerioAPI) => {
     if (resourceType && resourceType.includes('item')) {
       $(element).attr('type', 'imsqti_item_xmlv3p0');
     } else if (resourceType && resourceType.includes('test')) {
+      console.log('Converting resource type to imsqti_test_xmlv3p0');
       $(element).attr('type', 'imsqti_test_xmlv3p0');
     } else if (resourceType && resourceType.includes('associatedcontent')) {
       $(element).attr('type', 'webcontent');
@@ -215,8 +216,12 @@ export async function convertPackage(
   // Array to store processed files for potential post-processing
   const processedFiles = [];
 
+  const zipFileToProcess = Object.keys(zip.files).filter(
+    path => !path.includes('__MACOSX') && !path.includes('.DS_Store')
+  );
+
   // Process each file in the zip
-  for (const relativePath of Object.keys(zip.files)) {
+  for (const relativePath of zipFileToProcess) {
     const zipEntry = zip.files[relativePath];
 
     // Skip directories

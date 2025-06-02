@@ -2,16 +2,225 @@ import * as path from 'path';
 import * as cheerio from 'cheerio';
 import unzipper from 'unzipper';
 import archiver from 'archiver';
-import { cleanXMLString, convertManifestFile, convertQti2toQti3 } from './../../qti-converter/converter/converter';
+import { convertQti2toQti3 } from './converter';
 import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { qtiTransform } from 'src/lib/qti-transformer';
 import { Element } from 'domhandler';
+import { cleanXMLString } from 'src/lib/qti-helper';
+
+// Function to find the prefix for a given namespace URI by checking all elements
+function findNamespacePrefixFromAnyElement($, namespaceURI): { prefix: string; namespace: string } | null {
+  // Check all elements for namespace declarations
+  for (const element of $('*')) {
+    const attributes = element.attribs || {};
+    for (const [attrName, attrValue] of Object.entries(attributes)) {
+      if (
+        attrName.startsWith('xmlns:') &&
+        attrValue.toString().trim().toLocaleLowerCase().includes(namespaceURI.trim().toLocaleLowerCase())
+      ) {
+        const prefix = attrName.replace('xmlns:', '');
+        const namespace = attrValue.toString().trim();
+        if (prefix) {
+          return { prefix, namespace };
+        }
+        break;
+      }
+    }
+  }
+  return null;
+}
+
+const removeNamespacePrefix = ($: cheerio.CheerioAPI, prefix: string): cheerio.CheerioAPI => {
+  // First, find the namespace URI for the given prefix
+  let namespaceURI = null;
+  for (const element of $('*')) {
+    const nsAttr = $(element).attr(`xmlns:${prefix}`);
+    if (nsAttr) {
+      namespaceURI = nsAttr;
+      break;
+    }
+  }
+
+  if (!namespaceURI) {
+    console.warn(`No namespace found for prefix: ${prefix}`);
+    return $;
+  }
+
+  // Check if there's already a default namespace and handle it
+  const existingDefaultNS = $('[xmlns]').first().attr('xmlns');
+  if (existingDefaultNS) {
+    // Check if the existing default namespace is the same as the prefix namespace
+    if (existingDefaultNS.trim() === namespaceURI.trim()) {
+      // Same namespace - just remove the prefix declarations, no need for olddefault
+    } else {
+      // Different namespaces - rename existing default namespace to olddefault:
+      $('[xmlns]').each((index, element) => {
+        const $elem = $(element);
+        const defaultNS = $elem.attr('xmlns');
+        if (defaultNS) {
+          $elem.removeAttr('xmlns');
+          $elem.attr('xmlns:olddefault', defaultNS);
+        }
+      });
+
+      // Also update any elements that were using the default namespace
+      $('*').each((index, element) => {
+        const $elem = $(element);
+        const tagName = (element as any).tagName;
+
+        // Skip if element already has a prefix or is the one we're converting
+        if (tagName.includes(':')) return;
+
+        // Check if this element should be in the old default namespace
+        let shouldPrefix = false;
+        let currentElement = element;
+
+        // Walk up the tree to find namespace context
+        while (currentElement) {
+          const $current = $(currentElement);
+          if ($current.attr('xmlns:olddefault')) {
+            shouldPrefix = true;
+            break;
+          }
+          currentElement = currentElement.parent;
+        }
+
+        if (shouldPrefix) {
+          // We need to recreate this element with olddefault: prefix
+          const innerHTML = $elem.html();
+          if ((element as any).attribs) {
+            const attributes = { ...(element as any).attribs };
+            delete attributes.xmlns; // Remove xmlns if present
+
+            const attrString = Object.entries(attributes)
+              .map(([name, value]) => `${name}="${value}"`)
+              .join(' ');
+
+            const newElementHtml = innerHTML
+              ? `<olddefault:${tagName}${attrString ? ' ' + attrString : ''}>${innerHTML}</olddefault:${tagName}>`
+              : `<olddefault:${tagName}${attrString ? ' ' + attrString : ''}/>`;
+
+            $elem.replaceWith(newElementHtml);
+          }
+        }
+      });
+    }
+  }
+
+  // Now handle the prefix removal
+  const elementsToTransform = [];
+  $(`*`).each((index, element) => {
+    if ((element as any).name.startsWith(prefix + ':')) {
+      elementsToTransform.unshift(element);
+    }
+  });
+
+  elementsToTransform.forEach(element => {
+    const $elem = $(element);
+    const localName = element.tagName.replace(`${prefix}:`, '');
+
+    const newAttributes = {};
+    Object.entries(element.attribs || {}).forEach(([attrName, attrValue]) => {
+      if (attrName === `xmlns:${prefix}`) {
+        // Convert to default namespace
+        newAttributes['xmlns'] = attrValue;
+      } else if (attrName.startsWith(`${prefix}:`)) {
+        const localAttrName = attrName.replace(`${prefix}:`, '');
+        newAttributes[localAttrName] = attrValue;
+      } else if (!attrName.startsWith('xmlns:') || attrName === 'xmlns:olddefault') {
+        newAttributes[attrName] = attrValue;
+      }
+    });
+
+    const innerHTML = $elem.html();
+    const attrString = Object.entries(newAttributes)
+      .map(([name, value]) => `${name}="${value}"`)
+      .join(' ');
+
+    const newElementHtml = innerHTML
+      ? `<${localName}${attrString ? ' ' + attrString : ''}>${innerHTML}</${localName}>`
+      : `<${localName}${attrString ? ' ' + attrString : ''}/>`;
+
+    $elem.replaceWith(newElementHtml);
+  });
+
+  // Clean up any remaining namespace declarations for the removed prefix
+  $(`[xmlns\\:${prefix}]`).each((index, element) => {
+    const $elem = $(element);
+    const nsValue = $elem.attr(`xmlns:${prefix}`);
+    $elem.removeAttr(`xmlns:${prefix}`);
+
+    if (!$elem.attr('xmlns')) {
+      $elem.attr('xmlns', nsValue);
+    }
+  });
+
+  return $;
+};
+
+export const convertManifestFile = ($: cheerio.CheerioAPI) => {
+  console.log('Converting manifest file...');
+  // Replace schemas
+
+  // Find the prefix for the IMS CP namespace
+  const imscpNamespace = 'http://www.imsglobal.org/xsd/imscp';
+  const result = findNamespacePrefixFromAnyElement($, imscpNamespace);
+
+  if (result) {
+    const { prefix, namespace } = result;
+    // Get the XML string and remove the prefix
+    $ = removeNamespacePrefix($, prefix);
+
+    console.log(
+      `Removed prefix: ${prefix} for namespace: ${namespace} content:`,
+      $.xml().substring(0, Math.min(500, $.xml().length))
+    ); // Log first 100 characters for debugging
+  }
+
+  $('manifest').attr({
+    xmlns: 'http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1',
+    'xmlns:imsqti': 'http://www.imsglobal.org/xsd/imsqti_metadata_v3p0',
+    'xsi:schemaLocation': `http://ltsc.ieee.org/xsd/LOM https://purl.imsglobal.org/spec/md/v1p3/schema/xsd/imsmd_loose_v1p3p2.xsd
+                    http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqtiv3p0_imscpv1p2_v1p0.xsd
+                    http://www.imsglobal.org/xsd/imsqti_metadata_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_metadatav3p0_v1p0.xsd`
+  });
+
+  // Add or replace schema version
+  $('manifest > metadata').each((_, element) => {
+    const schemaElement = $('schema', element);
+    if (schemaElement.length > 0) {
+      schemaElement.text('QTI Package');
+    } else {
+      $(element).append('<schema>QTI Package</schema>');
+    }
+    const schemaVersionElement = $('schemaversion', element);
+    if (schemaVersionElement.length === 0) {
+      $(element).append('<schemaversion>3.0.0</schemaversion>');
+    } else {
+      schemaVersionElement.text('3.0.0');
+    }
+  });
+
+  // Replace resource types
+  $('resource').each((_, element) => {
+    const resourceType = $(element).attr('type');
+    if (resourceType && resourceType.includes('item')) {
+      $(element).attr('type', 'imsqti_item_xmlv3p0');
+    } else if (resourceType && resourceType.includes('test')) {
+      $(element).attr('type', 'imsqti_test_xmlv3p0');
+    } else if (resourceType && resourceType.includes('associatedcontent')) {
+      $(element).attr('type', 'webcontent');
+    }
+  });
+  return $;
+};
 
 // Function to handle Firestore storage files
 // callbacks for converting assessment, manifest and item are optional and provided with defaul conversions
 // can be overridden if other conversions are needed
-export async function convertPackageStream(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Shared core processing logic
+// Shared core processing logic
+async function processPackageFiles(
   unzipStream: any,
   convertManifest: ($manifest: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = $manifest => {
     convertManifestFile($manifest);
@@ -28,11 +237,14 @@ export async function convertPackageStream(
     if ($item('assessmentItem').length > 0) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
       const transform = qtiTransform(modifiedContent);
+      if (!transform) {
+        console.warn('QTI Transform could not be initialized. Please check your QTI package.');
+      }
       const transformResult = await transform
-        // .stripStylesheets()
         .objectToImg()
         .objectToVideo()
         .objectToAudio()
+        .ssmlSubToSpan()
         .stripMaterialInfo()
         .minChoicesToOne()
         .externalScored()
@@ -42,113 +254,327 @@ export async function convertPackageStream(
       $item = cheerio.load(transformResult.xml(), { xmlMode: true, xml: true });
     }
     return $item;
-  },
-  postProcessing: (
-    files: { path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]
-  ) => Promise<{ path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]> = async files => {
-    return Promise.resolve(files);
   }
-): Promise<Buffer> {
-  const archive = archiver('zip', {
-    zlib: { level: 9 }
-  });
-  const outputBuffers: Buffer[] = [];
-  const processedFiles: { path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[] = [];
+): Promise<Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>> {
+  const processedFiles = new Map<
+    string,
+    {
+      content: string | Buffer;
+      type: 'test' | 'item' | 'manifest' | 'other';
+    }
+  >();
 
-  // Collect data chunks in an array of buffers
-  archive.on('data', chunk => {
-    outputBuffers.push(chunk);
-  });
-
+  // Process files from the unzip stream
   for await (const entry of unzipStream) {
     const entryName = entry.path;
     const fileType = path.extname(entryName);
 
     if (fileType === '.xml') {
-      // If the file is an XML, process it
       const content = await entry.buffer();
-      let $ = cheerio.load(cleanXMLString(content.toString('utf8')), { xmlMode: true, xml: true });
+      let $ = cheerio.load(cleanXMLString(content.toString('utf8')), {
+        xmlMode: true,
+        xml: true
+      });
+
       let modifiedContent = $.xml();
+      let fileTypeCategory: 'test' | 'item' | 'manifest' | 'other' = 'other';
+
       if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
         $ = await convertAssessment($);
         modifiedContent = $.xml();
-        processedFiles.push({ path: entryName, content: modifiedContent, type: 'test' });
+        fileTypeCategory = 'test';
       } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
         $ = await convertItem($);
         modifiedContent = $.xml();
-        processedFiles.push({ path: entryName, content: modifiedContent, type: 'item' });
+        fileTypeCategory = 'item';
       } else if (entryName === 'imsmanifest.xml') {
         $ = await convertManifest($);
         modifiedContent = $.xml();
-        processedFiles.push({ path: entryName, content: modifiedContent, type: 'manifest' });
+        fileTypeCategory = 'manifest';
       }
-      // Append the modified XML to the archive
-      archive.append(modifiedContent, { name: entryName });
+
+      processedFiles.set(entryName, {
+        content: modifiedContent,
+        type: fileTypeCategory
+      });
+
+      // Clean up buffer immediately
+      content.fill(0);
     } else {
-      // Append other files as they are to the archive
+      // Handle non-XML files
       const content = await entry.buffer();
-      archive.append(content, { name: entryName });
-      processedFiles.push({ path: entryName, content: content, type: 'other' });
+
+      processedFiles.set(entryName, {
+        content: content,
+        type: 'other'
+      });
     }
+
     entry.autodrain();
   }
-  archive.removeAllListeners(); // Remove event listeners
-  await archive.finalize();
-  // Perform post-processing before finalizing the archive
-  const updatedFiles = await postProcessing(processedFiles);
 
-  // Create a new archive instead of aborting the old one
-  const newArchive = archiver('zip', {
-    zlib: { level: 9 }
-  });
-  const newOutputBuffers: Buffer[] = [];
+  return processedFiles;
+}
 
-  // Collect data chunks in an array of buffers
-  newArchive.on('data', chunk => {
-    newOutputBuffers.push(chunk);
-  });
+// Shared post-processing logic
+async function postProcessPackageFiles(
+  processedFiles: Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>
+): Promise<Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>> {
+  const assessmentFiles = Array.from(processedFiles.entries())
+    .filter(([_, file]) => file.type === 'test')
+    .map(([path, file]) => ({ path, content: file.content as string, type: file.type }));
 
-  // Append updated files to the new archive
-  for (const file of updatedFiles) {
-    newArchive.append(file.content, { name: file.path });
+  if (assessmentFiles.length > 0) {
+    const manifestEntry = processedFiles.get('imsmanifest.xml');
+
+    if (manifestEntry && typeof manifestEntry.content === 'string') {
+      for (const assessment of assessmentFiles) {
+        const updatedContent = await processAssessmentReferences(assessment, manifestEntry.content, processedFiles);
+
+        if (updatedContent !== assessment.content) {
+          processedFiles.set(assessment.path, {
+            content: updatedContent,
+            type: 'test'
+          });
+        }
+      }
+    }
   }
 
-  // Finalize the new archive
-  await newArchive.finalize();
+  return processedFiles;
+}
 
-  // Combine the collected data chunks into a single buffer
-  const outputBuffer = Buffer.concat(newOutputBuffers);
+// Helper function for processing assessment references
+async function processAssessmentReferences(
+  assessment: { path: string; content: string; type: string },
+  manifestContent: string,
+  processedFiles: Map<string, { content: string | Buffer; type: string }>
+): Promise<string> {
+  const $manifest = cheerio.load(manifestContent, { xmlMode: true, xml: true });
+  const $assessment = cheerio.load(assessment.content, { xmlMode: true, xml: true });
 
-  // Return the final buffer
-  return outputBuffer;
+  const assessmentRefs = $assessment('qti-assessment-item-ref');
+  const itemFiles = Array.from(processedFiles.entries())
+    .filter(([_, file]) => file.type === 'item')
+    .map(([path, file]) => ({ path, content: file.content as string, type: file.type }));
+
+  const assessmentInManifest = $manifest('resource[type="imsqti_test_xmlv3p0"]');
+  let changed = false;
+
+  for (const assessmentRef of assessmentRefs) {
+    const refId = $assessment(assessmentRef).attr('identifier');
+    const matchingItem = findByAttribute($manifest, 'qti-assessment-item-ref', 'identifier', refId);
+
+    if (!matchingItem) {
+      const hrefItem = $assessment(assessmentRef).attr('href');
+      const hrefTest = assessmentInManifest.attr('href');
+      const relativePath = resolvePath(hrefItem, hrefTest);
+
+      const matchingItemFile = itemFiles.find(item => {
+        const path1 = item.path.replace(/^(.\/|\/)/, '');
+        const path2 = relativePath.replace(/^(.\/|\/)/, '');
+        return path1 === path2;
+      });
+
+      const itemInManifest = findByHref($manifest, 'resource', relativePath);
+
+      if (matchingItemFile) {
+        const $item = cheerio.load(matchingItemFile.content, { xmlMode: true, xml: true });
+        if ($item('qti-assessment-item').length > 0) {
+          const assessmentItemId = $item('qti-assessment-item')[0]?.attribs['identifier'];
+          assessmentRef.attribs['identifier'] = assessmentItemId || refId;
+          if (itemInManifest) {
+            itemInManifest.attribs['identifier'] = assessmentItemId || refId;
+          }
+        }
+      }
+      changed = true;
+    }
+  }
+
+  return changed ? $assessment.xml() : assessment.content;
+}
+
+// Original function that returns a Buffer (for backward compatibility)
+export async function convertPackageStream(
+  unzipStream: any,
+  convertManifest?: ($manifest: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>,
+  convertAssessment?: ($assessment: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>,
+  convertItem?: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>,
+  postProcessing?: (
+    files: { path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]
+  ) => Promise<{ path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]>
+): Promise<Buffer> {
+  // Process files using shared logic
+  const processedFiles = await processPackageFiles(unzipStream, convertManifest, convertAssessment, convertItem);
+
+  // Apply post-processing using shared logic
+  const updatedFiles = await postProcessPackageFiles(processedFiles);
+
+  // If custom post-processing is provided, apply it
+  if (postProcessing) {
+    const filesArray = Array.from(updatedFiles.entries()).map(([path, file]) => ({
+      path,
+      content: typeof file.content === 'string' ? file.content : file.content.toString(),
+      type: file.type
+    }));
+
+    const customProcessedFiles = await postProcessing(filesArray);
+
+    // Update the map with custom processed results
+    updatedFiles.clear();
+    for (const file of customProcessedFiles) {
+      updatedFiles.set(file.path, {
+        content: file.content,
+        type: file.type
+      });
+    }
+  }
+
+  // Create archive and return as Buffer
+  return createArchiveBuffer(updatedFiles);
+}
+
+// New function that streams directly to storage
+export async function convertPackageStreamAndWriteToStream(
+  unzipStream: any,
+  outputStream: NodeJS.WritableStream,
+  convertManifest?: ($manifest: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>,
+  convertAssessment?: ($assessment: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>,
+  convertItem?: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>
+): Promise<void> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Process files using shared logic
+      const processedFiles = await processPackageFiles(unzipStream, convertManifest, convertAssessment, convertItem);
+
+      // Apply post-processing using shared logic
+      const updatedFiles = await postProcessPackageFiles(processedFiles);
+
+      // Stream to output
+      await streamArchiveToOutput(updatedFiles, outputStream);
+
+      // Clean up
+      updatedFiles.clear();
+
+      resolve();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+// Helper function to create archive buffer
+async function createArchiveBuffer(files: Map<string, { content: string | Buffer; type: string }>): Promise<Buffer> {
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  const outputBuffers: Buffer[] = [];
+
+  archive.on('data', chunk => {
+    outputBuffers.push(chunk);
+  });
+
+  // Add all files to archive
+  for (const [filePath, fileData] of files.entries()) {
+    if (Buffer.isBuffer(fileData.content)) {
+      archive.append(fileData.content, { name: filePath });
+    } else {
+      archive.append(fileData.content, { name: filePath });
+    }
+  }
+
+  await archive.finalize();
+  return Buffer.concat(outputBuffers);
+}
+
+// Helper function to stream archive to output
+async function streamArchiveToOutput(
+  files: Map<string, { content: string | Buffer; type: string }>,
+  outputStream: NodeJS.WritableStream
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    // Pipe directly to output stream
+    archive.pipe(outputStream);
+
+    // Handle archive events
+    archive.on('error', err => {
+      reject(err);
+    });
+
+    archive.on('end', () => {
+      resolve();
+    });
+
+    // Add all files to archive
+    for (const [filePath, fileData] of files.entries()) {
+      if (Buffer.isBuffer(fileData.content)) {
+        archive.append(fileData.content, { name: filePath });
+      } else {
+        archive.append(fileData.content, { name: filePath });
+      }
+    }
+
+    archive.finalize();
+  });
+}
+
+// Convenience function for Firebase Storage usage
+export async function convertPackageToStorage(
+  inputFile: any, // Firebase Storage file
+  outputFile: any // Firebase Storage file
+): Promise<void> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const readStream = inputFile.createReadStream();
+      const unzipStream = readStream.pipe(unzipper.Parse({ forceStream: true }));
+
+      const writeStream = outputFile.createWriteStream({
+        metadata: {
+          contentType: 'application/zip'
+        }
+      });
+
+      // Handle stream errors
+      writeStream.on('error', error => {
+        console.error('Write stream error:', error);
+        reject(error);
+      });
+
+      readStream.on('error', error => {
+        console.error('Read stream error:', error);
+        reject(error);
+      });
+
+      // Handle successful completion
+      writeStream.on('finish', () => {
+        resolve();
+      });
+
+      await convertPackageStreamAndWriteToStream(unzipStream, writeStream);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 /**
- * Resolves a relative path from a base file to an absolute path relative to the root.
- * @param baseFilePath - The path of the file containing the reference.
- * @param relativeReference - The relative reference path from the base file.
- * @returns The relative path from the root.
+ * Resolves a relative path against a base path
+ * @param relativePath - The path to resolve (e.g., 'item.xml')
+ * @param basePath - The path to resolve against (e.g., 'item/assessmentTest.xml')
+ * @returns The resolved absolute path (e.g., 'item/item.xml')
  */
-function resolvePathFromRoot(baseFilePath: string, relativeReference: string): string {
-  // Get the directory of the base file
-  const baseDir = path.dirname(baseFilePath);
+function resolvePath(relativePath: string, basePath: string): string {
+  // Extract the directory part of the base path
+  const baseDir = basePath.split('/').slice(0, -1).join('/');
 
-  // Resolve the absolute path
-  const absolutePath = path.resolve(baseDir, relativeReference);
-
-  // Define the root directory name
-  const rootDir = 'items';
-
-  // Find the index of the root directory in the resolved path
-  const rootIndex = absolutePath.indexOf(rootDir);
-  if (rootIndex === -1) {
-    throw new Error(`Root directory '${rootDir}' not found in resolved path`);
+  // If there's no directory in the base path, just return the relative path
+  if (!baseDir) {
+    return relativePath;
   }
 
-  // Extract the path from the root directory onward
-  const relativePath = absolutePath.substring(rootIndex);
-
-  return relativePath.replace(/\\/g, '/'); // Normalize for all OS
+  // Join the base directory with the relative path
+  return `${baseDir}/${relativePath}`;
 }
 
 function findByAttribute($assessmentTest: cheerio.CheerioAPI, tagName: string, attribute: string, value: string) {
@@ -163,10 +589,13 @@ function findByAttribute($assessmentTest: cheerio.CheerioAPI, tagName: string, a
   return null;
 }
 
-function findByHref($assessmentTest: cheerio.CheerioAPI, tagName: string, value: string) {
-  for (const itemRef of $assessmentTest(tagName)) {
+function findByHref($element: cheerio.CheerioAPI, tagName: string, value: string) {
+  for (const itemRef of $element(tagName)) {
     const itemRefElement = itemRef as Element;
     const attributeValue = itemRefElement.attribs['href'];
+    if (!attributeValue) {
+      continue; // Skip if href attribute is not present
+    }
     // now check if the href is the same, but if it should not matter if one of the href starts with ./ or / or not
     const attributeValueNormalized = attributeValue.replace(/^(.\/|\/)/, '');
     const valueNormalized = value.replace(/^(.\/|\/)/, '');
@@ -277,7 +706,7 @@ export async function convertPackageFolder(
           // some packages, especially those from TAO have identifiers in the assessment that don't match the identifier in the item
           const hrefItem = $assessment(assessmentRef).attr('href');
           const hrefTest = assessmentInManifest.attr('href');
-          const relativePath = resolvePathFromRoot(hrefTest, hrefItem);
+          const relativePath = resolvePath(hrefItem, hrefTest);
           const matchingItem = items.find(item => {
             const path1 = item.path.replace(/^(.\/|\/)/, '');
             const path2 = relativePath.replace(/^(.\/|\/)/, '');
