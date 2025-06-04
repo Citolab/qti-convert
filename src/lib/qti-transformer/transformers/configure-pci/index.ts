@@ -4,6 +4,7 @@ export interface ModuleResolutionConfig {
   waitSeconds?: number;
   context?: string;
   catchError?: boolean;
+  urlArgs?: string;
   paths: {
     [key: string]: string | string[];
   };
@@ -36,6 +37,7 @@ async function configurePCI(
   const portableCustomInteractions = $('qti-portable-custom-interaction');
   const moduleResolutionConfig = await getModuleResolutionConfig('/modules/module_resolution.js');
   const moduleResolutionFallbackConfig = await getModuleResolutionConfig('/modules/fallback_module_resolution.js');
+
   if (portableCustomInteractions.length > 0) {
     for (const interaction of portableCustomInteractions) {
       // set data-base-url
@@ -48,53 +50,122 @@ async function configurePCI(
       }
       customInteractionTypeIdentifiers.push(customInteractionTypeIdentifier);
 
-      if (moduleResolutionConfig) {
-        // add this configuration to the portable custom interactions like:
-        //    <qti-interaction-modules>
-        //      <qti-interaction-module fallback-path="modules/shading_fallback.js" id="shading" primary-path="modules/shading.js"/>
-        // This makes it easier in the player because otherwise the player has to check for the existence of the module_resolution.js and fallback_module_resolution.js
+      // Check if qti-interaction-modules already exists
+      const existingModulesElement = $(interaction).find('qti-interaction-modules');
 
-        if ($(interaction).find('qti-interaction-modules').length === 0) {
-          $(interaction).append('<qti-interaction-modules></qti-interaction-modules>');
-        }
-        for (const module in moduleResolutionConfig.paths) {
-          const path = moduleResolutionConfig.paths[module];
-          let fallbackPath: string | string[] = '';
-          if (
-            moduleResolutionFallbackConfig &&
-            moduleResolutionFallbackConfig.paths &&
-            moduleResolutionFallbackConfig.paths[module]
-          ) {
-            fallbackPath = moduleResolutionConfig.paths[module];
-          }
-          const primaryArray = Array.isArray(path) ? path : [path];
-          const fallbackPathArray = Array.isArray(fallbackPath) ? fallbackPath : [fallbackPath];
-          // create an array with primary and fallback paths.
-          const paths = primaryArray.map((primaryPath, i) => {
-            const fallbackPath = fallbackPathArray.length > i ? fallbackPathArray[i] : '';
-            return {
-              primaryPath,
-              fallbackPath
-            };
-          });
-          // check if all fallbackPath elements are in the array: paths, otherwise add
-          for (const fallbackPath of fallbackPathArray) {
-            if (!paths.some(p => p.fallbackPath === fallbackPath)) {
-              paths.push({
-                primaryPath: primaryArray.length > 0 ? primaryArray[0] : fallbackPath,
-                fallbackPath
-              });
+      // If it exists and has primary-configuration, handle that format
+      if (existingModulesElement.length > 0 && existingModulesElement.attr('primary-configuration')) {
+        const primaryConfigPath = existingModulesElement.attr('primary-configuration');
+        if (primaryConfigPath) {
+          try {
+            // Load the primary configuration
+            const primaryConfig = await getModuleResolutionConfig(`/${primaryConfigPath}`);
+
+            // Get existing module elements that only have id attributes
+            const existingModules = existingModulesElement.find('qti-interaction-module');
+
+            // Update existing modules with paths from config
+            existingModules.each((_, moduleEl) => {
+              const moduleId = $(moduleEl).attr('id');
+              if (moduleId && primaryConfig.paths && primaryConfig.paths[moduleId]) {
+                const primaryPath = primaryConfig.paths[moduleId];
+                const primaryPathString = Array.isArray(primaryPath) ? primaryPath[0] : primaryPath;
+                $(moduleEl).attr('primary-path', primaryPathString);
+
+                // Check for fallback path
+                if (
+                  moduleResolutionFallbackConfig &&
+                  moduleResolutionFallbackConfig.paths &&
+                  moduleResolutionFallbackConfig.paths[moduleId]
+                ) {
+                  const fallbackPath = moduleResolutionFallbackConfig.paths[moduleId];
+                  const fallbackPathString = Array.isArray(fallbackPath) ? fallbackPath[0] : fallbackPath;
+                  $(moduleEl).attr('fallback-path', fallbackPathString);
+                }
+              }
+            });
+
+            // Add any additional modules from primary config that aren't already present
+            if (primaryConfig.paths) {
+              for (const moduleId in primaryConfig.paths) {
+                const existingModule = existingModulesElement.find(`qti-interaction-module[id="${moduleId}"]`);
+                if (existingModule.length === 0) {
+                  const primaryPath = primaryConfig.paths[moduleId];
+                  const primaryPathString = Array.isArray(primaryPath) ? primaryPath[0] : primaryPath;
+
+                  let fallbackPathAttr = '';
+                  if (
+                    moduleResolutionFallbackConfig &&
+                    moduleResolutionFallbackConfig.paths &&
+                    moduleResolutionFallbackConfig.paths[moduleId]
+                  ) {
+                    const fallbackPath = moduleResolutionFallbackConfig.paths[moduleId];
+                    const fallbackPathString = Array.isArray(fallbackPath) ? fallbackPath[0] : fallbackPath;
+                    fallbackPathAttr = ` fallback-path="${fallbackPathString}"`;
+                  }
+
+                  existingModulesElement.append(
+                    `<qti-interaction-module id="${moduleId}" primary-path="${primaryPathString}"${fallbackPathAttr}/>`
+                  );
+                }
+              }
             }
+
+            // Apply urlArgs if present in config
+            if (primaryConfig.urlArgs) {
+              existingModulesElement.attr('url-args', primaryConfig.urlArgs);
+            }
+          } catch (error) {
+            console.warn(`Failed to load primary configuration: ${primaryConfigPath}`, error);
           }
-          // add the paths to the qti-interaction-modules
-          for (const path of paths) {
-            $(interaction)
-              .find('qti-interaction-modules')
-              .append(
-                `<qti-interaction-module ${
-                  path.fallbackPath ? `fallback-path="${path.fallbackPath}"` : ''
-                } id="${module}" primary-path="${path.primaryPath}"/>`
-              );
+        }
+      } else {
+        // Original logic for when there's no existing qti-interaction-modules or no primary-configuration
+        if (moduleResolutionConfig) {
+          // Create qti-interaction-modules if it doesn't exist
+          if ($(interaction).find('qti-interaction-modules').length === 0) {
+            $(interaction).append('<qti-interaction-modules></qti-interaction-modules>');
+          }
+
+          for (const module in moduleResolutionConfig.paths) {
+            const path = moduleResolutionConfig.paths[module];
+            let fallbackPath: string | string[] = '';
+            if (
+              moduleResolutionFallbackConfig &&
+              moduleResolutionFallbackConfig.paths &&
+              moduleResolutionFallbackConfig.paths[module]
+            ) {
+              fallbackPath = moduleResolutionFallbackConfig.paths[module];
+            }
+            const primaryArray = Array.isArray(path) ? path : [path];
+            const fallbackPathArray = Array.isArray(fallbackPath) ? fallbackPath : [fallbackPath];
+            // create an array with primary and fallback paths.
+            const paths = primaryArray.map((primaryPath, i) => {
+              const fallbackPath = fallbackPathArray.length > i ? fallbackPathArray[i] : '';
+              return {
+                primaryPath,
+                fallbackPath
+              };
+            });
+            // check if all fallbackPath elements are in the array: paths, otherwise add
+            for (const fallbackPath of fallbackPathArray) {
+              if (!paths.some(p => p.fallbackPath === fallbackPath)) {
+                paths.push({
+                  primaryPath: primaryArray.length > 0 ? primaryArray[0] : fallbackPath,
+                  fallbackPath
+                });
+              }
+            }
+            // add the paths to the qti-interaction-modules
+            for (const path of paths) {
+              $(interaction)
+                .find('qti-interaction-modules')
+                .append(
+                  `<qti-interaction-module ${
+                    path.fallbackPath ? `fallback-path="${path.fallbackPath}"` : ''
+                  } id="${module}" primary-path="${path.primaryPath}"/>`
+                );
+            }
           }
         }
       }
