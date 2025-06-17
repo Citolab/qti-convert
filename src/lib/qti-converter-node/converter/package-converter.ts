@@ -8,6 +8,9 @@ import { qtiTransform } from 'src/lib/qti-transformer';
 import { Element } from 'domhandler';
 import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from 'src/lib/qti-helper';
 
+const saxonModule = await import('saxon-js');
+globalThis.SaxonJS = saxonModule.default || saxonModule;
+
 // Function to find the prefix for a given namespace URI by checking all elements
 function findNamespacePrefixFromAnyElement($, namespaceURI): { prefix: string; namespace: string } | null {
   // Check all elements for namespace declarations
