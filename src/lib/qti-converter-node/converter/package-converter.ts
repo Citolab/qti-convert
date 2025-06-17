@@ -6,7 +6,7 @@ import { convertQti2toQti3 } from './converter';
 import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { qtiTransform } from 'src/lib/qti-transformer';
 import { Element } from 'domhandler';
-import { cleanXMLString } from 'src/lib/qti-helper';
+import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from 'src/lib/qti-helper';
 
 // Function to find the prefix for a given namespace URI by checking all elements
 function findNamespacePrefixFromAnyElement($, namespaceURI): { prefix: string; namespace: string } | null {
@@ -316,85 +316,6 @@ async function processPackageFiles(
   return processedFiles;
 }
 
-// Shared post-processing logic
-async function postProcessPackageFiles(
-  processedFiles: Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>
-): Promise<Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>> {
-  const assessmentFiles = Array.from(processedFiles.entries())
-    .filter(([_, file]) => file.type === 'test')
-    .map(([path, file]) => ({ path, content: file.content as string, type: file.type }));
-
-  if (assessmentFiles.length > 0) {
-    const manifestEntry = processedFiles.get('imsmanifest.xml');
-
-    if (manifestEntry && typeof manifestEntry.content === 'string') {
-      for (const assessment of assessmentFiles) {
-        const updatedContent = await processAssessmentReferences(assessment, manifestEntry.content, processedFiles);
-
-        if (updatedContent !== assessment.content) {
-          processedFiles.set(assessment.path, {
-            content: updatedContent,
-            type: 'test'
-          });
-        }
-      }
-    }
-  }
-
-  return processedFiles;
-}
-
-// Helper function for processing assessment references
-async function processAssessmentReferences(
-  assessment: { path: string; content: string; type: string },
-  manifestContent: string,
-  processedFiles: Map<string, { content: string | Buffer; type: string }>
-): Promise<string> {
-  const $manifest = cheerio.load(manifestContent, { xmlMode: true, xml: true });
-  const $assessment = cheerio.load(assessment.content, { xmlMode: true, xml: true });
-
-  const assessmentRefs = $assessment('qti-assessment-item-ref');
-  const itemFiles = Array.from(processedFiles.entries())
-    .filter(([_, file]) => file.type === 'item')
-    .map(([path, file]) => ({ path, content: file.content as string, type: file.type }));
-
-  const assessmentInManifest = $manifest('resource[type="imsqti_test_xmlv3p0"]');
-  let changed = false;
-
-  for (const assessmentRef of assessmentRefs) {
-    const refId = $assessment(assessmentRef).attr('identifier');
-    const matchingItem = findByAttribute($manifest, 'qti-assessment-item-ref', 'identifier', refId);
-
-    if (!matchingItem) {
-      const hrefItem = $assessment(assessmentRef).attr('href');
-      const hrefTest = assessmentInManifest.attr('href');
-      const relativePath = resolvePath(hrefItem, hrefTest);
-
-      const matchingItemFile = itemFiles.find(item => {
-        const path1 = item.path.replace(/^(.\/|\/)/, '');
-        const path2 = relativePath.replace(/^(.\/|\/)/, '');
-        return path1 === path2;
-      });
-
-      const itemInManifest = findByHref($manifest, 'resource', relativePath);
-
-      if (matchingItemFile) {
-        const $item = cheerio.load(matchingItemFile.content, { xmlMode: true, xml: true });
-        if ($item('qti-assessment-item').length > 0) {
-          const assessmentItemId = $item('qti-assessment-item')[0]?.attribs['identifier'];
-          assessmentRef.attribs['identifier'] = assessmentItemId || refId;
-          if (itemInManifest) {
-            itemInManifest.attribs['identifier'] = assessmentItemId || refId;
-          }
-        }
-      }
-      changed = true;
-    }
-  }
-
-  return changed ? $assessment.xml() : assessment.content;
-}
-
 // Original function that returns a Buffer (for backward compatibility)
 export async function convertPackageStream(
   unzipStream: any,
@@ -407,9 +328,8 @@ export async function convertPackageStream(
 ): Promise<Buffer> {
   // Process files using shared logic
   const processedFiles = await processPackageFiles(unzipStream, convertManifest, convertAssessment, convertItem);
-
   // Apply post-processing using shared logic
-  const updatedFiles = await postProcessPackageFiles(processedFiles);
+  const updatedFiles = await postProcessPackageFilesSyncAssessmentItemAndItemRefIds(processedFiles);
 
   // If custom post-processing is provided, apply it
   if (postProcessing) {
@@ -449,7 +369,7 @@ export async function convertPackageStreamAndWriteToStream(
       const processedFiles = await processPackageFiles(unzipStream, convertManifest, convertAssessment, convertItem);
 
       // Apply post-processing using shared logic
-      const updatedFiles = await postProcessPackageFiles(processedFiles);
+      const updatedFiles = await postProcessPackageFilesSyncAssessmentItemAndItemRefIds(processedFiles);
 
       // Stream to output
       await streamArchiveToOutput(updatedFiles, outputStream);
@@ -558,55 +478,6 @@ export async function convertPackageToStorage(
   });
 }
 
-/**
- * Resolves a relative path against a base path
- * @param relativePath - The path to resolve (e.g., 'item.xml')
- * @param basePath - The path to resolve against (e.g., 'item/assessmentTest.xml')
- * @returns The resolved absolute path (e.g., 'item/item.xml')
- */
-function resolvePath(relativePath: string, basePath: string): string {
-  // Extract the directory part of the base path
-  const baseDir = basePath.split('/').slice(0, -1).join('/');
-
-  // If there's no directory in the base path, just return the relative path
-  if (!baseDir) {
-    return relativePath;
-  }
-
-  // Join the base directory with the relative path
-  return `${baseDir}/${relativePath}`;
-}
-
-function findByAttribute($assessmentTest: cheerio.CheerioAPI, tagName: string, attribute: string, value: string) {
-  for (const itemRef of $assessmentTest(tagName)) {
-    const itemRefElement = itemRef as Element;
-    const attributeValue = itemRefElement.attribs[attribute];
-    if (attributeValue === value) {
-      return itemRefElement;
-    }
-  }
-
-  return null;
-}
-
-function findByHref($element: cheerio.CheerioAPI, tagName: string, value: string) {
-  for (const itemRef of $element(tagName)) {
-    const itemRefElement = itemRef as Element;
-    const attributeValue = itemRefElement.attribs['href'];
-    if (!attributeValue) {
-      continue; // Skip if href attribute is not present
-    }
-    // now check if the href is the same, but if it should not matter if one of the href starts with ./ or / or not
-    const attributeValueNormalized = attributeValue.replace(/^(.\/|\/)/, '');
-    const valueNormalized = value.replace(/^(.\/|\/)/, '');
-    if (attributeValueNormalized === valueNormalized) {
-      return itemRefElement;
-    }
-  }
-
-  return null;
-}
-
 async function processFilesInFolder(
   packageFolder: string,
   outputFolder: string,
@@ -661,7 +532,6 @@ async function processFilesInFolder(
 }
 
 export async function convertPackageFolder(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   packageFolder: string,
   outputFolder: string,
   convertManifest: ($manifest: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = $manifest => {
@@ -682,61 +552,10 @@ export async function convertPackageFolder(
     }
     return $item;
   },
-  postProcessing: (
+  postProcessing?: (
     files: { path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]
-  ) => Promise<{ path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]> = async files => {
-    const assessments = files.filter(file => file.type === 'test');
-    for (const assessment of assessments) {
-      const $manifest = await cheerio.load(files.find(file => file.type === 'manifest')?.content, {
-        xmlMode: true,
-        xml: true
-      });
-      if (!$manifest) {
-        return Promise.resolve(files);
-      }
-      const $assessment = await cheerio.load(assessment.content, { xmlMode: true, xml: true });
-      const assessmentRefs = $assessment('qti-assessment-item-ref');
-      const assessmentInManifest = $manifest('resource[type="imsqti_test_xmlv3p0"]');
-      let changed = false;
-      for (const assessmentRef of assessmentRefs) {
-        const refId = $assessment(assessmentRef).attr('identifier');
-        const matchingItem = findByAttribute($manifest, 'qti-assessment-item-ref', 'identifier', refId);
-        const items = files.filter(file => file.type === 'item');
-        if (!matchingItem) {
-          // some packages, especially those from TAO have identifiers in the assessment that don't match the identifier in the item
-          const hrefItem = $assessment(assessmentRef).attr('href');
-          const hrefTest = assessmentInManifest.attr('href');
-          const relativePath = resolvePath(hrefItem, hrefTest);
-          const matchingItem = items.find(item => {
-            const path1 = item.path.replace(/^(.\/|\/)/, '');
-            const path2 = relativePath.replace(/^(.\/|\/)/, '');
-            return path1 === path2;
-          });
-          const itemInManifest = findByHref($manifest, 'resource', relativePath);
-          if (matchingItem) {
-            const $item = await cheerio.load(matchingItem.content, { xmlMode: true, xml: true });
-            if ($item('qti-assessment-item').length > 0) {
-              const assessmentItemId = $item('qti-assessment-item')[0]?.attribs['identifier'];
-              assessmentRef.attribs['identifier'] = assessmentItemId || refId;
-              if (itemInManifest) {
-                itemInManifest.attribs['identifier'] = assessmentItemId || refId;
-              }
-            }
-          }
-          changed = true;
-        }
-      }
-      if (changed) {
-        // replace the assessment in the files array
-        const modifiedAssessment = $assessment.xml();
-        const assessmentIndex = files.findIndex(file => file.path === assessment.path);
-        files[assessmentIndex].content = modifiedAssessment;
-      }
-    }
-    return Promise.resolve(files);
-  }
+  ) => Promise<{ path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]>
 ): Promise<void> {
-  // check if outputFolder exists, if not create it
   // Check if outputFolder exists, if not create it
   if (!existsSync(outputFolder)) {
     mkdirSync(outputFolder, { recursive: true });
@@ -750,7 +569,38 @@ export async function convertPackageFolder(
     convertItem
   );
 
-  const finalFiles = await postProcessing(processedFiles);
+  // Convert array to Map for shared post-processing
+  const filesMap = new Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>();
+  for (const file of processedFiles) {
+    // Extract just the filename for the map key to match the stream processing behavior
+    const fileName = path.basename(file.path);
+    filesMap.set(fileName, {
+      content: file.content,
+      type: file.type
+    });
+  }
+
+  // Apply shared post-processing logic
+  const updatedFilesMap = await postProcessPackageFilesSyncAssessmentItemAndItemRefIds(filesMap);
+
+  // Convert back to array format, preserving original paths
+  const updatedFiles = processedFiles.map(originalFile => {
+    const fileName = path.basename(originalFile.path);
+    const updatedFile = updatedFilesMap.get(fileName);
+
+    if (updatedFile) {
+      return {
+        ...originalFile,
+        content: typeof updatedFile.content === 'string' ? updatedFile.content : updatedFile.content.toString()
+      };
+    }
+    return originalFile;
+  });
+
+  // Apply custom post-processing if provided
+  const finalFiles = postProcessing ? await postProcessing(updatedFiles) : updatedFiles;
+
+  // Write all files
   for (const file of finalFiles) {
     writeFileSync(file.path, file.content);
   }

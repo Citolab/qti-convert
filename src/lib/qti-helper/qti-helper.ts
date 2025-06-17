@@ -1597,3 +1597,170 @@ export function forceMemoryCleanup() {
 
   console.log('Memory cleanup operations completed');
 }
+
+/// Updated shared post-processing logic
+export async function postProcessPackageFilesSyncAssessmentItemAndItemRefIds(
+  processedFiles: Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>
+): Promise<Map<string, { content: string | Buffer; type: 'test' | 'item' | 'manifest' | 'other' }>> {
+  const assessmentFiles = Array.from(processedFiles.entries())
+    .filter(([_, file]) => file.type === 'test')
+    .map(([path, file]) => ({ path, content: file.content as string, type: file.type }));
+
+  if (assessmentFiles.length > 0) {
+    const manifestEntry = processedFiles.get('imsmanifest.xml');
+    if (manifestEntry && typeof manifestEntry.content === 'string') {
+      let manifestUpdated = false;
+      let updatedManifestContent = manifestEntry.content;
+
+      for (const assessment of assessmentFiles) {
+        const result = await processAssessmentReferences(assessment, updatedManifestContent, processedFiles);
+
+        if (result.assessmentUpdated) {
+          processedFiles.set(assessment.path, {
+            content: result.updatedAssessmentContent,
+            type: 'test'
+          });
+        }
+
+        if (result.manifestUpdated) {
+          updatedManifestContent = result.updatedManifestContent;
+          manifestUpdated = true;
+        }
+      }
+
+      // Update manifest if any changes were made
+      if (manifestUpdated) {
+        processedFiles.set('imsmanifest.xml', {
+          content: updatedManifestContent,
+          type: 'manifest'
+        });
+      }
+    }
+  }
+  return processedFiles;
+}
+
+// Updated helper function for processing assessment references
+async function processAssessmentReferences(
+  assessment: { path: string; content: string; type: string },
+  manifestContent: string,
+  processedFiles: Map<string, { content: string | Buffer; type: string }>
+): Promise<{
+  assessmentUpdated: boolean;
+  manifestUpdated: boolean;
+  updatedAssessmentContent: string;
+  updatedManifestContent: string;
+}> {
+  const $manifest = cheerio.load(manifestContent, { xmlMode: true, xml: true });
+  const $assessment = cheerio.load(assessment.content, { xmlMode: true, xml: true });
+  const assessmentRefs = $assessment('qti-assessment-item-ref');
+  const itemFiles = Array.from(processedFiles.entries())
+    .filter(([_, file]) => file.type === 'item')
+    .map(([path, file]) => ({ path, content: file.content as string, type: file.type }));
+  const assessmentInManifest = $manifest('resource[type="imsqti_test_xmlv3p0"]');
+
+  let assessmentChanged = false;
+  let manifestChanged = false;
+
+  for (const assessmentRef of assessmentRefs) {
+    const refId = $assessment(assessmentRef).attr('identifier');
+    const matchingItem = findByAttribute($manifest, 'qti-assessment-item-ref', 'identifier', refId);
+
+    if (!matchingItem) {
+      const hrefItem = $assessment(assessmentRef).attr('href');
+      const hrefTest = assessmentInManifest.attr('href');
+      const relativePath = resolvePath(hrefItem, hrefTest);
+
+      const matchingItemFile = itemFiles.find(item => {
+        const path1 = item.path.replace(/^(.\/|\/)/, '');
+        const path2 = relativePath.replace(/^(.\/|\/)/, '');
+        return path1 === path2;
+      });
+
+      const itemInManifest = findByHref($manifest, 'resource', relativePath);
+
+      if (matchingItemFile) {
+        const $item = cheerio.load(matchingItemFile.content, { xmlMode: true, xml: true });
+        if ($item('qti-assessment-item').length > 0) {
+          const assessmentItemId = $item('qti-assessment-item')[0]?.attribs['identifier'];
+          assessmentRef.attribs['identifier'] = assessmentItemId || refId;
+          assessmentChanged = true;
+
+          if (itemInManifest) {
+            itemInManifest.attribs['identifier'] = assessmentItemId || refId;
+            manifestChanged = true;
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    assessmentUpdated: assessmentChanged,
+    manifestUpdated: manifestChanged,
+    updatedAssessmentContent: assessmentChanged ? $assessment.xml() : assessment.content,
+    updatedManifestContent: manifestChanged ? $manifest.xml() : manifestContent
+  };
+}
+
+function findByAttribute($assessmentTest: cheerio.CheerioAPI, tagName: string, attribute: string, value: string) {
+  for (const itemRef of $assessmentTest(tagName)) {
+    const itemRefElement = itemRef as Element;
+    const attributeValue = itemRefElement.attribs[attribute];
+    if (attributeValue === value) {
+      return itemRefElement;
+    }
+  }
+
+  return null;
+}
+
+function findByHref($element: cheerio.CheerioAPI, tagName: string, value: string) {
+  for (const itemRef of $element(tagName)) {
+    const itemRefElement = itemRef as Element;
+    const attributeValue = itemRefElement.attribs['href'];
+    if (!attributeValue) {
+      continue; // Skip if href attribute is not present
+    }
+    // now check if the href is the same, but if it should not matter if one of the href starts with ./ or / or not
+    const attributeValueNormalized = attributeValue.replace(/^(.\/|\/)/, '');
+    const valueNormalized = value.replace(/^(.\/|\/)/, '');
+    if (attributeValueNormalized === valueNormalized) {
+      return itemRefElement;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolves a relative path against a base path
+ * @param relativePath - The path to resolve (e.g., '../../items/item.xml')
+ * @param basePath - The path to resolve against (e.g., 'tests/folder/test.xml')
+ * @returns The resolved absolute path (e.g., 'items/item.xml')
+ */
+function resolvePath(relativePath: string, basePath: string): string {
+  // Extract the directory part of the base path
+  const baseDir = basePath.split('/').slice(0, -1);
+
+  // Split the relative path into segments
+  const relativeSegments = relativePath.split('/');
+
+  // Start with the base directory segments
+  const resultSegments = [...baseDir];
+
+  // Process each segment of the relative path
+  for (const segment of relativeSegments) {
+    if (segment === '..') {
+      // Go up one directory (remove last segment from result)
+      if (resultSegments.length > 0) {
+        resultSegments.pop();
+      }
+    } else if (segment !== '.' && segment !== '') {
+      // Add normal segments (ignore '.' and empty segments)
+      resultSegments.push(segment);
+    }
+  }
+
+  return resultSegments.join('/');
+}

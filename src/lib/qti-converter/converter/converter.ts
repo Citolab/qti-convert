@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
+import { postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from 'src/lib/qti-helper';
 import { qtiTransform } from 'src/lib/qti-transformer';
 // import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json';
 
@@ -157,11 +158,11 @@ export function cleanXMLString(xmlString: string): string {
     return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlString?.replace('&#xfeff;', '')}`;
   }
 }
-
 /**
  * Browser-compatible function to convert assessment packages
  * Processes a package file and applies conversions to manifest, assessment, and item files
  * @param {Blob|File} file - The uploaded file object
+ * @param {string} xsltJson - Path to the XSLT JSON file for conversion
  * @param {Function} convertManifest - Optional function to convert manifest files
  * @param {Function} convertAssessment - Optional function to convert assessment files
  * @param {Function} convertItem - Optional function to convert item files
@@ -205,8 +206,33 @@ export async function convertPackage(
     return $item;
   },
   postProcessing = async files => {
-    // Default post-processing (no changes)
-    return files;
+    debugger;
+    // Default post-processing: sync assessment item identifiers
+    // Convert array to Map for shared post-processing
+    const filesMap = new Map();
+    for (const file of files) {
+      filesMap.set(file.path, {
+        content: file.content,
+        type: file.type
+      });
+    }
+
+    // Apply shared post-processing logic for identifier synchronization
+    const updatedFilesMap = await postProcessPackageFilesSyncAssessmentItemAndItemRefIds(filesMap);
+
+    // Convert back to array format
+    return files.map(originalFile => {
+      const updatedFile = updatedFilesMap.get(originalFile.path);
+
+      if (updatedFile) {
+        return {
+          ...originalFile,
+          content: updatedFile.content,
+          type: updatedFile.type
+        };
+      }
+      return originalFile;
+    });
   }
 ) {
   // Load the file into JSZip
@@ -240,28 +266,28 @@ export async function convertPackage(
       // Load the XML with cheerio
       let $ = cheerio.load(cleanedContent, { xmlMode: true, xml: true });
       let modifiedContent = $.xml();
-      let fileType = 'other';
+      let fileTypeCategory = 'other';
 
       // Apply appropriate conversion based on file type
       if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
         $ = await convertAssessment($);
         modifiedContent = $.xml();
-        fileType = 'test';
+        fileTypeCategory = 'test';
       } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
         $ = await convertItem($);
         modifiedContent = $.xml();
-        fileType = 'item';
+        fileTypeCategory = 'item';
       } else if (relativePath.toLowerCase().includes('imsmanifest.xml')) {
         $ = await convertManifest($);
         modifiedContent = $.xml();
-        fileType = 'manifest';
+        fileTypeCategory = 'manifest';
       }
 
       // Add the processed file to our array
       processedFiles.push({
         path: relativePath,
         content: modifiedContent,
-        type: fileType
+        type: fileTypeCategory
       });
     } else {
       // For non-XML files, keep them as binary data
@@ -269,18 +295,18 @@ export async function convertPackage(
       processedFiles.push({
         path: relativePath,
         content: binaryContent,
-        type: 'binary' // Mark as binary to handle differently later
+        type: 'other' // Changed from 'binary' to 'other' to match the type system
       });
     }
   }
 
-  // Apply post-processing to the files
-  const updatedFiles = await postProcessing(processedFiles);
+  // Apply post-processing (includes identifier sync by default)
+  const finalFiles = await postProcessing(processedFiles);
 
   // Add all processed files to the new zip
-  for (const file of updatedFiles) {
-    if (file.type === 'binary') {
-      // For binary files, add directly as blobs
+  for (const file of finalFiles) {
+    if (file.type === 'other' && file.content instanceof Blob) {
+      // For binary files (blobs), add directly
       newZip.file(file.path, file.content);
     } else {
       // For XML and text files
@@ -292,17 +318,4 @@ export async function convertPackage(
   const outputBlob = await newZip.generateAsync({ type: 'blob' });
 
   return outputBlob;
-}
-
-// Note: The blobToString function can be kept for other uses but is no longer used
-// in the convertPackage function for binary files
-async function blobToString(blob) {
-  if (typeof blob === 'string') return blob;
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsText(blob);
-  });
 }
