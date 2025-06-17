@@ -3,23 +3,31 @@
 import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json' assert { type: 'json' };
 import { cleanXMLString } from 'src/lib/qti-helper';
 
-// if (!saxon) {
-//   try {
-//     // Dynamically import saxon-js only if not already loaded
-//     const module = await import('saxon-js');
-//     saxonJS = module.default || module;
-//     globalThis.SaxonJS = saxonJS; // cache it globally if you want
-//   } catch (err) {
-//     throw new Error('SaxonJS could not be loaded: ' + err.message);
-//   }
-// }
-// const env = saxon.getPlatform();
-// const doc = env.parseXmlFromString(env.readFile('./node_modules/qti30upgrader/qti2xTo30.xsl'));
-// doc._saxonBaseUri = 'dummy';
-// const sef = saxon.compile(doc);
+export const initializeSaxonJS = async () => {
+  if (typeof globalThis.SaxonJS === 'undefined') {
+    try {
+      // Try to import saxon-js if we're in Node.js
+      if (typeof window === 'undefined') {
+        const saxonModule = await import('saxon-js');
+        globalThis.SaxonJS = saxonModule.default || saxonModule;
+      } else {
+        // In browser, check if it's already loaded via script tag
+        if (typeof (window as any).SaxonJS !== 'undefined') {
+          globalThis.SaxonJS = (window as any).SaxonJS;
+        } else {
+          throw new Error('SaxonJS not available in browser. Please include the SaxonJS script tag.');
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to initialize SaxonJS: ${error.message}`);
+    }
+  }
+  return globalThis.SaxonJS;
+};
 
 const convert = async (qti2: string) => {
   try {
+    await initializeSaxonJS();
     qti2 = cleanXMLString(qti2);
     if (!globalThis.SaxonJS) {
       console.error('SaxonJS is not loaded in the global scope.');

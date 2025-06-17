@@ -5,7 +5,6 @@ import archiver from 'archiver';
 import { convertQti2toQti3 } from './converter';
 import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { qtiTransform } from 'src/lib/qti-transformer';
-import { Element } from 'domhandler';
 import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from 'src/lib/qti-helper';
 
 // Function to find the prefix for a given namespace URI by checking all elements
