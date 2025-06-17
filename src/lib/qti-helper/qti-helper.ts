@@ -1163,7 +1163,6 @@ const getMediaTypeByExtension = (extension: string) => {
     case 'mkv':
     case 'webm':
     case 'flv':
-    case '3gp':
     case 'mpeg':
     case 'mpg':
     case 'wmv':

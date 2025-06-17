@@ -38,6 +38,7 @@ const cliOptions = {
   splitting: true,
   bundle: true,
   skipNodeModulesBundle: false,
+  external: ['saxon-js'],
   outExtension() {
     return {
       js: `.mjs`
