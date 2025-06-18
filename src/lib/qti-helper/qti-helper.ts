@@ -740,7 +740,7 @@ export const processPackage = async (
       // Create a synthetic test XML that includes all items
       const xml = `<?xml version="1.0" encoding="utf-8"?>
         <qti-assessment-test xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-            xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd"
+            xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd"
             identifier="All" title="ALL items"
             tool-name="CitoLab" tool-version="3.10"
             xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0">

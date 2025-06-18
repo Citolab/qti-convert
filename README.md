@@ -99,7 +99,7 @@ This create a package.zip per item, for all items in a folder. The package will 
 
 ### Convert
 
-#### Converting a QTI 2.x XML String to QTI 3.0
+#### Converting a QTI 2.x XML String to QTI 3
 
 ```ts
 import { convertQti2toQti3 } from '@citolab/qti-convert/qti-convert';
@@ -112,7 +112,7 @@ convertQti2toQti3(qti2Xml).then(qti3Xml => {
 
 #### Converting a Zipped QTI Package
 
-The convertPackageStream function processes a zipped QTI package from a stream and converts all relevant QTI 2x files to QTI 3.0.
+The convertPackageStream function processes a zipped QTI package from a stream and converts all relevant QTI 2x files to QTI 3
 
 ```ts
 import { convertPackageStream } from '@citolab/qti-convert/qti-convert';

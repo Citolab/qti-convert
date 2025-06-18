@@ -9,7 +9,7 @@ test('convert dep dialog to html popover', async () => {
   const id = 'WIN_d579fd6a-c46d-409a-a9f6-df7bbabcb8e3';
 
   const qti = xml`<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd
+	xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd
 						http://www.duo.nl/schema/dep_extension ../dep_extension.xsd"
 	title="32gbg6" identifier="ITM-32gbg6" time-dependent="false" label="32gbg6"
 	xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"

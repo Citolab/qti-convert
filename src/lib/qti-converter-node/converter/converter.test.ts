@@ -58,8 +58,8 @@ test('qti2 to qti3 convert should work', async () => {
     </itemBody>
   </assessmentItem>`;
   const expectedOutput = `<?xml version="1.0" encoding="UTF-8"?>
-<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
-<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" identifier="textEntry" title="Richard III (Take 3)" adaptive="false" time-dependent="false">
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd" identifier="textEntry" title="Richard III (Take 3)" adaptive="false" time-dependent="false">
     <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"/>
   
     <qti-item-body>
@@ -153,8 +153,8 @@ test('convert a TAO PCI', async () => {
 `;
 
   const expectedResult = `<?xml version="1.0" encoding="UTF-8"?>
-<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
-<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" identifier="i605b50d60c465892a88c0651ffd390" title="decisiontask" label="decisiontask" xml:lang="en-US" adaptive="false" time-dependent="false" tool-name="TAO" tool-version="3.4.0-sprint134">
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd" identifier="i605b50d60c465892a88c0651ffd390" title="decisiontask" label="decisiontask" xml:lang="en-US" adaptive="false" time-dependent="false" tool-name="TAO" tool-version="3.4.0-sprint134">
   <qti-stylesheet href="decisiontask/runtime/css/decisiontask.css" type="text/css"/>
   <qti-stylesheet href="decisiontask/runtime/css/base.css" type="text/css"/>
   <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"/>
