@@ -3,8 +3,30 @@ import JSZip from 'jszip';
 import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 import { convertQti2toQti3 } from '../qti-converter';
-import { qtiTransform } from '../qti-transformer';
+import { ModuleResolutionConfig, qtiTransform } from '../qti-transformer';
 import { ciBootstrap, registerCES } from './ci-bootstap';
+
+// Function to create blob URL for a file
+async function createBlobUrl(filePath, zip, originalSrcValue) {
+  const mediaFile = zip.files[filePath];
+
+  if (mediaFile) {
+    try {
+      // Get file as array buffer
+      let blob = await mediaFile.async('blob');
+      blob = new Blob([blob], {
+        type: getMimeTypeFromFileName(filePath)
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      return objectUrl;
+    } catch (e) {
+      console.error(`Error processing media file ${filePath}:`, e);
+      return originalSrcValue; // Return original source if there's an error
+    }
+  }
+
+  return originalSrcValue; // Return original source if file not found in zip
+}
 
 export const qtiReferenceAttributes = [
   'src',
@@ -354,6 +376,165 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
     totalRemoved: removedFilesCount
   };
 };
+
+// Modified function to handle module resolution with item-specific prefixes
+async function processModuleResolutionJs(
+  filePath: string,
+  zip: JSZip,
+  originalSrcValue: string,
+  itemIdentifier?: string
+) {
+  debugger;
+  const moduleResolutionFile = zip.files[filePath];
+  const anyWindow = window as any;
+  if (!moduleResolutionFile) {
+    console.error(`Module resolution file not found: ${filePath}`);
+    return originalSrcValue;
+  }
+
+  try {
+    // Read the content of the module_resolution.js file
+    const contentBuffer = await moduleResolutionFile.async('uint8array');
+    const contentString = new TextDecoder().decode(contentBuffer);
+
+    // Extract the JSON configuration from the file
+    let moduleConfig: ModuleResolutionConfig | null = null;
+
+    // Try to extract JSON from common patterns
+    const configPatterns = [
+      /require\.config\s*\(\s*({[\s\S]*?})\s*\)/,
+      /define\s*\(\s*({[\s\S]*?})\s*\)/,
+      /({[\s\S]*?})/ // Fallback: try to find any JSON-like structure
+    ];
+
+    for (const pattern of configPatterns) {
+      const match = contentString.match(pattern);
+      if (match && match[1]) {
+        try {
+          // Clean up the matched string and try to parse as JSON
+          let jsonString = match[1];
+
+          // Handle JavaScript object notation (convert to valid JSON)
+          jsonString = jsonString
+            .replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":') // Quote unquoted keys
+            .replace(/:\s*'([^']*)'/g, ': "$1"') // Convert single quotes to double quotes
+            .replace(/,\s*}/g, '}') // Remove trailing commas
+            .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
+
+          moduleConfig = JSON.parse(jsonString);
+          break;
+        } catch (e) {
+          console.warn(`Failed to parse module config from pattern: ${e}`);
+          continue;
+        }
+      }
+    }
+
+    if (!moduleConfig || !moduleConfig.paths) {
+      console.warn(`No valid module configuration found in ${filePath}`);
+      return await createBlobUrl(filePath, zip, originalSrcValue);
+    }
+
+    // Create blob URLs for all referenced modules with item-specific prefixes
+    const updatedPaths: { [key: string]: string } = {};
+    const moduleDir = filePath.substring(0, filePath.lastIndexOf('/') + 1);
+
+    // Create a prefix for this item's modules to avoid conflicts
+    const itemPrefix = itemIdentifier ? `${itemIdentifier}_` : '';
+
+    for (const [moduleName, modulePath] of Object.entries(moduleConfig.paths)) {
+      if (typeof modulePath === 'string') {
+        // Resolve the module path relative to the module_resolution.js file
+        let resolvedPath = modulePath;
+
+        // Add .js extension if not present
+        if (!resolvedPath.endsWith('.js')) {
+          resolvedPath += '.js';
+        }
+
+        // Make it relative to the module_resolution.js directory
+        if (!resolvedPath.startsWith('./') && !resolvedPath.startsWith('/')) {
+          resolvedPath = moduleDir + resolvedPath;
+        } else if (resolvedPath.startsWith('./')) {
+          resolvedPath = moduleDir + resolvedPath.substring(2);
+        }
+
+        // Remove leading slash if present
+        resolvedPath = resolvedPath.startsWith('/') ? resolvedPath.substring(1) : resolvedPath;
+
+        // Create blob URL for the module file
+        const moduleFile = zip.files[resolvedPath];
+        if (moduleFile) {
+          try {
+            const moduleBlob = await moduleFile.async('blob');
+
+            // Create a unique blob with item-specific identifier
+            const uniqueBlob = new Blob([moduleBlob], {
+              type: 'application/javascript'
+            });
+
+            const moduleBlobUrl = URL.createObjectURL(uniqueBlob);
+
+            // Store the blob URL with item-specific key to avoid conflicts
+            const uniqueModuleName = `${itemPrefix}${moduleName}`;
+            updatedPaths[moduleName] = moduleBlobUrl; // Keep original name in config
+
+            // Store reference for cleanup later if needed
+            if (!anyWindow.moduleResolutionBlobs) {
+              anyWindow.moduleResolutionBlobs = new Map();
+            }
+            anyWindow.moduleResolutionBlobs.set(uniqueModuleName, moduleBlobUrl);
+
+            console.log(`Created blob URL for module ${uniqueModuleName}: ${moduleBlobUrl}`);
+          } catch (e) {
+            console.error(`Error creating blob URL for module ${moduleName} at ${resolvedPath}:`, e);
+            updatedPaths[moduleName] = modulePath; // Keep original path as fallback
+          }
+        } else {
+          console.warn(`Module file not found: ${resolvedPath} for module ${moduleName}`);
+          updatedPaths[moduleName] = modulePath; // Keep original path as fallback
+        }
+      }
+    }
+
+    // Create the updated module_resolution.js content
+    const updatedConfig = {
+      ...moduleConfig,
+      paths: updatedPaths
+    };
+
+    // Generate new JavaScript content
+    let newContent: string;
+    if (contentString.includes('require.config')) {
+      newContent = `require.config(${JSON.stringify(updatedConfig, null, 2)});`;
+    } else if (contentString.includes('define')) {
+      newContent = `define(${JSON.stringify(updatedConfig, null, 2)});`;
+    } else {
+      // Fallback: create a require.config call
+      newContent = `require.config(${JSON.stringify(updatedConfig, null, 2)});`;
+    }
+
+    // Create a blob with the updated content, prefixed with item identifier
+    const newBlob = new Blob([newContent], {
+      type: 'application/javascript'
+    });
+
+    const moduleResolutionBlobUrl = URL.createObjectURL(newBlob);
+
+    // Store the module resolution blob URL with item-specific key
+    if (!anyWindow.moduleResolutionBlobs) {
+      anyWindow.moduleResolutionBlobs = new Map();
+    }
+    const uniqueResolutionName = `${itemPrefix}module_resolution`;
+    anyWindow.moduleResolutionBlobs.set(uniqueResolutionName, moduleResolutionBlobUrl);
+
+    // Return the blob URL for the modified module_resolution.js
+    return moduleResolutionBlobUrl;
+  } catch (e) {
+    console.error(`Error processing module_resolution.js ${filePath}:`, e);
+    return await createBlobUrl(filePath, zip, originalSrcValue);
+  }
+}
 
 /**
  * Processes a package file, extracting and converting assessment items and tests
@@ -855,31 +1036,13 @@ export const processPackage = async (
           else if (lowerFilePath.endsWith('index.html')) {
             return await processIndexHtml(filePath, zip, srcValue);
           }
+          // Special handling for module_resolution.js
+          else if (lowerFilePath.endsWith('module_resolution.js')) {
+            return await processModuleResolutionJs(filePath, zip, srcValue);
+          }
 
           return await createBlobUrl(filePath, zip, srcValue);
         });
-
-        // Function to create blob URL for a file
-        async function createBlobUrl(filePath, zip, originalSrcValue) {
-          const mediaFile = zip.files[filePath];
-
-          if (mediaFile) {
-            try {
-              // Get file as array buffer
-              let blob = await mediaFile.async('blob');
-              blob = new Blob([blob], {
-                type: getMimeTypeFromFileName(filePath)
-              });
-              const objectUrl = URL.createObjectURL(blob);
-              return objectUrl;
-            } catch (e) {
-              console.error(`Error processing media file ${filePath}:`, e);
-              return originalSrcValue; // Return original source if there's an error
-            }
-          }
-
-          return originalSrcValue; // Return original source if file not found in zip
-        }
 
         // Function to process bootstrap.js file
         async function processBootstrapJs(filePath, zip, originalSrcValue) {
