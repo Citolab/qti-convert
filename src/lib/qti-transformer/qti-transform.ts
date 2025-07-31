@@ -12,6 +12,8 @@ import {
   toMathMLWebcomponents,
   qbCleanup,
   depConvert,
+  depConvertExtended,
+  hideInputsForChoiceInteractionWithImages,
   minChoicesToOne,
   externalScored,
   changeAssetLocation,
@@ -54,6 +56,8 @@ interface QtiTransformAPI {
   stripMaterialInfo(): QtiTransformAPI;
   qbCleanup(): QtiTransformAPI;
   depConvert(): QtiTransformAPI;
+  depConvertExtended(): QtiTransformAPI;
+  hideInputsForChoiceInteractionWithImages(): QtiTransformAPI;
   minChoicesToOne(): QtiTransformAPI;
   suffix(elements: string[], suffix: string): QtiTransformAPI;
   externalScored(): QtiTransformAPI;
@@ -185,6 +189,14 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     depConvert() {
       depConvert($);
+      return api;
+    },
+    depConvertExtended() {
+      depConvertExtended($);
+      return api;
+    },
+    hideInputsForChoiceInteractionWithImages() {
+      hideInputsForChoiceInteractionWithImages($);
       return api;
     },
     minChoicesToOne() {

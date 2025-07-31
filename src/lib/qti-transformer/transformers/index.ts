@@ -6,6 +6,8 @@ export * from './suffix';
 export * from './custom-types';
 export * from './strip-material-info';
 export * from './dep-convert';
+export * from './dep-convert-extended';
+export * from './hide-inputs-for-choice-interaction-with-images';
 export * from './qb-cleanup';
 export * from './ssml';
 export * from './min-choices-to-one';

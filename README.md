@@ -258,6 +258,8 @@ The build-in functions that can be chained are:
 - `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML
 - `qbCleanup(): QtiTransformAPI`: Clean-up for package created with the Quesify Platform
 - `depConvert(): QtiTransformAPI`: Converts qti from the Dutch Extension Profile. For now only dep-dialog to a html popover. With is basic support for these dialog.
+- `depConvertExtended(): QtiTransformAPI`: Converts qti from the Dutch Extension Profile to a web-component dep-popup.
+- `hideInputsForChoiceInteractionWithImages`: Hides the input for choice interactions when all simple choices contain images
 - `minChoicesToOne(): QtiTransformAPI`: Ensure the minimum number of choices is one.
 - `suffix(elements: string[], suffix: string)`: Add a suffix to specified elements.
 - `externalScored()`: Mark the XML as externally scored.
