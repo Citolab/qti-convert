@@ -244,25 +244,25 @@ await xmlValue.fnChAsync(async $ => {
 The build-in functions that can be chained are:
 
 - `mathml(): QtiTransformAPI`: Convert MathML elements to web components.
-- `objectToVideo(): QtiTransformAPI`: Convert `<object>` elements to `<video>` elements..
-- `objectToAudio(): QtiTransformAPI`: Convert `<object>` elements to `<audio>` elements..
+- `objectToVideo(): QtiTransformAPI`: Convert `<object>` elements to `<video>` elements.
+- `objectToAudio(): QtiTransformAPI`: Convert `<object>` elements to `<audio>` elements.
 - `objectToImg(): QtiTransformAPI`: Convert `<object>` elements to `<img>` elements.
-- `ssmlSubToSpan(): QtiTransformAPI`: Convert <ssml:sub> to data-ssml attributes
-- `stripStylesheets(): QtiTransformAPI`: Remove all stylesheet references from the XML.
-- `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. Url can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overriden. Also by default you won't get a callback for base64 urls.
-- `changeAssetLocationAsync(getNewUrl: (oldUrl: string) => Promise<string>, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Async function of changeAssetLocation
-- `configurePciAsync(baseUrl: string, getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>): Promise<QtiTransformAPI>`: makes sure custom-interaction-type-identifier are unique per item, adds /modules/module_resolution.js and /modules/fallback_module_resolution.js to the qti-interaction-modules tag of the item qti and sets a baseUrl to be able to get the full path of the modules.
-- `upgradePci()`: The default qti3 upgrader doesn't handle pci's exported from TAO properly. This is tested only for PCI's that use the latest PCI standard and are exported to qti2.x with TAO.
-- `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used override default web-components. E.g. `<qti-choice-interaction class="type:custom">` will result in `<qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
-- `customInteraction(baseRef: string, baseItem: string)` Transforms qti-custom-interactions that contain an object tag. Object tag will be removed and attributes will be merged in the qti-custom-interactions tag.
-- `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML
-- `qbCleanup(): QtiTransformAPI`: Clean-up for package created with the Quesify Platform
-- `depConvert(): QtiTransformAPI`: Converts qti from the Dutch Extension Profile. For now only dep-dialog to a html popover. With is basic support for these dialog.
-- `depConvertExtended(): QtiTransformAPI`: Converts qti from the Dutch Extension Profile to a web-component dep-popup.
-- `hideInputsForChoiceInteractionWithImages`: Hides the input for choice interactions when all simple choices contain images
+- `ssmlSubToSpan(): QtiTransformAPI`: Convert `<ssml:sub>` to data-ssml attributes.
+- `stripStylesheets(options?: { removePattern?: string, keepPattern?: string }): QtiTransformAPI`: Remove stylesheet references from the XML. Optionally pass patterns using `*` as wildcard to indicate which stylesheets to remove or keep (e.g., `*main.css`, `theme*`, `*old*`).
+- `changeAssetLocation(getNewUrl: (oldUrl: string) => string, srcAttribute?: string[], skipBase64 = true): QtiTransformAPI`: Helper function to change the asset location of media files. URL can be changed in the callback function. By default the following attributes are checked for references: `['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location']` but that can be overridden. Also by default you won't get a callback for base64 URLs.
+- `changeAssetLocationAsync(getNewUrl: (oldUrl: string) => Promise<string>, srcAttribute?: string[], skipBase64 = true): Promise<QtiTransformAPI>`: Async function of changeAssetLocation.
+- `configurePciAsync(baseUrl: string, getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>): Promise<QtiTransformAPI>`: Makes sure custom-interaction-type-identifier are unique per item, adds /modules/module_resolution.js and /modules/fallback_module_resolution.js to the qti-interaction-modules tag of the item QTI and sets a baseUrl to be able to get the full path of the modules.
+- `upgradePci(): QtiTransformAPI`: The default QTI3 upgrader doesn't handle PCIs exported from TAO properly. This is tested only for PCIs that use the latest PCI standard and are exported to QTI2.x with TAO.
+- `customTypes(): QtiTransformAPI`: Apply custom type transformations to the XML. Can be used to override default web-components. E.g. `<qti-choice-interaction class="type:custom">` will result in `<qti-choice-interaction-custom>` so you can create your own web-component to render choice interactions.
+- `customInteraction(baseRef: string, baseItem: string): QtiTransformAPI`: Transforms qti-custom-interactions that contain an object tag. Object tag will be removed and attributes will be merged in the qti-custom-interactions tag.
+- `stripMaterialInfo(): QtiTransformAPI`: Remove unnecessary material information from the XML.
+- `qbCleanup(): QtiTransformAPI`: Clean-up for packages created with the Quesify Platform.
+- `depConvert(): QtiTransformAPI`: Converts QTI from the Dutch Extension Profile. For now only dep-dialog to an HTML popover. This is basic support for these dialogs.
+- `depConvertExtended(): QtiTransformAPI`: Converts QTI from the Dutch Extension Profile to a web-component dep-popup.
+- `hideInputsForChoiceInteractionWithImages(): QtiTransformAPI`: Hides the input for choice interactions when all simple choices contain images.
 - `minChoicesToOne(): QtiTransformAPI`: Ensure the minimum number of choices is one.
-- `suffix(elements: string[], suffix: string)`: Add a suffix to specified elements.
-- `externalScored()`: Mark the XML as externally scored.
+- `suffix(elements: string[], suffix: string): QtiTransformAPI`: Add a suffix to specified elements.
+- `externalScored(): QtiTransformAPI`: Mark the XML as externally scored.
 
 Other function to get the output of the transformer:
 
