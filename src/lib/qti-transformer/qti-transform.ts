@@ -51,7 +51,7 @@ interface QtiTransformAPI {
     getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
   ): Promise<QtiTransformAPI>;
   upgradePci(): QtiTransformAPI;
-  stripStylesheets(): QtiTransformAPI;
+  stripStylesheets(options?: { removePattern?: string; keepPattern?: string }): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
   qbCleanup(): QtiTransformAPI;
@@ -167,8 +167,8 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       upgradePci($);
       return api;
     },
-    stripStylesheets() {
-      stripStylesheets($);
+    stripStylesheets(options?: { removePattern?: string; keepPattern?: string }) {
+      stripStylesheets($, options);
       return api;
     },
     customTypes() {
