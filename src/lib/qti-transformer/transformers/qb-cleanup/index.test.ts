@@ -258,3 +258,32 @@ test('cleanup QB qti - preserve text in nested spans', async () => {
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
+
+test('cleanup QB qti - exact real world scenario', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body class="defaultBody" xml:lang="nl-NL">
+    <div class="content">
+      <qti-simple-associable-choice identifier="y_B" match-max="1">
+        <div>
+          <p><span /> <span> <span>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</span></span></p>
+        </div>
+      </qti-simple-associable-choice>
+    </div>
+  </qti-item-body>`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+    <qti-item-body xml:lang="nl-NL">
+      <div class="container">
+        <qti-simple-associable-choice identifier="y_B" match-max="1">
+          <div>
+            <p>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</p>
+          </div>
+        </qti-simple-associable-choice>
+      </div>
+    </qti-item-body>`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  console.log('Real world test result:', result);
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});

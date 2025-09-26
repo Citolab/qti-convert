@@ -61,32 +61,49 @@ export function qbCleanup($: cheerio.CheerioAPI) {
             return;
           }
 
-          // For spans without attributes, check if they're redundant
-          const children = $span.children();
-          const parent = $span.parent();
-
-          // Case 1: Span contains only one child span (and maybe whitespace), unwrap the outer span
-          if (children.length === 1 && children.first().is('span')) {
+          // Special handling for the problematic pattern: <span> <span>text</span></span>
+          // This should become just "text"
+          const children = $span.children('span');
+          if (children.length === 1) {
             const childSpan = children.first();
-            const spanContents = $span.contents();
+            const childText = childSpan.text().trim();
 
-            // Check if there's only whitespace before/after the child span
-            let hasOnlyWhitespaceAround = true;
-            spanContents.each(function () {
-              if (!$(this).is('span') && $(this).text().trim()) {
-                hasOnlyWhitespaceAround = false;
+            // If the child span has text and the outer span only has whitespace + the child
+            if (childText) {
+              const outerContents = $span.contents();
+              let hasOnlyWhitespaceAndOneSpan = true;
+
+              outerContents.each(function () {
+                const node = $(this);
+                if (node.is('span')) {
+                  // This is our child span, that's fine
+                  return;
+                } else if (node.get(0).nodeType === 3) {
+                  // Text node
+                  // Check if it's only whitespace
+                  if (node.text().trim()) {
+                    hasOnlyWhitespaceAndOneSpan = false;
+                  }
+                } else {
+                  // Other element
+                  hasOnlyWhitespaceAndOneSpan = false;
+                }
+              });
+
+              if (hasOnlyWhitespaceAndOneSpan) {
+                // Replace the outer span with just the child span's content
+                $span.replaceWith(childSpan.contents());
+                changed = true;
+                return;
               }
-            });
-
-            if (hasOnlyWhitespaceAround) {
-              $span.contents().unwrap();
-              changed = true;
-              return;
             }
           }
 
-          // Case 2: Multiple nested empty spans - look for patterns like <span><span></span></span>
-          if (children.length === 1 && children.first().is('span')) {
+          // Handle other nested span patterns
+          const parent = $span.parent();
+
+          // Case: Multiple nested empty spans - look for patterns like <span><span></span></span>
+          if (children.length === 1) {
             const childSpan = children.first();
             const childText = childSpan.text().trim();
             const childHtml = childSpan.html().trim();
@@ -103,7 +120,7 @@ export function qbCleanup($: cheerio.CheerioAPI) {
             }
           }
 
-          // Case 3: Very specific case - unwrap spans that are clearly redundant wrappers
+          // Case: Very specific case - unwrap spans that are clearly redundant wrappers
           // Only unwrap if the span is a clear wrapper with no semantic purpose
           if (children.length === 0 && textContent) {
             // Check if this is a problematic pattern like <span> <span>text</span></span>
