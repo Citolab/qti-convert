@@ -214,3 +214,47 @@ test('reset variables', async () => {
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
+
+test('cleanup QB qti - preserve text in nested spans', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body class="defaultBody" xml:lang="nl-NL">
+    <div class="content">
+      <qti-simple-associable-choice identifier="y_B" match-max="1">
+        <div>
+          <p><span /> <span> <span>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</span></span></p>
+        </div>
+      </qti-simple-associable-choice>
+      
+      <!-- Additional test cases for span cleanup -->
+      <div>
+        <p><span></span>Some text after empty span</p>
+        <p><span> </span>Text after whitespace-only span</p>
+        <p><span><span></span>Nested empty spans</span> with text</p>
+        <p><span><span>Nested span with text</span></span></p>
+      </div>
+    </div>
+  </qti-item-body>`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+    <qti-item-body xml:lang="nl-NL">
+      <div class="container">
+        <qti-simple-associable-choice identifier="y_B" match-max="1">
+          <div>
+            <p>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</p>
+          </div>
+        </qti-simple-associable-choice>
+        
+        <div>
+          <p>Some text after empty span</p>
+          <p>Text after whitespace-only span</p>
+          <p>Nested empty spans with text</p>
+          <p>Nested span with text</p>
+        </div>
+      </div>
+    </qti-item-body>`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  console.log('Result:', result);
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});

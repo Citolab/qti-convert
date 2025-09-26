@@ -27,6 +27,109 @@ export function qbCleanup($: cheerio.CheerioAPI) {
       $(element).replaceWith($(element).html());
     });
 
+    // Clean up empty and unnecessary spans
+    function cleanupSpans() {
+      let changed = true;
+      while (changed) {
+        changed = false;
+
+        $('span').each(function () {
+          const $span = $(this);
+          const textContent = $span.text().trim();
+          const htmlContent = $span.html().trim();
+
+          // If span is completely empty (no text, no meaningful content)
+          if (!textContent || htmlContent === '' || htmlContent === '&nbsp;') {
+            $span.remove();
+            changed = true;
+            return;
+          }
+
+          // If span contains only whitespace, remove it
+          if (!textContent && htmlContent.match(/^[\s&nbsp;]*$/)) {
+            $span.remove();
+            changed = true;
+            return;
+          }
+
+          // Check if span has attributes (preserve spans with classes, ids, etc.)
+          const attributes = $span.get(0)?.attribs;
+          const hasAttributes = attributes && Object.keys(attributes).length > 0;
+
+          // Don't unwrap spans that have attributes
+          if (hasAttributes) {
+            return;
+          }
+
+          // For spans without attributes, check if they're redundant
+          const children = $span.children();
+          const parent = $span.parent();
+
+          // Case 1: Span contains only one child span (and maybe whitespace), unwrap the outer span
+          if (children.length === 1 && children.first().is('span')) {
+            const childSpan = children.first();
+            const spanContents = $span.contents();
+
+            // Check if there's only whitespace before/after the child span
+            let hasOnlyWhitespaceAround = true;
+            spanContents.each(function () {
+              if (!$(this).is('span') && $(this).text().trim()) {
+                hasOnlyWhitespaceAround = false;
+              }
+            });
+
+            if (hasOnlyWhitespaceAround) {
+              $span.contents().unwrap();
+              changed = true;
+              return;
+            }
+          }
+
+          // Case 2: Multiple nested empty spans - look for patterns like <span><span></span></span>
+          if (children.length === 1 && children.first().is('span')) {
+            const childSpan = children.first();
+            const childText = childSpan.text().trim();
+            const childHtml = childSpan.html().trim();
+
+            // If child span is empty, remove it and check if parent becomes empty
+            if (!childText || childHtml === '' || childHtml === '&nbsp;') {
+              childSpan.remove();
+              // After removing child, check if this span is now empty
+              if (!$span.text().trim()) {
+                $span.remove();
+                changed = true;
+                return;
+              }
+            }
+          }
+
+          // Case 3: Very specific case - unwrap spans that are clearly redundant wrappers
+          // Only unwrap if the span is a clear wrapper with no semantic purpose
+          if (children.length === 0 && textContent) {
+            // Check if this is a problematic pattern like <span> <span>text</span></span>
+            const nextSibling = $span.next();
+            const prevSibling = $span.prev();
+            const parentTagName = parent.prop('tagName')?.toLowerCase();
+
+            // Only unwrap in very specific cases where we're sure it's not semantic
+            // Don't unwrap spans inside semantic elements like strong, em, etc.
+            const semanticParents = ['strong', 'em', 'b', 'i', 'u', 'mark', 'small', 'del', 'ins', 'sub', 'sup'];
+            const isInSemanticParent = semanticParents.includes(parentTagName || '');
+
+            // Only unwrap if it's clearly a wrapper in a paragraph and not in semantic context
+            if (!isInSemanticParent && parentTagName === 'p' && !prevSibling.length && !nextSibling.length) {
+              $span.contents().unwrap();
+              changed = true;
+              return;
+            }
+          }
+        });
+      }
+    }
+
+    // Run span cleanup
+    cleanupSpans();
+
     $('p').each((index, element) => {
       const $element = $(element);
       if ($element.html().trim() === '') {
@@ -126,5 +229,4 @@ export function qbCleanup($: cheerio.CheerioAPI) {
       }
     }
   }
-  // $('div:has(qti-extended-text-interaction)').contents().unwrap();
 }
