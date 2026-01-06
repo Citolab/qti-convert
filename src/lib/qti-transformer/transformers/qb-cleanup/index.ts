@@ -38,15 +38,21 @@ export function qbCleanup($: cheerio.CheerioAPI) {
           const textContent = $span.text().trim();
           const htmlContent = $span.html().trim();
 
-          // If span is completely empty (no text, no meaningful content)
-          if (!textContent || htmlContent === '' || htmlContent === '&nbsp;') {
+          // Check if span contains QTI elements that should be preserved
+          const hasQtiElements =
+            $span.find(
+              '[class*="qti-"], [id*="qti-"], qti-gap, qti-gap-text, qti-gap-match-interaction, qti-extended-text-interaction, qti-choice-interaction, qti-text-entry-interaction, qti-inline-choice-interaction, qti-hottext-interaction, qti-order-interaction, qti-associate-interaction, qti-match-interaction, qti-hotspot-interaction, qti-select-point-interaction, qti-graphic-order-interaction, qti-graphic-associate-interaction, qti-graphic-gap-match-interaction, qti-position-object-interaction, qti-slider-interaction, qti-draw-interaction, qti-upload-interaction'
+            ).length > 0;
+
+          // If span is completely empty (no text, no meaningful content) AND doesn't contain QTI elements
+          if ((!textContent || htmlContent === '' || htmlContent === '&nbsp;') && !hasQtiElements) {
             $span.remove();
             changed = true;
             return;
           }
 
-          // If span contains only whitespace, remove it
-          if (!textContent && htmlContent.match(/^[\s&nbsp;]*$/)) {
+          // If span contains only whitespace AND doesn't contain QTI elements, remove it
+          if (!textContent && htmlContent.match(/^[\s&nbsp;]*$/) && !hasQtiElements) {
             $span.remove();
             changed = true;
             return;

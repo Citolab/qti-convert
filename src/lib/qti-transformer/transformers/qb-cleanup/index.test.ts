@@ -287,3 +287,47 @@ test('cleanup QB qti - exact real world scenario', async () => {
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
+
+test('preserve QTI gap elements in spans', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body xml:lang="nl-NL">
+    <qti-gap-match-interaction id="gapMatchScoring" response-identifier="RESPONSE" max-associations="0" shuffle="false">
+      <qti-gap-text identifier="A" match-max="1">
+        <span>rupsen</span>
+      </qti-gap-text>
+      <qti-gap-text identifier="B" match-max="1">
+        <span>koolplanten</span>
+      </qti-gap-text>
+      <qti-gap-text identifier="C" match-max="1">
+        <span>volwassen sluipwesp</span>
+      </qti-gap-text>
+      <qti-gap-text identifier="D" match-max="1">
+        <span>larven van sluipwesp</span>
+      </qti-gap-text>
+      <p><span><qti-gap identifier="G1" required="true"/></span>&#xa0;<m:math><m:mo>&#x2192;</m:mo></m:math>&#xa0;<span><qti-gap identifier="G2" required="true"/></span>&#xa0;<m:math><m:mo>&#x2192;</m:mo></m:math>&#xa0;<span><qti-gap identifier="G3" required="true"/></span></p>
+    </qti-gap-match-interaction>
+  </qti-item-body>`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body xml:lang="nl-NL">
+    <qti-gap-match-interaction id="gapMatchScoring" response-identifier="RESPONSE" max-associations="0" shuffle="false">
+      <qti-gap-text identifier="A" match-max="1">
+        <span>rupsen</span>
+      </qti-gap-text>
+      <qti-gap-text identifier="B" match-max="1">
+        <span>koolplanten</span>
+      </qti-gap-text>
+      <qti-gap-text identifier="C" match-max="1">
+        <span>volwassen sluipwesp</span>
+      </qti-gap-text>
+      <qti-gap-text identifier="D" match-max="1">
+        <span>larven van sluipwesp</span>
+      </qti-gap-text>
+      <p><span><qti-gap identifier="G1" required="true"/></span> <m:math><m:mo>→</m:mo></m:math> <span><qti-gap identifier="G2" required="true"/></span> <m:math><m:mo>→</m:mo></m:math> <span><qti-gap identifier="G3" required="true"/></span></p>
+    </qti-gap-match-interaction>
+  </qti-item-body>`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});
