@@ -84,6 +84,7 @@
     "archiver": "^7.0.1",
     "cheerio": "^1.0.0",
     "jszip": "^3.10.1",
+    "saxon-js": "^2.7.0",
     "unzipper": "^0.12.3",
     "xml-formatter": "^3.6.4"
   },
@@ -106,7 +107,6 @@
     "path-browserify": "^1.0.1",
     "prettier": "3.5.3",
     "qti30upgrader": "github:Citolab/qti30Upgrader",
-    "saxon-js": "^2.7.0",
     "ts-jest": "^29.2.6",
     "ts-node": "^10.9.2",
     "tsup": "^8.4.0",

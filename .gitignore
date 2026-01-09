@@ -29,3 +29,5 @@ storybook-static/
 
 vscode.html-custom-data.json
 vscode.css-custom-data.json
+.npm-cache/
+*.tgz
