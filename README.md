@@ -28,7 +28,15 @@ The following commands can be run from the terminal:
 ```
 
 Should have a qti2.x zip file as input parameter.
-It will create a qti3 zip file in the same folder call yourpackage-qti3.zip
+It will create a qti3 zip file in the same folder called `yourpackage-qti3.zip`.
+
+#### Converting all zip files in a folder
+
+```sh
+    npx -p=@citolab/qti-convert qti-convert-pkg /path/to/folder-with-zips
+```
+
+Should have the path to a folder as input parameter. It will convert all `.zip` files in that folder and write the converted packages to a new folder next to it called `folder-with-zips-qti3`.
 
 #### Converting a folder
 
@@ -327,7 +335,7 @@ console.log(allResources);
 
 ## License
 
-This package is licensed under the GNU General Public License. See the [LICENSE file](/LICENSE) for more information.
+This package is licensed under the Apache License 2.0. See the [LICENSE file](/LICENSE) for more information.
 
 ## Contributing
 
