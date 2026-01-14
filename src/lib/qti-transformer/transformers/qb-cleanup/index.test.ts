@@ -331,3 +331,69 @@ test('preserve QTI gap elements in spans', async () => {
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
+
+test('cleanup UserSRVet bold nesting', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body xml:lang="nl-NL">
+    <div class="content">
+      <!-- Case 1: p.UserSRVet containing strong with spans -->
+      <p class="UserSRVet">
+        <strong>
+          <span>Zelfstandig </span>
+        </strong>
+        <span>wonen</span>
+      </p>
+      
+      <!-- Case 2: strong containing p.UserSRVet with spans -->
+      <strong>
+        <p class="UserSRVet">
+          <span>Another </span>
+          <span>example</span>
+        </p>
+      </strong>
+      
+      <!-- Case 3: More complex nesting -->
+      <p class="UserSRVet">
+        <strong>
+          <span>Complex </span>
+          <span>nested </span>
+        </strong>
+        <span>structure</span>
+      </p>
+    </div>
+  </qti-item-body>`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body xml:lang="nl-NL">
+    <div class="container">
+      <!-- Case 1: p.UserSRVet containing strong with spans -->
+      <p class="UserSRVet">
+        <strong>
+          Zelfstandig 
+        </strong>
+        <span>wonen</span>
+      </p>
+      
+      <!-- Case 2: strong containing p.UserSRVet with spans -->
+      <strong>
+        <p class="UserSRVet">
+          Another 
+          example
+        </p>
+      </strong>
+      
+      <!-- Case 3: More complex nesting -->
+      <p class="UserSRVet">
+        <strong>
+          Complex 
+          nested 
+        </strong>
+        <span>structure</span>
+      </p>
+    </div>
+  </qti-item-body>`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});

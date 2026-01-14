@@ -153,6 +153,54 @@ export function qbCleanup($: cheerio.CheerioAPI) {
     // Run span cleanup
     cleanupSpans();
 
+    // Clean up UserSRVet paragraphs with redundant strong/bold nesting
+    function cleanupUserSRVetBoldNesting() {
+      // Case 1: <p class="UserSRVet"> containing <strong> tags
+      $('p.UserSRVet').each(function () {
+        const $p = $(this);
+        
+        // Look for strong tags that contain spans that make text bold again
+        $p.find('strong').each(function () {
+          const $strong = $(this);
+          
+          // Check if the strong contains spans with content
+          const $spans = $strong.find('span');
+          if ($spans.length > 0) {
+            // Flatten the structure by removing the spans but keeping their content
+            $spans.each(function () {
+              const $span = $(this);
+              $span.contents().unwrap();
+            });
+          }
+        });
+      });
+      
+      // Case 2: <strong> containing <p class="UserSRVet">
+      $('strong').each(function () {
+        const $strong = $(this);
+        const $userParagraphs = $strong.find('p.UserSRVet');
+        
+        if ($userParagraphs.length > 0) {
+          $userParagraphs.each(function () {
+            const $p = $(this);
+            
+            // Look for nested spans within the paragraph that might make text bold again
+            const $spans = $p.find('span');
+            if ($spans.length > 0) {
+              // Flatten the structure by removing the spans but keeping their content
+              $spans.each(function () {
+                const $span = $(this);
+                $span.contents().unwrap();
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Run UserSRVet cleanup
+    cleanupUserSRVetBoldNesting();
+
     $('p').each((index, element) => {
       const $element = $(element);
       if ($element.html().trim() === '') {
