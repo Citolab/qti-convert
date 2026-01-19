@@ -360,6 +360,9 @@ test('cleanup UserSRVet bold nesting', async () => {
         </strong>
         <span>structure</span>
       </p>
+
+      <!-- Case 4: Exact reported pattern -->
+      <p class="UserSRVet"><strong>Zelfstandig</strong><span>wonen</span></p>
     </div>
   </qti-item-body>`;
 
@@ -368,28 +371,27 @@ test('cleanup UserSRVet bold nesting', async () => {
     <div class="container">
       <!-- Case 1: p.UserSRVet containing strong with spans -->
       <p class="UserSRVet">
-        <strong>
-          Zelfstandig 
-        </strong>
+        <span>Zelfstandig </span>
         <span>wonen</span>
       </p>
       
       <!-- Case 2: strong containing p.UserSRVet with spans -->
       <strong>
-        <p class="UserSRVet">
-          Another 
-          example
+        <p>
+          <span>Another </span>
+          <span>example</span>
         </p>
       </strong>
       
       <!-- Case 3: More complex nesting -->
       <p class="UserSRVet">
-        <strong>
-          Complex 
-          nested 
-        </strong>
+        <span>Complex </span>
+        <span>nested </span>
         <span>structure</span>
       </p>
+
+      <!-- Case 4: Exact reported pattern -->
+      <p class="UserSRVet">Zelfstandig <span>wonen</span></p>
     </div>
   </qti-item-body>`;
 

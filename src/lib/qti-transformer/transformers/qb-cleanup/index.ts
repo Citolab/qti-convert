@@ -155,46 +155,29 @@ export function qbCleanup($: cheerio.CheerioAPI) {
 
     // Clean up UserSRVet paragraphs with redundant strong/bold nesting
     function cleanupUserSRVetBoldNesting() {
-      // Case 1: <p class="UserSRVet"> containing <strong> tags
-      $('p.UserSRVet').each(function () {
-        const $p = $(this);
-
-        // Look for strong tags that contain spans that make text bold again
-        $p.find('strong').each(function () {
-          const $strong = $(this);
-
-          // Check if the strong contains spans with content
-          const $spans = $strong.find('span');
-          if ($spans.length > 0) {
-            // Flatten the structure by removing the spans but keeping their content
-            $spans.each(function () {
-              const $span = $(this);
-              $span.contents().unwrap();
-            });
-          }
-        });
+      // 1) If an element inside a <strong> has class UserSRVet, remove that class.
+      $('strong .UserSRVet').each(function () {
+        const $el = $(this);
+        $el.removeClass('UserSRVet');
+        if (($el.attr('class') || '').trim() === '') {
+          $el.removeAttr('class');
+        }
       });
 
-      // Case 2: <strong> containing <p class="UserSRVet">
-      $('strong').each(function () {
-        const $strong = $(this);
-        const $userParagraphs = $strong.find('p.UserSRVet');
+      // 2) If an element has class UserSRVet and contains an inner <strong>, unwrap the <strong>.
+      $('.UserSRVet').each(function () {
+        const $userEl = $(this);
+        $userEl.find('strong').each(function () {
+          const $strong = $(this);
 
-        if ($userParagraphs.length > 0) {
-          $userParagraphs.each(function () {
-            const $p = $(this);
+          // Avoid "wordword" concatenation when <strong> is directly followed by an element (e.g. <span>).
+          const strongNode = $strong.get(0) as unknown as { next?: { type?: string; name?: string } };
+          if (strongNode?.next?.type === 'tag' && !/\s$/.test($strong.text())) {
+            $strong.after(' ');
+          }
 
-            // Look for nested spans within the paragraph that might make text bold again
-            const $spans = $p.find('span');
-            if ($spans.length > 0) {
-              // Flatten the structure by removing the spans but keeping their content
-              $spans.each(function () {
-                const $span = $(this);
-                $span.contents().unwrap();
-              });
-            }
-          });
-        }
+          $strong.replaceWith($strong.contents());
+        });
       });
     }
 
