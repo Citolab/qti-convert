@@ -44,6 +44,21 @@ export function qbCleanup($: cheerio.CheerioAPI) {
               '[class*="qti-"], [id*="qti-"], qti-gap, qti-gap-text, qti-gap-match-interaction, qti-extended-text-interaction, qti-choice-interaction, qti-text-entry-interaction, qti-inline-choice-interaction, qti-hottext-interaction, qti-order-interaction, qti-associate-interaction, qti-match-interaction, qti-hotspot-interaction, qti-select-point-interaction, qti-graphic-order-interaction, qti-graphic-associate-interaction, qti-graphic-gap-match-interaction, qti-position-object-interaction, qti-slider-interaction, qti-draw-interaction, qti-upload-interaction'
             ).length > 0;
 
+          // Spans can also wrap media/other non-text content (e.g. <img>) that must not be removed.
+          const hasMediaElements =
+            $span.find('img, video, audio, object, iframe, embed, svg, math, table, qti-media-interaction').length > 0;
+
+          // If span has no text but contains media/non-text content, unwrap it (keep the content).
+          if (!textContent && hasMediaElements) {
+            const attributes = $span.get(0)?.attribs;
+            const hasAttributes = attributes && Object.keys(attributes).length > 0;
+            if (!hasAttributes) {
+              $span.replaceWith($span.contents());
+              changed = true;
+            }
+            return;
+          }
+
           // If span is completely empty (no text, no meaningful content) AND doesn't contain QTI elements
           if ((!textContent || htmlContent === '' || htmlContent === '&nbsp;') && !hasQtiElements) {
             $span.remove();

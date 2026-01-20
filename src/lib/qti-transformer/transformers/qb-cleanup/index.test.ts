@@ -269,6 +269,54 @@ test('does not wipe non-text content in layout columns (video)', async () => {
   expect(areEqual).toEqual(true);
 });
 
+test('does not remove images wrapped in spans', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body class="defaultBody" xml:lang="nl-NL">
+    <div class="content">
+      <div class="qti-layout-row">
+        <div class="qti-layout-col6">
+          <div id="leftbody">
+            <p><span>Een Britse poster uit de Eerste Wereldoorlog (1914-1918)</span></p>
+            <p>
+              <span>
+                <img id="Id-IMG_ae59ea38-c799-40f7-a135-0e9e31f52115" src="../img/GSKB-cbt-24-09-02.jpg" width="334" height="500" alt=""/>
+              </span>
+            </p>
+          </div>
+        </div>
+        <div class="qti-layout-col6">
+          <div id="question">
+            <p><strong><span>Bij welk gevolg past de oproep op de poster?</span></strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </qti-item-body>
+`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body xml:lang="nl-NL">
+    <div class="container">
+      <div class="qti-layout-row">
+        <div class="qti-layout-col6">
+          <p>Een Britse poster uit de Eerste Wereldoorlog (1914-1918)</p>
+          <p>
+            <img id="Id-IMG_ae59ea38-c799-40f7-a135-0e9e31f52115" src="../img/GSKB-cbt-24-09-02.jpg" width="334" height="500" alt=""/>
+          </p>
+        </div>
+        <div class="qti-layout-col6">
+          <p><strong><span>Bij welk gevolg past de oproep op de poster?</span></strong></p>
+        </div>
+      </div>
+    </div>
+  </qti-item-body>
+`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});
+
 test('cleanup QB qti - preserve text in nested spans', async () => {
   const input = xml`<?xml version="1.0" encoding="UTF-8"?>
   <qti-item-body class="defaultBody" xml:lang="nl-NL">
