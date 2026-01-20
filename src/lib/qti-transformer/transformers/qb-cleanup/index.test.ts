@@ -215,6 +215,60 @@ test('reset variables', async () => {
   expect(areEqual).toEqual(true);
 });
 
+test('does not wipe non-text content in layout columns (video)', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body class="defaultBody" xml:lang="nl-NL">
+    <div class="content">
+      <div class="qti-layout-row">
+        <div class="qti-layout-col6">
+          <div id="leftbody">
+            <p><span/></p>
+            <div id="Iaf63a511-b761-4c53-bdef-b7115b8a123b">
+              <qti-media-interaction response-identifier="VIDEORESPONSE" autostart="false" max-plays="0" id="I990c31b5-9070-4d01-a9d4-6fdf9a583aac">
+                <video width="384" height="288" controls="">
+                  <source src="../video/GSKB-cbt-24-11-02_T.webm" type="video/webm"/>
+                </video>
+              </qti-media-interaction>
+            </div>
+            <p><span/></p>
+          </div>
+        </div>
+        <div class="qti-layout-col6">
+          <div id="question">
+            <p><strong><span>Onder welke naam staat de grensversperring bekend?</span></strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </qti-item-body>
+`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body xml:lang="nl-NL">
+    <div class="container">
+      <div class="qti-layout-row">
+        <div class="qti-layout-col6">
+          <div id="Iaf63a511-b761-4c53-bdef-b7115b8a123b">
+            <qti-media-interaction response-identifier="VIDEORESPONSE" autostart="false" max-plays="0" id="I990c31b5-9070-4d01-a9d4-6fdf9a583aac">
+              <video width="384" height="288" controls="">
+                <source src="../video/GSKB-cbt-24-11-02_T.webm" type="video/webm"/>
+              </video>
+            </qti-media-interaction>
+          </div>
+        </div>
+        <div class="qti-layout-col6">
+          <p><strong><span>Onder welke naam staat de grensversperring bekend?</span></strong></p>
+        </div>
+      </div>
+    </div>
+  </qti-item-body>
+`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});
+
 test('cleanup QB qti - preserve text in nested spans', async () => {
   const input = xml`<?xml version="1.0" encoding="UTF-8"?>
   <qti-item-body class="defaultBody" xml:lang="nl-NL">

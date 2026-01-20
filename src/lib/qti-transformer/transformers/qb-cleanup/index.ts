@@ -209,8 +209,31 @@ export function qbCleanup($: cheerio.CheerioAPI) {
     // Search for empty div with class qti-layout-col6 and add non-breaking space
     const columnElements = $('.qti-layout-col6');
     for (const column of columnElements) {
-      if ($(column).text().trim() === '') {
-        $(column).html('\u00A0');
+      const $column = $(column);
+      const text = $column.text().replace(/\u00A0/g, '').trim();
+      if (text !== '') continue;
+
+      // Some columns contain non-text content (e.g. video/media interactions) and should not be replaced by &nbsp;.
+      const hasNonTextContent = $column
+        .find('*')
+        .toArray()
+        .some((el) => {
+          const tagName = (el as unknown as { tagName?: string }).tagName?.toLowerCase();
+          if (!tagName) return false;
+
+          if (tagName.startsWith('qti-')) return true;
+          if (tagName.startsWith('dep:')) return true;
+
+          if (['video', 'audio', 'img', 'object', 'iframe', 'embed', 'svg', 'math', 'table'].includes(tagName)) {
+            return true;
+          }
+
+          const attribs = (el as unknown as { attribs?: Record<string, string> }).attribs;
+          return !!attribs && Object.keys(attribs).length > 0;
+        });
+
+      if (!hasNonTextContent) {
+        $column.html('\u00A0');
       }
     }
 
