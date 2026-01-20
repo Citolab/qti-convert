@@ -5,6 +5,23 @@ import path, { dirname } from 'path';
 import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 
+const normalizeHref = (href: string) => href.replaceAll('\\', '/');
+
+const resolveFolderFromFileOrFolder = (inputPath: string) => {
+  const resolved = path.resolve(inputPath);
+  try {
+    const stat = lstatSync(resolved);
+    if (stat.isDirectory()) return resolved;
+    if (stat.isFile()) return path.dirname(resolved);
+  } catch {
+    // If a caller accidentally passes a file path that doesn't exist yet (e.g. ".../imsmanifest.xml"),
+    // treat it as a file path and use its directory.
+    if (resolved.toLowerCase().endsWith('.xml')) return path.dirname(resolved);
+    throw new Error(`Path does not exist: ${inputPath}`);
+  }
+  throw new Error(`Unsupported path type: ${inputPath}`);
+};
+
 export const qtiReferenceAttributes = [
   'src',
   'href',
@@ -251,14 +268,12 @@ export const createPackageZip = async (foldername: string, createManifest = fals
   const manifest = `${foldername}/imsmanifest.xml`;
 
   if (createAssessment) {
-    const assessmentFilename = `${foldername}/test.xml`;
-    const assessment = await createAssessmentTest(assessmentFilename);
+    const assessment = await createAssessmentTest(foldername);
     writeFileSync(`${foldername}/test.xml`, assessment);
   }
 
   if (createManifest) {
-    const manifestFilename = `${foldername}/imsmanifest.xml`;
-    const manifest = await createOrCompleteManifest(manifestFilename);
+    const manifest = await createOrCompleteManifest(foldername);
     writeFileSync(`${foldername}/imsmanifest.xml`, manifest);
   }
 
@@ -354,10 +369,14 @@ const getEmptyManifest = (identifier: string, version: '2.x' | '3.0') => {
 };
 
 export const createOrCompleteManifest = async (foldername: string) => {
-  const manifest = `${foldername}/imsmanifest.xml`;
+  const folderPath = resolveFolderFromFileOrFolder(foldername);
+  const manifest = path.join(folderPath, 'imsmanifest.xml');
   // check if manifest exists
-  const identfier = foldername.split('/').pop();
-  const version = determineQtiVersion(foldername);
+  const identfier = path.basename(folderPath);
+  const version = determineQtiVersion(folderPath);
+  if (!version) {
+    throw new Error(`Could not determine QTI version in folder: ${folderPath}`);
+  }
   let manifestString = '';
   if (!existsSync(manifest)) {
     manifestString = getEmptyManifest(identfier, version);
@@ -370,7 +389,9 @@ export const createOrCompleteManifest = async (foldername: string) => {
   });
 
   const allResouces: QtiResource[] = [];
-  getAllXmlResourcesRecursivelyWithDependencies(allResouces, foldername, version);
+  getAllXmlResourcesRecursivelyWithDependencies(allResouces, folderPath, version);
+
+  const resourceIdentifiers = new Set(allResouces.map(r => r.identifier).filter(Boolean));
 
   const allDependencies = allResouces.flatMap(r =>
     r.dependencies.map(d => ({ fileRef: d, referencedBy: r.identifier }))
@@ -384,12 +405,18 @@ export const createOrCompleteManifest = async (foldername: string) => {
 
   // Create a new list of unique dependencies
   const uniqueDependencies: UniqueDependency[] = [];
+  const uniqueDependencyIdByHref = new Map<string, string>();
 
   allDependencies.forEach(dependency => {
     const { fileRef, referencedBy } = dependency;
 
+    // Dependencies to other QTI resources are referenced by identifier and should not become new resources.
+    if (resourceIdentifiers.has(fileRef)) {
+      return;
+    }
+
     // Extract the filename from href
-    const filename = fileRef.split('/').pop()?.replaceAll('.', '_') ?? '';
+    const filename = path.basename(fileRef).replaceAll('.', '_');
 
     // Check if this dependency is already in the unique list
     const existingDependency = uniqueDependencies.find(dep => dep.href === fileRef);
@@ -414,14 +441,13 @@ export const createOrCompleteManifest = async (foldername: string) => {
         id,
         referencedBy: [referencedBy]
       });
+      uniqueDependencyIdByHref.set(fileRef, id);
     }
   });
 
   for (const resource of allResouces) {
     if ($manifestXml(`resource[identifier="${resource.identifier}"]`).length === 0) {
-      const href = resource.href.replace(foldername, '');
-      // remove first slash if it exists
-      const hrefWithoutLeadingSlash = href[0] === '/' ? href.slice(1) : href;
+      const hrefWithoutLeadingSlash = normalizeHref(path.relative(folderPath, resource.href));
       $manifestXml('resources').append(
         `<resource identifier="${resource.identifier}" type="${resource.type}" href="${hrefWithoutLeadingSlash}">
       <file href="${hrefWithoutLeadingSlash}" />
@@ -429,15 +455,25 @@ export const createOrCompleteManifest = async (foldername: string) => {
       );
     }
     if (resource.dependencies.length > 0) {
-      const dependencyFiles = uniqueDependencies.filter(d => d.referencedBy.includes(resource.identifier));
       const manifestResource = $manifestXml(`resource[identifier="${resource.identifier}"]`);
       if (manifestResource.length > 0) {
-        for (const dependency of dependencyFiles) {
-          const dependencyNode = manifestResource.find(`dependency[identifierref="${dependency.id}"]`);
+        const identifierDependencies = resource.dependencies.filter(d => resourceIdentifiers.has(d));
+        for (const identifierDependency of identifierDependencies) {
+          const dependencyNode = manifestResource.find(`dependency[identifierref="${identifierDependency}"]`);
+          if (dependencyNode.length === 0) {
+            manifestResource.append(`<dependency identifierref="${identifierDependency}"/>`);
+          }
+        }
+
+        const fileDependencies = resource.dependencies.filter(d => !resourceIdentifiers.has(d));
+        for (const fileDependency of fileDependencies) {
+          const uniqueDependencyId = uniqueDependencyIdByHref.get(fileDependency);
+          if (!uniqueDependencyId) continue;
+          const dependencyNode = manifestResource.find(`dependency[identifierref="${uniqueDependencyId}"]`);
 
           if (dependencyNode.length === 0) {
             // Append the dependency node if it doesn't exist
-            manifestResource.append(`<dependency identifierref="${dependency.id}"/>`);
+            manifestResource.append(`<dependency identifierref="${uniqueDependencyId}"/>`);
           }
         }
       }
@@ -445,9 +481,7 @@ export const createOrCompleteManifest = async (foldername: string) => {
   }
   for (const resource of uniqueDependencies) {
     if ($manifestXml(`resource[identifier="${resource.id}"]`).length === 0) {
-      const href = resource.href.replace(foldername, '');
-      // remove first slash if it exists
-      const hrefWithoutLeadingSlash = href[0] === '/' ? href.slice(1) : href;
+      const hrefWithoutLeadingSlash = normalizeHref(path.relative(folderPath, resource.href));
       $manifestXml('resources').append(
         `<resource identifier="${resource.id}" type="${
           version === '3.0' ? 'associatedcontent/learning-application-resource' : 'webcontent'
@@ -490,9 +524,13 @@ const formatAttributesByVersion = (attributes: string, version: '3.0' | '2.x') =
 };
 
 export const createAssessmentTest = async (foldername: string) => {
+  const folderPath = resolveFolderFromFileOrFolder(foldername);
   const allResouces: QtiResource[] = [];
-  const version = determineQtiVersion(foldername);
-  getAllXmlResourcesRecursivelyWithDependencies(allResouces, foldername, version);
+  const version = determineQtiVersion(folderPath);
+  if (!version) {
+    throw new Error(`Could not determine QTI version in folder: ${folderPath}`);
+  }
+  getAllXmlResourcesRecursivelyWithDependencies(allResouces, folderPath, version);
   const items = allResouces.filter(item => item.type.includes('imsqti_item'));
   items.sort((a, b) => {
     const getLeadingNumber = (filename: string): number | null => {
@@ -551,7 +589,7 @@ ${
         <${formatTag('assessment-section')} title="Section 1" visible="true" identifier="S1">
         ${items
           .map(item => {
-            const relativePath = path.relative(foldername, item.href);
+            const relativePath = normalizeHref(path.relative(folderPath, item.href));
 
             // Ensure unique identifier
             let uniqueIdentifier = item.identifier;

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { writeFileSync } from 'fs';
+import path from 'path';
 import { createOrCompleteManifest } from '../qti-helper-node';
 
 const folderLocation = process.argv[2];
@@ -11,8 +12,10 @@ if (!folderLocation) {
 }
 
 try {
-  const manifest = await createOrCompleteManifest(folderLocation);
-  writeFileSync(`${folderLocation}/imsmanifest.xml`, manifest);
+  const invocationCwd = process.env.INIT_CWD ?? process.cwd();
+  const resolvedFolderLocation = path.resolve(invocationCwd, folderLocation);
+  const manifest = await createOrCompleteManifest(resolvedFolderLocation);
+  writeFileSync(path.join(resolvedFolderLocation, 'imsmanifest.xml'), manifest);
   console.log('Successfully added/completed the manifest.');
 } catch (error) {
   console.error(error);
