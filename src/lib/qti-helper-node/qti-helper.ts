@@ -445,15 +445,33 @@ export const createOrCompleteManifest = async (foldername: string) => {
     }
   });
 
-  for (const resource of allResouces) {
-    if ($manifestXml(`resource[identifier="${resource.identifier}"]`).length === 0) {
-      const hrefWithoutLeadingSlash = normalizeHref(path.relative(folderPath, resource.href));
+  const upsertResource = (identifier: string, type: string, href: string) => {
+    const existing = $manifestXml(`resource[identifier="${identifier}"]`);
+    if (existing.length === 0) {
       $manifestXml('resources').append(
-        `<resource identifier="${resource.identifier}" type="${resource.type}" href="${hrefWithoutLeadingSlash}">
-      <file href="${hrefWithoutLeadingSlash}" />
+        `<resource identifier="${identifier}" type="${type}" href="${href}">
+      <file href="${href}" />
     </resource>`
       );
+      return;
     }
+
+    existing.attr('type', type);
+    existing.attr('href', href);
+
+    const files = existing.find('file');
+    if (files.length === 0) {
+      existing.append(`<file href="${href}" />`);
+      return;
+    }
+    files.each((_, el) => {
+      $manifestXml(el).attr('href', href);
+    });
+  };
+
+  for (const resource of allResouces) {
+    const hrefWithoutLeadingSlash = normalizeHref(path.relative(folderPath, resource.href));
+    upsertResource(resource.identifier, resource.type, hrefWithoutLeadingSlash);
     if (resource.dependencies.length > 0) {
       const manifestResource = $manifestXml(`resource[identifier="${resource.identifier}"]`);
       if (manifestResource.length > 0) {
@@ -480,16 +498,12 @@ export const createOrCompleteManifest = async (foldername: string) => {
     }
   }
   for (const resource of uniqueDependencies) {
-    if ($manifestXml(`resource[identifier="${resource.id}"]`).length === 0) {
-      const hrefWithoutLeadingSlash = normalizeHref(path.relative(folderPath, resource.href));
-      $manifestXml('resources').append(
-        `<resource identifier="${resource.id}" type="${
-          version === '3.0' ? 'associatedcontent/learning-application-resource' : 'webcontent'
-        }" href="${hrefWithoutLeadingSlash}">
-      <file href="${hrefWithoutLeadingSlash}" />
-    </resource>`
-      );
-    }
+    const hrefWithoutLeadingSlash = normalizeHref(path.relative(folderPath, resource.href));
+    upsertResource(
+      resource.id,
+      version === '3.0' ? 'associatedcontent/learning-application-resource' : 'webcontent',
+      hrefWithoutLeadingSlash
+    );
   }
   let xmlString = $manifestXml.xml();
   // Remove the BOM character if it exists: https://github.com/cheeriojs/cheerio/issues/1117

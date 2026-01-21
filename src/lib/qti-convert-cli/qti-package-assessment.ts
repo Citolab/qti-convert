@@ -12,7 +12,7 @@ if (!folderLocation) {
 }
 
 try {
-  const invocationCwd = process.env.INIT_CWD ?? process.cwd();
+  const invocationCwd = process.env.INIT_CWD ?? process.env.PWD ?? process.cwd();
   const resolvedFolderLocation = path.resolve(invocationCwd, folderLocation);
   const assessment = await createAssessmentTest(resolvedFolderLocation);
   writeFileSync(path.join(resolvedFolderLocation, 'test.xml'), assessment);

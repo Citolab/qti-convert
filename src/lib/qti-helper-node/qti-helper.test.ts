@@ -49,7 +49,30 @@ test('createOrCompleteManifest uses relative hrefs to the target folder', async 
   expect(manifest).not.toContain(normalizePathForAssertion(root));
 });
 
+test('createOrCompleteManifest updates existing resources hrefs', async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'qti-create-manifest-'));
+  mkdirSync(path.join(root, 'items'), { recursive: true });
+
+  writeItem(path.join(root, 'items', '32gn9p.xml'), 'ITM-32gn9p');
+
+  writeFileSync(
+    path.join(root, 'imsmanifest.xml'),
+    `<?xml version="1.0"?>
+<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" identifier="MANIFEST-TEST">
+  <organizations/>
+  <resources>
+    <resource identifier="ITM-32gn9p" type="imsqti_item_xmlv2p2" href=".storybook/storybook-assets/demo-package/items/32gn9p.xml">
+      <file href=".storybook/storybook-assets/demo-package/items/32gn9p.xml"/>
+    </resource>
+  </resources>
+</manifest>`
+  );
+
+  const manifest = await createOrCompleteManifest(root);
+  expect(manifest).toContain('href="items/32gn9p.xml"');
+  expect(manifest).not.toContain('href=".storybook/storybook-assets/demo-package/items/32gn9p.xml"');
+});
+
 function normalizePathForAssertion(p: string) {
   return p.replaceAll('\\', '/');
 }
-
