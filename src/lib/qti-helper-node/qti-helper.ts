@@ -582,7 +582,7 @@ ${
                      xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd http://www.w3.org/1998/Math/MathML https://purl.imsglobal.org/spec/mathml/v3p0/schema/xsd/mathml3.xsd http://www.w3.org/2001/XInclude https://purl.imsglobal.org/spec/w3/2001/schema/xsd/XInclude.xsd" 
                      xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:m="http://www.w3.org/1998/Math/MathML" 
                      tool-version="0.1" 
-                     title="My Test" tool-name="Spectatus" identifier="TST-GENERATED-TEST">`
+                     title="My Test" tool-name="@citolab/qti-components" identifier="TST-GENERATED-TEST">`
     : `<assessmentTest xmlns="http://www.imsglobal.org/xsd/imsqti_v2p2" 
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
            identifier="TST-GENERATED-TEST"
