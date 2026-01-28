@@ -50,40 +50,38 @@ test('cleanup QB qti', async () => {
 </qti-item-body>
 `;
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-    <qti-item-body xml:lang="nl-NL">
-    <div class="container">
-        <div class="qti-layout-row">
-            <div class="qti-layout-col6">
-                <p>
-                    <strong>
-                    Hartritme-stoornis
-                    </strong>
-                </p>
-                <p>
-                    Terra heeft last van een hartritme-stoornis. Haar lichaamscellen krijgen op dat moment onvoldoende zuurstof. Door het gebrek aan zuurstof gaat de stofwisseling omlaag. Stofwisseling is een levenskenmerk.
-                </p>
-            </div>
-            <table>
-                <tr>
-                    <td>hallo</td>
-                    <td>zonder paragraaf</td>
-                </tr>
-            </table>
-            <div class="qti-layout-col6">
-                <p>
-                    <strong>
-                        <span>
-                            Noem een ander levenskenmerk.
-                        </span>
-                    </strong>
-                </p>
-                <div>
-                    <qti-extended-text-interaction response-identifier="RESPONSE" id="I51355a70-0eec-467f-a428-e00fc7a881d2" class="qti-height-lines-6" expected-lines="5" expected-length="350"/>
-                </div>
-            </div>
-        </div>
-    </div>
-</qti-item-body>
+    <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
+      <div class="qti-layout-row">
+          <div class="qti-layout-col6">
+              <p>
+                  <strong>
+                  Hartritme-stoornis
+                  </strong>
+              </p>
+              <p>
+                  Terra heeft last van een hartritme-stoornis. Haar lichaamscellen krijgen op dat moment onvoldoende zuurstof. Door het gebrek aan zuurstof gaat de stofwisseling omlaag. Stofwisseling is een levenskenmerk.
+              </p>
+          </div>
+          <table>
+              <tr>
+                  <td>hallo</td>
+                  <td>zonder paragraaf</td>
+              </tr>
+          </table>
+          <div class="qti-layout-col6">
+              <p>
+                  <strong>
+                      <span>
+                          Noem een ander levenskenmerk.
+                      </span>
+                  </strong>
+              </p>
+              <div>
+                  <qti-extended-text-interaction response-identifier="RESPONSE" id="I51355a70-0eec-467f-a428-e00fc7a881d2" class="qti-height-lines-6" expected-lines="5" expected-length="350"/>
+              </div>
+          </div>
+      </div>
+  </qti-item-body>
 `;
   const result = await qtiTransform(input).qbCleanup().xml();
   const areEqual = await areXmlEqual(result, expectedOutput);
@@ -150,9 +148,7 @@ test('reset variables', async () => {
    </qti-assessment-item>
 `;
   const expectedOutput = xml`<qti-assessment-item>
-  <qti-item-body xml:lang="nl-NL">
-    <div class="container">
-    </div>
+  <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
   </qti-item-body>
   <qti-response-processing>
     <qti-set-outcome-value identifier="RAW_SCORE">
@@ -244,21 +240,19 @@ test('does not wipe non-text content in layout columns (video)', async () => {
 `;
 
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-  <qti-item-body xml:lang="nl-NL">
-    <div class="container">
-      <div class="qti-layout-row">
-        <div class="qti-layout-col6">
-          <div id="Iaf63a511-b761-4c53-bdef-b7115b8a123b">
-            <qti-media-interaction response-identifier="VIDEORESPONSE" autostart="false" max-plays="0" id="I990c31b5-9070-4d01-a9d4-6fdf9a583aac">
-              <video width="384" height="288" controls="">
-                <source src="../video/GSKB-cbt-24-11-02_T.webm" type="video/webm"/>
-              </video>
-            </qti-media-interaction>
-          </div>
+  <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
+    <div class="qti-layout-row">
+      <div class="qti-layout-col6">
+        <div id="Iaf63a511-b761-4c53-bdef-b7115b8a123b">
+          <qti-media-interaction response-identifier="VIDEORESPONSE" autostart="false" max-plays="0" id="I990c31b5-9070-4d01-a9d4-6fdf9a583aac">
+            <video width="384" height="288" controls="">
+              <source src="../video/GSKB-cbt-24-11-02_T.webm" type="video/webm"/>
+            </video>
+          </qti-media-interaction>
         </div>
-        <div class="qti-layout-col6">
-          <p><strong><span>Onder welke naam staat de grensversperring bekend?</span></strong></p>
-        </div>
+      </div>
+      <div class="qti-layout-col6">
+        <p><strong><span>Onder welke naam staat de grensversperring bekend?</span></strong></p>
       </div>
     </div>
   </qti-item-body>
@@ -295,18 +289,16 @@ test('does not remove images wrapped in spans', async () => {
 `;
 
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-  <qti-item-body xml:lang="nl-NL">
-    <div class="container">
-      <div class="qti-layout-row">
-        <div class="qti-layout-col6">
-          <p>Een Britse poster uit de Eerste Wereldoorlog (1914-1918)</p>
-          <p>
-            <img id="Id-IMG_ae59ea38-c799-40f7-a135-0e9e31f52115" src="../img/GSKB-cbt-24-09-02.jpg" width="334" height="500" alt=""/>
-          </p>
-        </div>
-        <div class="qti-layout-col6">
-          <p><strong><span>Bij welk gevolg past de oproep op de poster?</span></strong></p>
-        </div>
+  <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
+    <div class="qti-layout-row">
+      <div class="qti-layout-col6">
+        <p>Een Britse poster uit de Eerste Wereldoorlog (1914-1918)</p>
+        <p>
+          <img id="Id-IMG_ae59ea38-c799-40f7-a135-0e9e31f52115" src="../img/GSKB-cbt-24-09-02.jpg" width="334" height="500" alt=""/>
+        </p>
+      </div>
+      <div class="qti-layout-col6">
+        <p><strong><span>Bij welk gevolg past de oproep op de poster?</span></strong></p>
       </div>
     </div>
   </qti-item-body>
@@ -338,20 +330,18 @@ test('cleanup QB qti - preserve text in nested spans', async () => {
   </qti-item-body>`;
 
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-    <qti-item-body xml:lang="nl-NL">
-      <div class="container">
-        <qti-simple-associable-choice identifier="y_B" match-max="1">
-          <div>
-            <p>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</p>
-          </div>
-        </qti-simple-associable-choice>
-        
+    <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
+      <qti-simple-associable-choice identifier="y_B" match-max="1">
         <div>
-          <p>Some text after empty span</p>
-          <p>Text after whitespace-only span</p>
-          <p>Nested empty spans with text</p>
-          <p>Nested span with text</p>
+          <p>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</p>
         </div>
+      </qti-simple-associable-choice>
+      
+      <div>
+        <p>Some text after empty span</p>
+        <p>Text after whitespace-only span</p>
+        <p>Nested empty spans with text</p>
+        <p>Nested span with text</p>
       </div>
     </qti-item-body>`;
 
@@ -374,14 +364,12 @@ test('cleanup QB qti - exact real world scenario', async () => {
   </qti-item-body>`;
 
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-    <qti-item-body xml:lang="nl-NL">
-      <div class="container">
-        <qti-simple-associable-choice identifier="y_B" match-max="1">
-          <div>
-            <p>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</p>
-          </div>
-        </qti-simple-associable-choice>
-      </div>
+    <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
+      <qti-simple-associable-choice identifier="y_B" match-max="1">
+        <div>
+          <p>Door stuwdammen in een rivier aan te leggen krijgt een land een voorraad zoet water.</p>
+        </div>
+      </qti-simple-associable-choice>
     </qti-item-body>`;
 
   const result = await qtiTransform(input).qbCleanup().xml();
@@ -469,8 +457,7 @@ test('cleanup UserSRVet bold nesting', async () => {
   </qti-item-body>`;
 
   const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
-  <qti-item-body xml:lang="nl-NL">
-    <div class="container">
+  <qti-item-body xml:lang="nl-NL" class="custom-qti-style cito-style">
       <!-- Case 1: p.UserSRVet containing strong with spans -->
       <p class="UserSRVet">
         <span>Zelfstandig </span>
@@ -494,7 +481,6 @@ test('cleanup UserSRVet bold nesting', async () => {
 
       <!-- Case 4: Exact reported pattern -->
       <p class="UserSRVet">Zelfstandig <span>wonen</span></p>
-    </div>
   </qti-item-body>`;
 
   const result = await qtiTransform(input).qbCleanup().xml();

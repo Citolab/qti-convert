@@ -1,20 +1,25 @@
 import * as cheerio from 'cheerio';
 
 export function qbCleanup($: cheerio.CheerioAPI) {
-  /* remove default body class */
-  const itemBody = $('qti-item-body');
-  if (itemBody.length > 0) {
-    itemBody.removeClass('defaultBody');
-    if (itemBody.attr('class') === '') {
-      itemBody.removeAttr('class');
-    }
-    itemBody.html(
-      itemBody
-        .html()
-        .replace(/\u00A0/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&#xa0;/g, ' ')
-    );
+  const itemBodies = $('qti-item-body');
+  if (itemBodies.length > 0) {
+    itemBodies.each((_, itemBodyEl) => {
+      const itemBody = $(itemBodyEl);
+
+      const html = itemBody.html();
+      if (typeof html === 'string') {
+        itemBody.html(html.replace(/\u00A0/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#xa0;/g, ' '));
+      }
+
+      const directContentWrappers = itemBody
+        .children('div.content')
+        .filter((_, el) => (($(el).attr('class') || '').trim() === 'content'));
+
+      if (directContentWrappers.length > 0) {
+        directContentWrappers.contents().unwrap();
+        itemBody.addClass('custom-qti-style cito-style');
+      }
+    });
 
     $('.content').attr('class', 'container');
     $('div#leftbody').length && $('div#leftbody').contents().unwrap();
