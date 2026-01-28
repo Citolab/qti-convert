@@ -309,6 +309,26 @@ test('does not remove images wrapped in spans', async () => {
   expect(areEqual).toEqual(true);
 });
 
+test('unwraps direct container wrapper and adds style classes', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body class="defaultBody" xml:lang="nl-NL">
+    <div class="container">
+      <p>Hallo</p>
+    </div>
+  </qti-item-body>
+`;
+
+  const expectedOutput = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-item-body class="defaultBody custom-qti-style cito-style" xml:lang="nl-NL">
+    <p>Hallo</p>
+  </qti-item-body>
+`;
+
+  const result = await qtiTransform(input).qbCleanup().xml();
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});
+
 test('cleanup QB qti - preserve text in nested spans', async () => {
   const input = xml`<?xml version="1.0" encoding="UTF-8"?>
   <qti-item-body class="defaultBody" xml:lang="nl-NL">

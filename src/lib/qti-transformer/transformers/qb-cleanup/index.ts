@@ -12,8 +12,11 @@ export function qbCleanup($: cheerio.CheerioAPI) {
       }
 
       const directContentWrappers = itemBody
-        .children('div.content')
-        .filter((_, el) => (($(el).attr('class') || '').trim() === 'content'));
+        .children('div.content, div.container')
+        .filter((_, el) => {
+          const classValue = ($(el).attr('class') || '').trim();
+          return classValue === 'content' || classValue === 'container';
+        });
 
       if (directContentWrappers.length > 0) {
         directContentWrappers.contents().unwrap();
