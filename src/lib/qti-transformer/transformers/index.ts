@@ -16,3 +16,4 @@ export * from './change-asset-location';
 export * from './configure-pci';
 export * from './upgrade-pci';
 export * from './strip-stylesheets';
+export * from './stylesheets-inline';

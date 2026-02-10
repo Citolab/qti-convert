@@ -19,11 +19,13 @@ import {
   changeAssetLocation,
   changeAssetLocationAsync,
   configurePciAsync,
-  stripStylesheets
+  stripStylesheets,
+  stylesheetsInline
 } from './transformers';
 import { customInteraction } from './transformers/custom-interaction';
 import { ModuleResolutionConfig } from './transformers/configure-pci';
 export { type ModuleResolutionConfig } from './transformers/configure-pci';
+import type { StylesheetsInlineOptions } from './transformers/stylesheets-inline';
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
 // Define the types for the API methods
@@ -51,6 +53,12 @@ interface QtiTransformAPI {
     getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
   ): Promise<QtiTransformAPI>;
   upgradePci(): QtiTransformAPI;
+  stylesheetsInline(
+    getStylesheetContentOrOptions?:
+      | ((href: string) => Promise<string | null | undefined>)
+      | StylesheetsInlineOptions,
+    options?: StylesheetsInlineOptions
+  ): Promise<QtiTransformAPI>;
   stripStylesheets(options?: { removePattern?: string; keepPattern?: string }): QtiTransformAPI;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
@@ -156,6 +164,19 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     upgradePci() {
       upgradePci($);
+      return api;
+    },
+    async stylesheetsInline(
+      getStylesheetContentOrOptions?:
+        | ((href: string) => Promise<string | null | undefined>)
+        | StylesheetsInlineOptions,
+      options?: StylesheetsInlineOptions
+    ) {
+      const getStylesheetContent =
+        typeof getStylesheetContentOrOptions === 'function' ? getStylesheetContentOrOptions : undefined;
+      const stylesheetsInlineOptions =
+        typeof getStylesheetContentOrOptions === 'function' ? options : getStylesheetContentOrOptions;
+      await stylesheetsInline($, getStylesheetContent, stylesheetsInlineOptions);
       return api;
     },
     stripStylesheets(options?: { removePattern?: string; keepPattern?: string }) {
