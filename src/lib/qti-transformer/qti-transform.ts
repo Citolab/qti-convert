@@ -42,7 +42,7 @@ interface QtiTransformAPI {
     srcAttribute?: string[],
     skipBase64?: boolean
   ): QtiTransformAPI;
-  customInteraction(baseRef: string, baseItem: string): QtiTransformAPI;
+  customInteraction(baseRef: string, baseItem: string, force?: boolean): QtiTransformAPI;
   changeAssetLocationAsync(
     getNewUrlAsync: (oldUrl: string) => Promise<string>,
     srcAttribute?: string[],
@@ -187,8 +187,8 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       customTypes($);
       return api;
     },
-    customInteraction(baseRef: string, baseItem: string) {
-      customInteraction($, baseRef, baseItem);
+    customInteraction(baseRef: string, baseItem: string, force = false) {
+      customInteraction($, baseRef, baseItem, force);
       return api;
     },
     stripMaterialInfo() {
