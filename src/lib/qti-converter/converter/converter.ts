@@ -2,6 +2,16 @@ import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import { postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from 'src/lib/qti-helper';
 import { qtiTransform } from 'src/lib/qti-transformer';
+
+const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
+  $('*')
+    .toArray()
+    .some(el => {
+      if (el.type !== 'tag') {
+        return false;
+      }
+      return (el.name || '').split(':').pop() === localName;
+    });
 // import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json';
 
 /**
@@ -179,7 +189,7 @@ export async function convertPackage(
   },
   convertAssessment = async $assessment => {
     // Default assessment conversion
-    if ($assessment('assessmentTest').length > 0) {
+    if (hasElementLocalName($assessment, 'assessmentTest')) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($assessment.xml()), xsltJson);
       $assessment = cheerio.load(modifiedContent, { xmlMode: true, xml: true });
     }
@@ -187,7 +197,7 @@ export async function convertPackage(
   },
   convertItem = async $item => {
     // Default item conversion
-    if ($item('assessmentItem').length > 0) {
+    if (hasElementLocalName($item, 'assessmentItem')) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()), xsltJson);
       const transform = qtiTransform(modifiedContent);
       const transformResult = await transform
@@ -269,11 +279,11 @@ export async function convertPackage(
       let fileTypeCategory = 'other';
 
       // Apply appropriate conversion based on file type
-      if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
+      if (hasElementLocalName($, 'qti-assessment-test') || hasElementLocalName($, 'assessmentTest')) {
         $ = await convertAssessment($);
         modifiedContent = $.xml();
         fileTypeCategory = 'test';
-      } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
+      } else if (hasElementLocalName($, 'qti-assessment-item') || hasElementLocalName($, 'assessmentItem')) {
         $ = await convertItem($);
         modifiedContent = $.xml();
         fileTypeCategory = 'item';

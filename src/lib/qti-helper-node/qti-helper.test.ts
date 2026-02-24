@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
-import { createAssessmentTest, createOrCompleteManifest } from './qti-helper';
+import { createAssessmentTest, createOrCompleteManifest, determineQtiVersion } from './qti-helper';
 
 const writeItem = (filePath: string, identifier: string) => {
   writeFileSync(
@@ -36,6 +36,17 @@ test('createAssessmentTest accepts a file path and uses its directory', async ()
 
   const assessment = await createAssessmentTest(path.join(root, 'test.xml'));
   expect(assessment).toContain('href="items/32gn9p.xml"');
+});
+
+test('determineQtiVersion detects qti-prefixed qti2 files', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'qti-version-prefix-'));
+  writeFileSync(
+    path.join(root, 'test.xml'),
+    `<?xml version="1.0" encoding="UTF-8"?>
+<qti:assessmentTest xmlns:qti="http://www.imsglobal.org/xsd/imsqti_v2p1" identifier="TST-1"/>`
+  );
+
+  expect(determineQtiVersion(root)).toBe('2.x');
 });
 
 test('createOrCompleteManifest uses relative hrefs to the target folder', async () => {

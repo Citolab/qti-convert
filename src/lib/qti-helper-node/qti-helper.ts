@@ -6,6 +6,18 @@ import xmlFormat from 'xml-formatter';
 import { Element } from 'domhandler';
 
 const normalizeHref = (href: string) => href.replaceAll('\\', '/');
+const hasTagByLocalNameInXml = (xml: string, localName: string): boolean =>
+  new RegExp(`<(?:[A-Za-z_][\\w.-]*:)?${localName}(?=[\\s>/])`).test(xml);
+const getElementLocalName = (node: Element | { type?: string; name?: string }): string | undefined => {
+  if (node.type !== 'tag') {
+    return undefined;
+  }
+  return (node.name || '').split(':').pop();
+};
+const findFirstByLocalName = ($: cheerio.CheerioAPI, localName: string) =>
+  $('*')
+    .toArray()
+    .find(el => getElementLocalName(el as Element) === localName);
 
 const resolveFolderFromFileOrFolder = (inputPath: string) => {
   const resolved = path.resolve(inputPath);
@@ -79,7 +91,7 @@ export const determineQtiVersion = (foldername: string): '2.x' | '3.0' => {
           if (content.includes('<qti-assessment-test') || content.includes('<qti-assessment-item')) {
             return '3.0';
           }
-          if (content.includes('<assessmentTest') || content.includes('<assessmentItem')) {
+          if (hasTagByLocalNameInXml(content, 'assessmentTest') || hasTagByLocalNameInXml(content, 'assessmentItem')) {
             return '2.x';
           }
         }
@@ -96,8 +108,8 @@ export const getAllXmlResourcesRecursivelyWithDependencies = (
   foldername: string,
   version: '2.x' | '3.0'
 ) => {
-  const assessmentTestTag = version === '2.x' ? 'assessmentTest' : 'qti-assessment-test';
-  const assessmentItemTag = version === '2.x' ? 'assessmentItem' : 'qti-assessment-item';
+  const assessmentTestLocalName = version === '2.x' ? 'assessmentTest' : 'qti-assessment-test';
+  const assessmentItemLocalName = version === '2.x' ? 'assessmentItem' : 'qti-assessment-item';
   // continue if the foldername is not a folder but a file
   if (!lstatSync(foldername).isDirectory()) {
     return;
@@ -114,9 +126,10 @@ export const getAllXmlResourcesRecursivelyWithDependencies = (
       } else {
         if (subfolder.endsWith('.xml')) {
           const content = readFileSync(subfolder, 'utf-8');
-          if (content.indexOf(`<${assessmentTestTag}`) !== -1) {
+          if (hasTagByLocalNameInXml(content, assessmentTestLocalName)) {
             const $ = cheerio.load(content, { xmlMode: true, xml: true });
-            const identifier = $(assessmentTestTag).attr('identifier');
+            const testElement = findFirstByLocalName($, assessmentTestLocalName);
+            const identifier = testElement ? $(testElement).attr('identifier') : undefined;
             allResouces.push({
               type: version === '2.x' ? 'imsqti_test_xmlv2p2' : 'imsqti_test_xmlv3p0',
               href: subfolder,
@@ -125,12 +138,13 @@ export const getAllXmlResourcesRecursivelyWithDependencies = (
             });
           } else if (content.indexOf('<manifest') !== -1) {
             // do nothing
-          } else if (content.indexOf(`<${assessmentItemTag}`) !== -1) {
+          } else if (hasTagByLocalNameInXml(content, assessmentItemLocalName)) {
             const $ = cheerio.load(content, {
               xmlMode: true,
               xml: true
             });
-            const identifier = $(assessmentItemTag).attr('identifier');
+            const itemElement = findFirstByLocalName($, assessmentItemLocalName);
+            const identifier = itemElement ? $(itemElement).attr('identifier') : undefined;
             allResouces.push({
               type: version === '2.x' ? 'imsqti_item_xmlv2p2' : 'imsqti_item_xmlv3p0',
               href: subfolder,
@@ -641,18 +655,22 @@ ${
 
 const getDependencyReferences = (pathPath: string, $: cheerio.CheerioAPI, version: '2.x' | '3.0') => {
   const filenames = [];
+  const assessmentItemRefLocalName = version === '2.x' ? 'assessmentItemRef' : 'qti-assessment-item-ref';
 
   // Get qti-assessment-item identifiers
-  $(formatTagByVersion('assessment-item-ref', version)).each((i, elem) => {
-    const identifier = $(elem).attr('identifier');
-    if (identifier) {
-      filenames.push(identifier);
-    }
-  });
+  $('*')
+    .toArray()
+    .filter(elem => getElementLocalName(elem as Element) === assessmentItemRefLocalName)
+    .forEach(elem => {
+      const identifier = $(elem).attr('identifier');
+      if (identifier) {
+        filenames.push(identifier);
+      }
+    });
 
   qtiReferenceAttributes.forEach(selector => {
     $(`[${selector}]`).each((i, elem) => {
-      if (elem.type !== 'tag' || elem.name !== formatTagByVersion('assessment-item-ref', version)) {
+      if (getElementLocalName(elem as Element) !== assessmentItemRefLocalName) {
         const attr = $(elem).attr(selector);
         if (attr) {
           const directoryName = dirname(pathPath);

@@ -7,6 +7,16 @@ import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readd
 import { qtiTransform } from 'src/lib/qti-transformer';
 import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from 'src/lib/qti-helper';
 
+const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
+  $('*')
+    .toArray()
+    .some(el => {
+      if (el.type !== 'tag') {
+        return false;
+      }
+      return (el.name || '').split(':').pop() === localName;
+    });
+
 // Function to find the prefix for a given namespace URI by checking all elements
 function findNamespacePrefixFromAnyElement($, namespaceURI): { prefix: string; namespace: string } | null {
   // Check all elements for namespace declarations
@@ -226,14 +236,14 @@ async function processPackageFiles(
     return Promise.resolve($manifest);
   },
   convertAssessment: ($assessment: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $assessment => {
-    if ($assessment('assessmentTest').length > 0) {
+    if (hasElementLocalName($assessment, 'assessmentTest')) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($assessment.xml()));
       $assessment = cheerio.load(modifiedContent, { xmlMode: true, xml: true });
     }
     return $assessment;
   },
   convertItem: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $item => {
-    if ($item('assessmentItem').length > 0) {
+    if (hasElementLocalName($item, 'assessmentItem')) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
       const transform = qtiTransform(modifiedContent);
       if (!transform) {
@@ -278,11 +288,11 @@ async function processPackageFiles(
       let modifiedContent = $.xml();
       let fileTypeCategory: 'test' | 'item' | 'manifest' | 'other' = 'other';
 
-      if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
+      if (hasElementLocalName($, 'qti-assessment-test') || hasElementLocalName($, 'assessmentTest')) {
         $ = await convertAssessment($);
         modifiedContent = $.xml();
         fileTypeCategory = 'test';
-      } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
+      } else if (hasElementLocalName($, 'qti-assessment-item') || hasElementLocalName($, 'assessmentItem')) {
         $ = await convertItem($);
         modifiedContent = $.xml();
         fileTypeCategory = 'item';
@@ -497,11 +507,11 @@ async function processFilesInFolder(
       });
       let $ = cheerio.load(cleanXMLString(content), { xmlMode: true, xml: true });
       let modifiedContent = $.xml();
-      if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
+      if (hasElementLocalName($, 'qti-assessment-test') || hasElementLocalName($, 'assessmentTest')) {
         $ = await convertAssessment($);
         modifiedContent = $.xml();
         processedFiles.push({ path: `${outputFolder}/${fileName}`, content: modifiedContent, type: 'test' });
-      } else if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
+      } else if (hasElementLocalName($, 'qti-assessment-item') || hasElementLocalName($, 'assessmentItem')) {
         $ = await convertItem($);
         modifiedContent = $.xml();
         processedFiles.push({ path: `${outputFolder}/${fileName}`, content: modifiedContent, type: 'item' });
@@ -538,14 +548,14 @@ export async function convertPackageFolder(
     return Promise.resolve($manifest);
   },
   convertAssessment: ($assessment: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $assessment => {
-    if ($assessment('assessmentTest').length > 0) {
+    if (hasElementLocalName($assessment, 'assessmentTest')) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($assessment.xml()));
       $assessment = cheerio.load(modifiedContent, { xmlMode: true, xml: true });
     }
     return $assessment;
   },
   convertItem: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI> = async $item => {
-    if ($item('assessmentItem').length > 0) {
+    if (hasElementLocalName($item, 'assessmentItem')) {
       const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
       $item = cheerio.load(modifiedContent, { xmlMode: true, xml: true });
     }
