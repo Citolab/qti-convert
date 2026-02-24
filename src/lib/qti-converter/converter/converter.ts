@@ -12,6 +12,77 @@ const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean 
       }
       return (el.name || '').split(':').pop() === localName;
     });
+
+const normalizeConvertedQtiNamespace = (xml: string): string => {
+  const $ = cheerio.load(xml, { xmlMode: true, xml: true });
+  const qtiNamespacePrefixes = new Set<string>();
+  const qtiNamespaceValue = 'http://www.imsglobal.org/xsd/imsqtiasi_v3p0';
+  const isQtiAssessmentRoot = (name: string) => {
+    const localName = (name || '').split(':').pop();
+    return (
+      localName === 'qti-assessment-item' ||
+      localName === 'qti-assessment-test' ||
+      localName === 'assessment-item' ||
+      localName === 'assessment-test'
+    );
+  };
+
+  $('*').each((_, el) => {
+    if (el.type !== 'tag' || !el.attribs) {
+      return;
+    }
+    for (const [attrName, attrValue] of Object.entries(el.attribs)) {
+      if (attrName.startsWith('xmlns:') && attrValue.toLowerCase().includes('imsqtiasi_v3p0')) {
+        qtiNamespacePrefixes.add(attrName.slice('xmlns:'.length));
+      }
+    }
+  });
+
+  $('*').each((_, el) => {
+    if (el.type !== 'tag') {
+      return;
+    }
+    if (isQtiAssessmentRoot(el.name) && el.name.includes(':')) {
+      qtiNamespacePrefixes.add(el.name.split(':')[0]);
+    }
+  });
+
+  if (qtiNamespacePrefixes.size === 0) {
+    return xml;
+  }
+
+  const root = $('*')
+    .toArray()
+    .find(el => el.type === 'tag' && isQtiAssessmentRoot(el.name));
+  let qtiNamespace = (root && $(root).attr('xmlns')) || qtiNamespaceValue;
+
+  for (const prefix of qtiNamespacePrefixes) {
+    if (root) {
+      qtiNamespace = $(root).attr(`xmlns:${prefix}`) || qtiNamespace;
+    }
+    $('*').each((_, el) => {
+      if (el.type !== 'tag') {
+        return;
+      }
+      if (el.name.startsWith(`${prefix}:`)) {
+        const strippedName = el.name.slice(prefix.length + 1);
+        el.name = strippedName.startsWith('qti-') ? strippedName : `qti-${strippedName}`;
+      }
+      if (el.attribs && Object.prototype.hasOwnProperty.call(el.attribs, `xmlns:${prefix}`)) {
+        delete el.attribs[`xmlns:${prefix}`];
+      }
+    });
+  }
+
+  const normalizedRoot = $('*')
+    .toArray()
+    .find(el => el.type === 'tag' && isQtiAssessmentRoot(el.name));
+  if (normalizedRoot) {
+    $(normalizedRoot).attr('xmlns', qtiNamespace);
+  }
+
+  return cleanXMLString($.xml());
+};
 // import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json';
 
 /**
@@ -148,7 +219,7 @@ export const convertQti2toQti3 = async (qti2: string, xsltJson = './qti2xTo30.se
   }
 
   const qti3 = await convert(qti2, styleSheet);
-  return qti3;
+  return normalizeConvertedQtiNamespace(qti3);
 };
 export function cleanXMLString(xmlString: string): string {
   if (!xmlString) {
