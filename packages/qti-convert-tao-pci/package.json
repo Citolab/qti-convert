@@ -23,12 +23,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@citolab/qti-convert": "file:../qti-convert-core",
-    "cheerio": "^1.0.0"
+    "@citolab/qti-convert": "^0.3.52",
+    "cheerio": "^1.2.0"
   },
   "devDependencies": {
-    "tsup": "^8.4.0",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.9"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

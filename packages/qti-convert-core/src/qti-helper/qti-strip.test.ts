@@ -68,8 +68,8 @@ import { expect, test } from 'vitest';
 
 test(
   'test file to test',
+  { timeout: 100000 },
   async () => {
     expect(false).toEqual(false);
-  },
-  { timeout: 100000 }
+  }
 );

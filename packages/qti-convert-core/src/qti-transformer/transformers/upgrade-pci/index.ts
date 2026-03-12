@@ -45,7 +45,6 @@ export function upgradePci($: cheerio.CheerioAPI): cheerio.CheerioAPI {
   });
   portableCustomInteraction.find('properties').remove();
 
-
   const isAbsoluteOrInlineUrl = (value: string | undefined) => {
     if (!value || typeof value !== 'string') return false;
     const lowered = value.toLowerCase();

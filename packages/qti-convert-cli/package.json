@@ -2,13 +2,13 @@
   "name": "@citolab/qti-convert-cli",
   "version": "0.3.52",
   "description": "QTI converter - Command Line Tools",
-  "type": "module", 
+  "type": "module",
   "license": "Apache-2.0",
   "repository": "https://github.com/Citolab/qti-convert",
   "author": "Marcel Hoekstra",
   "contributors": [
     "Sander Looise",
-    "Patrick de Klein", 
+    "Patrick de Klein",
     "Marcel Hoekstra"
   ],
   "engines": {
@@ -25,15 +25,16 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup", 
+    "build": "tsup",
     "test": "vitest"
   },
   "dependencies": {
-    "@citolab/qti-convert": "file:../qti-convert-core"
+    "@citolab/qti-convert": "^0.3.52",
+    "saxon-js": "^2.7.0"
   },
   "devDependencies": {
-    "tsup": "^8.4.0",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.9"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }
