@@ -1,0 +1,255 @@
+import { qtiTransform } from '../../qti-transformer';
+import { convertManifestFile, convertPackageStream, convertQti2toQti3 } from '../index';
+import { expect, test } from 'vitest';
+import * as xml2js from 'xml2js';
+import { createReadStream, writeFile } from 'fs';
+import unzipper from 'unzipper';
+import * as cheerio from 'cheerio';
+
+async function areXmlEqual(xml1: string, xml2: string): Promise<boolean> {
+  const parser = new xml2js.Parser({ ignoreAttrs: true, trim: true, normalize: true });
+
+  try {
+    const obj1 = await parser.parseStringPromise(xml1);
+    const obj2 = await parser.parseStringPromise(xml2);
+
+    return JSON.stringify(obj1) === JSON.stringify(obj2);
+  } catch (error) {
+    console.error('Error parsing XML:', error);
+    return false;
+  }
+}
+
+// test('convert package', async () => {
+//   const zip = 'test.zip';
+//   const zipStream = createReadStream(zip).pipe(unzipper.Parse({ forceStream: true }));
+//   // zipStream.on('entry', entry => {
+//   //   console.log('Processing:', entry.path);
+//   //   entry.autodrain(); // Drain entry so the stream continues
+//   // });
+
+//   // zipStream.on('finish', () => {
+//   //   console.log('Finished reading ZIP');
+//   // });
+//   const updatedStream = await convertPackageStream(zipStream);
+
+//   writeFile('test-qti3.zip', updatedStream, () => {
+//     console.log('done');
+//   });
+// });
+
+test('qti2 to qti3 convert should work', async () => {
+  const saxonModule = await import('saxon-js'); // Ensure saxon-js is installed
+  globalThis.SaxonJS = saxonModule.default || saxonModule;
+  const input = `<?xml version="1.0" encoding="UTF-8"?>
+  <assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1.xsd"
+    identifier="textEntry" title="Richard III (Take 3)" adaptive="false" timeDependent="false">
+    <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string" />
+  
+    <itemBody>
+      <p>Identify the missing word in this famous quote from Shakespeare's Richard III.</p>
+      <blockquote>
+        <p>Now is the winter of our discontent<br /> Made glorious summer by this sun of <textEntryInteraction
+            responseIdentifier="RESPONSE" expectedLength="15" />;<br /> And all the clouds
+          that lour'd upon our house<br /> In the deep bosom of the ocean buried.</p>
+      </blockquote>
+    </itemBody>
+  </assessmentItem>`;
+  const expectedOutput = `<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0p1_v1p0.xsd" identifier="textEntry" title="Richard III (Take 3)" adaptive="false" time-dependent="false">
+    <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"/>
+  
+    <qti-item-body>
+      <p>Identify the missing word in this famous quote from Shakespeare's Richard III.</p>
+      <blockquote>
+        <p>Now is the winter of our discontent<br/> Made glorious summer by this sun of <qti-text-entry-interaction response-identifier="RESPONSE" expected-length="15"/>;<br/> And all the clouds
+          that lour'd upon our house<br/> In the deep bosom of the ocean buried.</p>
+      </blockquote>
+    </qti-item-body>
+  </qti-assessment-item>`;
+  const result = await convertQti2toQti3(input);
+  const areEqual = await areXmlEqual(result, expectedOutput);
+  expect(areEqual).toEqual(true);
+});
+
+test('convert a TAO PCI', async () => {
+  const saxonModule = await import('saxon-js'); // Ensure saxon-js is installed
+  globalThis.SaxonJS = saxonModule.default || saxonModule;
+  const qti2 = `<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p2" xmlns:html5="html5" xmlns:m="http://www.w3.org/1998/Math/MathML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p2 http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd" identifier="i605b50d60c465892a88c0651ffd390" title="decisiontask" label="decisiontask" xml:lang="en-US" adaptive="false" timeDependent="false" toolName="TAO" toolVersion="3.4.0-sprint134">
+  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>
+  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float"/> 
+  <stylesheet href="style/custom/tao-user-styles.css" type="text/css" media="all" title=""/>
+  <itemBody>
+    <div class="grid-row">
+      <div class="col-12"/>
+    </div>
+    <div class="grid-row">
+      <div class="col-12"/>
+    </div>
+    <div class="grid-row">
+      <div class="col-12">
+        <customInteraction responseIdentifier="RESPONSE">
+          <portableCustomInteraction xmlns="http://www.imsglobal.org/xsd/portableCustomInteraction"
+          customInteractionTypeIdentifier="decisiontask" hook="decisiontask/runtime/decisiontask.amd.js" version="0.0.10">
+            <resources>
+              <libraries>
+                <lib id="IMSGlobal/jquery_2_1_1"/>
+                <lib id="decisiontask/runtime/js/renderer"/>
+              </libraries><stylesheets>
+                <link href="decisiontask/runtime/css/base.css" type="text/css" title="base"/><link href="decisiontask/runtime/css/decisiontask.css" type="text/css" title="decisiontask"/></stylesheets><mediaFiles><file src="decisiontask/runtime/assets/feedback0.wav" type="application/octet-stream"/><file src="decisiontask/runtime/assets/feedback1.wav" type="application/octet-stream"/><file src="decisiontask/runtime/assets/feedback2.wav" type="application/octet-stream"/><file src="decisiontask/runtime/assets/feedback3.wav" type="application/octet-stream"/><file src="decisiontask/runtime/assets/feedback4.wav" type="application/octet-stream"/><file src="decisiontask/runtime/assets/feedback5.wav" type="application/octet-stream"/></mediaFiles></resources>
+            <properties>
+              <properties key="data">
+                <properties key="0">
+                  <property key="stimulusindex">1</property>
+                  <property key="stimulus">5 + 7 = 12</property>
+                  <property key="response">1
+</property>
+                </properties>
+                <properties key="1">
+                  <property key="stimulusindex">2</property>
+                  <property key="stimulus">4 + 4 = 9</property>
+                  <property key="response">2
+</property>
+                </properties>
+                <properties key="2">
+                  <property key="stimulusindex">3</property>
+                  <property key="stimulus">7 + 6 = 13</property>
+                  <property key="response">1</property>
+                </properties>
+              </properties>
+              <property key="uploadedFname">stimuli_IIL_item.csv</property>
+              <property key="feedback">true</property>
+              <property key="shufflestimuli"></property>
+              <property key="respkey"></property>
+              <property key="tlimit">0</property>
+              <property key="level">2</property>
+              <property key="buttonlabel0">True</property>
+              <property key="buttonlabel1">False</property>
+              <property key="buttonlabel2"></property>
+              <property key="buttonlabel3"></property>
+              <property key="buttonlabel4"></property>
+              <property key="buttonlabel5"></property>
+              <property key="buttonlabel6"></property>
+              <property key="buttonlabel7"></property>
+            </properties>
+            <markup xmlns="http://www.w3.org/1999/xhtml">
+              <div class="decisiontask">
+                <div class="prompt"/>
+                <div class="globalWrapper"/>
+              </div>
+            </markup>
+          </portableCustomInteraction>
+        </customInteraction>
+      </div>
+    </div>
+  </itemBody>
+  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p2/rptemplates/match_correct"/>
+</assessmentItem>
+
+`;
+
+  const qti3 = await convertQti2toQti3(qti2);
+  const transform = qtiTransform(qti3);
+  const transformResult = await transform
+    // .stripStylesheets()
+    .objectToImg()
+    .objectToVideo()
+    .objectToAudio()
+    .stripMaterialInfo()
+    .minChoicesToOne()
+    .externalScored()
+    .qbCleanup()
+    .depConvert()
+    .upgradePci();
+  const transformedQti3 = transformResult.xml();
+  console.log(transformedQti3);
+  expect(transformedQti3).toContain('<qti-portable-custom-interaction');
+  expect(transformedQti3).toContain('module="decisiontask"');
+  expect(transformedQti3).not.toContain('data-legacy-pci-proxy');
+  expect(transformedQti3).not.toContain('data-require-paths');
+});
+
+test('should convert manifest file with imscp prefix to default namespace', () => {
+  const inputXml = `<?xml version="1.0" encoding="UTF-8"?>
+<imscp:manifest identifier="MANIFEST-QTI-1" 
+  xmlns:xml="http://www.w3.org/XML/1998/namespace" 
+  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2" 
+  xmlns:imsqti="http://www.imsglobal.org/xsd/imsqti_v2p0" 
+  xmlns:xhtml="http://www.w3.org/1999/xhtml" 
+  xmlns:imscp="http://www.imsglobal.org/xsd/imscp_v1p1"
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+  <imscp:organizations/>
+  <imscp:resources>
+    <imscp:resource identifier="Q80000" type="imsqti_item_xmlv2p1" href="questions/Q80000.xml">
+      <imscp:metadata>
+        <imsmd:lom>
+          <imsmd:general>
+            <imsmd:title>Test Question</imsmd:title>
+          </imsmd:general>
+        </imsmd:lom>
+      </imscp:metadata>
+      <imscp:file href="questions/Q80000.xml"/>
+    </imscp:resource>
+    <imscp:resource identifier="Q80001" type="imsqti_item_xmlv2p1" href="questions/Q80001.xml">
+      <imscp:file href="questions/Q80001.xml"/>
+    </imscp:resource>
+  </imscp:resources>
+</imscp:manifest>`;
+
+  const expectedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="MANIFEST-QTI-1" 
+  xmlns:xml="http://www.w3.org/XML/1998/namespace" 
+  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2" 
+  xmlns:imsqti="http://www.imsglobal.org/xsd/imsqti_v2p0" 
+  xmlns:xhtml="http://www.w3.org/1999/xhtml" 
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+  <organizations/>
+  <resources>
+    <resource identifier="Q80000" type="imsqti_item_xmlv2p1" href="questions/Q80000.xml">
+      <metadata>
+        <imsmd:lom>
+          <imsmd:general>
+            <imsmd:title>Test Question</imsmd:title>
+          </imsmd:general>
+        </imsmd:lom>
+      </metadata>
+      <file href="questions/Q80000.xml"/>
+    </resource>
+    <resource identifier="Q80001" type="imsqti_item_xmlv2p1" href="questions/Q80001.xml">
+      <file href="questions/Q80001.xml"/>
+    </resource>
+  </resources>
+</manifest>`;
+
+  // Load the XML with cheerio
+  const $ = cheerio.load(inputXml, { xmlMode: true, xml: true });
+
+  // Call the function under test
+  const $result = convertManifestFile($);
+  const result = $result.xml();
+
+  // Log the actual result for debugging
+  console.log('Input XML:');
+  console.log(inputXml);
+  console.log('\nActual Result:');
+  console.log(result);
+  console.log('\nExpected Result:');
+  console.log(expectedXml);
+
+  // Basic assertions to help debug
+  expect(result).toContain('<manifest');
+  expect(result).not.toContain('<imscp:manifest');
+  expect(result).toContain('<organizations/>');
+  expect(result).not.toContain('<imscp:organizations/>');
+  expect(result).toContain('<resources>');
+  expect(result).not.toContain('<imscp:resources>');
+  expect(result).toContain('<resource identifier="Q80000"');
+  expect(result).not.toContain('<imscp:resource');
+
+  // You can add more specific assertions based on what you expect
+  // For now, let's see what the function actually produces
+});

@@ -1,0 +1,34 @@
+{
+  "name": "@citolab/qti-convert-tao-pci",
+  "version": "0.1.0",
+  "description": "TAO PCI conversion helpers for qti-convert",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Citolab/qti-convert",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --target node18 --dts --outDir dist",
+    "build:yalc": "npm run build && yalc publish --push",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@citolab/qti-convert": "file:../qti-convert-core",
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

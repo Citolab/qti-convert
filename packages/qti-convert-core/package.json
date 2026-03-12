@@ -1,0 +1,70 @@
+{
+  "name": "@citolab/qti-convert",
+  "version": "0.3.52",
+  "description": "QTI converter - Core functionality",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Citolab/qti-convert",
+  "author": "Marcel Hoekstra",
+  "contributors": [
+    "Sander Looise",
+    "Patrick de Klein",
+    "Marcel Hoekstra"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./qti-convert": {
+      "types": "./dist/qti-converter/index.d.ts",
+      "default": "./dist/qti-converter/index.js"
+    },
+    "./qti-convert-node": {
+      "types": "./dist/qti-converter-node/index.d.ts", 
+      "default": "./dist/qti-converter-node/index.js"
+    },
+    "./qti-loader": {
+      "types": "./dist/qti-loader/index.d.ts",
+      "default": "./dist/qti-loader/index.js"
+    },
+    "./qti-transformer": {
+      "types": "./dist/qti-transformer/index.d.ts",
+      "default": "./dist/qti-transformer/index.js"
+    },
+    "./qti-helper": {
+      "types": "./dist/qti-helper/index.d.ts",
+      "default": "./dist/qti-helper/index.js"
+    },
+    "./qti-helper-node": {
+      "types": "./dist/qti-helper-node/index.d.ts",
+      "default": "./dist/qti-helper-node/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src/assets"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest",
+    "lint": "eslint src/**"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "cheerio": "^1.0.0",
+    "jszip": "^3.10.1",
+    "saxon-js": "^2.7.0",
+    "unzipper": "^0.12.3",
+    "xml-formatter": "^3.6.4"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/node": "^22.13.10",
+    "@types/unzipper": "^0.10.11",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

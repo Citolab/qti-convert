@@ -1,7 +1,7 @@
 {
-  "name": "@citolab/qti-convert",
+  "name": "qti-convert-workspace",
   "repository": "https://github.com/Citolab/qti-convert",
-  "description": "QTI converter",
+  "description": "QTI converter - Workspace",
   "author": "Marcel Hoekstra",
   "contributors": [
     "Sander Looise",
@@ -9,84 +9,28 @@
     "Marcel Hoekstra"
   ],
   "license": "Apache-2.0",
-  "private": false,
+  "private": true,
   "engines": {
     "node": ">=16.0.0"
   },
-  "version": "0.3.52",
-  "type": "module",
-  "bin": {
-    "qti-convert-pkg": "./dist/qti-convert-pkg.mjs",
-    "qti-convert-folder": "./dist/qti-convert-folder.mjs",
-    "qti-create-manifest": "./dist/qti-package-manifest.mjs",
-    "qti-create-assessment": "./dist/qti-package-assessment.mjs",
-    "qti-strip-media-pkg": "./dist/qti-strip-media-pkg.mjs"
-  },
-  "exports": {
-    "./qti-convert": "./dist/qti-converter/index.js",
-    "./qti-convert-node": "./dist/qti-converter-node/index.js",
-    "./qti-loader": "./dist/qti-loader/index.js",
-    "./qti-transformer": "./dist/qti-transformer/index.js",
-    "./qti-helper": "./dist/qti-helper/index.js",
-    "./qti-helper-node": "./dist/qti-helper-node/index.js"
-  },
-  "typesVersions": {
-    "*": {
-      "qti-convert": [
-        "./dist/qti-converter/index.d.ts"
-      ],
-      "qti-loader": [
-        "./dist/qti-loader/index.d.ts"
-      ],
-      "qti-transformer": [
-        "./dist/qti-transformer/index.d.ts"
-      ],
-      "qti-helper": [
-        "./dist/helper/index.d.ts"
-      ],
-      "qti-helper-node": [
-        "./dist/helper-node/index.d.ts"
-      ],
-      "qti-convert-node": [
-        "./dist/qti-converter-node/index.d.ts"
-      ]
-    }
-  },
-  "files": [
-    "dist",
-    "types"
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "qti-convert-pkg": "npx qti-convert-pkg",
-    "qti-convert-folder": "npx qti-convert-folder",
-    "qti-package-manifest": "npx qti-create-manifest",
-    "qti-package-assessment": "npx qti-create-assessment",
-    "qti-package": "npx qti-create-package",
-    "qti-package-per-item": "npx qti-create-package-per-item",
-    "qti-strip-media-pkg": "npx qti-strip-media-pkg",
-    "----dev----": "",
-    "test": "vitest",
-    "test:output": "jest --json --outputFile=.jest-test-results.json",
-    "test:watch-output": "jest --watch --json --outputFile=.jest-test-results.json || true",
-    "build-lib": "tsx scripts/build.ts",
-    "watch-lib": "nodemon --watch \"src/**\" --ext \"ts,json,css\" --ignore \"src/**/*.spec.ts\" --exec \"tsx scripts/build.ts\" watch",
+    "build": "npm run build --workspaces --if-present",
+    "build:core": "npm run build --workspace=@citolab/qti-convert",
+    "build:cli": "npm run build --workspace=@citolab/qti-convert-cli", 
+    "build:tao-pci": "npm run build --workspace=@citolab/qti-convert-tao-pci",
+    "test": "npm run test --workspaces --if-present",
+    "test:core": "npm run test --workspace=@citolab/qti-convert",
+    "test:cli": "npm run test --workspace=@citolab/qti-convert-cli",
+    "test:tao-pci": "npm run test --workspace=@citolab/qti-convert-tao-pci",
+    "lint": "npm run lint --workspaces --if-present",
+    "clean": "rimraf packages/*/dist",
     "deploy": "firebase deploy --only hosting:qti-components",
-    "npm publish": "np",
-    "lint": "eslint src/lib/**",
     "list-outdated-dependencies": "npx npm-check-updates --format repo --peer",
     "update-dependencies": "npx npm-check-updates --peer -u && npm install",
-    "arethetypeswrong": "npm run build-lib && attw --pack",
-    "----hooks----": "",
-    "prepublishOnly": "echo 'calling prepublishOnly as npm lifecycle hook to build-lib!' && npm run build-lib",
-    "postpublish": "echo 'posthook for prosperity, does nothing for now!'"
-  },
-  "dependencies": {
-    "archiver": "^7.0.1",
-    "cheerio": "^1.0.0",
-    "jszip": "^3.10.1",
-    "saxon-js": "^2.7.0",
-    "unzipper": "^0.12.3",
-    "xml-formatter": "^3.6.4"
+    "yalc:push:tao-pci": "cd packages/qti-convert-tao-pci && yalc publish --push"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
@@ -107,6 +51,7 @@
     "path-browserify": "^1.0.1",
     "prettier": "3.5.3",
     "qti30upgrader": "github:Citolab/qti30Upgrader",
+    "rimraf": "^6.0.0",
     "ts-jest": "^29.2.6",
     "ts-node": "^10.9.2",
     "tsup": "^8.4.0",
