@@ -85,3 +85,28 @@ export async function putBlobFileInPackageCache(
 export async function deletePackageCache(packageId: string): Promise<boolean> {
   return await caches.delete(getPackageCacheName(packageId));
 }
+
+export async function ensurePackageServiceWorkerReady(
+  scriptUrl = '/sw.js',
+  scope = '/',
+): Promise<void> {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    await navigator.serviceWorker.register(scriptUrl, { scope });
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', done, { once: true });
+        setTimeout(done, 3000);
+      });
+    }
+  } catch {
+    // best effort
+  }
+}

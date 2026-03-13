@@ -20,13 +20,23 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --target node18 --dts --outDir dist",
     "build:yalc": "npm run build && yalc publish --push",
-    "test": "vitest run"
+    "test": "vitest run src/index.test.ts",
+    "prepare:storybook-assets": "node scripts/prepare-storybook-assets.mjs",
+    "storybook": "npm run prepare:storybook-assets && storybook dev -p 6010",
+    "build-storybook": "npm run prepare:storybook-assets && storybook build"
   },
   "dependencies": {
+    "@citolab/qti-browser-import": "^0.1.0",
     "@citolab/qti-convert": "^0.3.52",
     "cheerio": "^1.2.0"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "^10.2.7",
+    "@storybook/addon-docs": "^10.2.7",
+    "@storybook/addon-vitest": "^10.2.7",
+    "@storybook/web-components-vite": "^10.2.7",
+    "jszip": "^3.10.1",
+    "storybook": "^10.2.7",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
