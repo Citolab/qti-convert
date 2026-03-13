@@ -6,6 +6,7 @@ import * as cheerio3 from 'cheerio';
 import JSZip from 'jszip';
 import {
   deletePackageCache,
+  ensurePackageServiceWorkerReady,
   makePackageUrl,
   normalizeZipPath,
   putBlobFileInPackageCache,
@@ -48,6 +49,19 @@ export interface ImportQtiPackageResult {
   assessments: ImportedAssessmentInfo[];
   importErrors: string[];
   itemsPerAssessment: { assessmentId: string; items: ImportedItemInfo[] }[];
+}
+
+export interface PrepareQtiPackageOptions extends ImportQtiPackageOptions {
+  saxonJsUrl?: string;
+  componentsCdnUrl?: string;
+  componentsCssUrl?: string;
+}
+
+export interface PreparedQtiPackage {
+  packageId: string;
+  testUrl: string;
+  itemRefs: { identifier: string; title: string }[];
+  convertedItemCount: number;
 }
 
 const upsertPciAttribute = (
@@ -122,6 +136,316 @@ const resolveHref = (baseFilePath: string, href: string | undefined) => {
     return null;
   }
 };
+
+type XmlKind = 'item' | 'test' | 'other';
+
+function classifyXmlKind(xml: string): XmlKind {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const root = doc.documentElement?.localName;
+    if (root === 'qti-assessment-item' || root === 'assessmentItem') return 'item';
+    if (root === 'qti-assessment-test' || root === 'assessmentTest') return 'test';
+    return 'other';
+  } catch {
+    return 'other';
+  }
+}
+
+function getIdentifierFromItem(xml: string, fallback: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    return doc.documentElement.getAttribute('identifier') || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function extractItemRefs(testXml: string): { identifier: string; href: string }[] {
+  try {
+    const doc = new DOMParser().parseFromString(testXml, 'text/xml');
+    return Array.from(doc.getElementsByTagName('*'))
+      .filter(el => el.localName === 'qti-assessment-item-ref' || el.localName === 'assessmentItemRef')
+      .map(el => ({
+        identifier: el.getAttribute('identifier') || '',
+        href: el.getAttribute('href') || '',
+      }))
+      .filter(el => Boolean(el.href));
+  } catch {
+    return [];
+  }
+}
+
+function normalizeTestItemRefIdentifiers(
+  testXml: string,
+  testPath: string,
+  convertedXmlByPath: Map<string, string>,
+): string {
+  try {
+    const doc = new DOMParser().parseFromString(testXml, 'application/xml');
+    const parseError = doc.getElementsByTagName('parsererror')[0];
+    if (parseError) return testXml;
+
+    const refs = Array.from(doc.getElementsByTagName('*')).filter(
+      el => el.localName === 'qti-assessment-item-ref' || el.localName === 'assessmentItemRef',
+    );
+
+    let changed = false;
+    for (const ref of refs) {
+      const href = ref.getAttribute('href') || '';
+      const resolvedPath = resolveHref(testPath, href) || href;
+      const itemXml = convertedXmlByPath.get(resolvedPath);
+      if (!itemXml) continue;
+      const actualIdentifier = getIdentifierFromItem(itemXml, resolvedPath);
+      if (!actualIdentifier) continue;
+      if (ref.getAttribute('identifier') !== actualIdentifier) {
+        ref.setAttribute('identifier', actualIdentifier);
+        changed = true;
+      }
+    }
+
+    return changed ? new XMLSerializer().serializeToString(doc) : testXml;
+  } catch {
+    return testXml;
+  }
+}
+
+function getDirPath(filePath: string): string {
+  const normalized = normalizeZipPath(filePath);
+  const idx = normalized.lastIndexOf('/');
+  return idx >= 0 ? normalized.slice(0, idx + 1) : '';
+}
+
+const runtimeBlobUrlCache = new Map<string, string>();
+
+async function materializeRuntimeAssetUrl(url: string): Promise<string> {
+  if (!/^(https?:)/i.test(url)) return url;
+
+  const cached = runtimeBlobUrlCache.get(url);
+  if (cached) return cached;
+
+  const parsed = new URL(url, window.location.origin);
+  const hasFileExtension = /\.(?:js|json|mjs|cjs|css|html)$/i.test(parsed.pathname);
+  const candidates = hasFileExtension ? [url] : [url, `${url}.js`, `${url}.json`];
+
+  let response: Response | null = null;
+  let resolvedUrl = url;
+  let lastStatus: number | null = null;
+
+  for (const candidate of candidates) {
+    const attempt = await fetch(candidate, { cache: 'no-store' });
+    if (attempt.ok) {
+      response = attempt;
+      resolvedUrl = candidate;
+      break;
+    }
+    lastStatus = attempt.status;
+  }
+
+  if (!response) {
+    throw new Error(`Runtime asset missing for ${url} (${lastStatus ?? 'network error'})`);
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  runtimeBlobUrlCache.set(resolvedUrl, blobUrl);
+  runtimeBlobUrlCache.set(url, blobUrl);
+  return blobUrl;
+}
+
+async function prepareItemXmlForRuntime(
+  xmlString: string,
+  itemPath: string,
+  packageId: string,
+  options: Pick<PrepareQtiPackageOptions, 'componentsCdnUrl' | 'componentsCssUrl'> = {},
+): Promise<string> {
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+  } catch {
+    return Promise.resolve(xmlString);
+  }
+
+  const parseError = doc.getElementsByTagName('parsererror')[0];
+  if (parseError) return Promise.resolve(xmlString);
+
+  const itemDir = getDirPath(itemPath);
+  const baseUrl = makePackageUrl(packageId, itemDir);
+  const origin = window.location.origin;
+  const toAbsoluteModulePath = (value: string | null): string | null => {
+    if (value === null) return null;
+    const trimmed = value.trim();
+    if (!trimmed || /^(data:|blob:|https?:)/i.test(trimmed)) return trimmed;
+
+    const resolved = resolveHref(itemPath, trimmed);
+    if (!resolved) return trimmed;
+    return `${origin}${makePackageUrl(packageId, resolved)}`;
+  };
+
+  const all = Array.from(doc.getElementsByTagName('*'));
+  const pcis = all.filter(
+    el => el.localName === 'qti-portable-custom-interaction' || el.localName === 'portableCustomInteraction',
+  );
+  const interactionModules = all.filter(el => el.localName === 'qti-interaction-module' || el.localName === 'module');
+
+  for (const moduleEl of interactionModules) {
+    const primary = toAbsoluteModulePath(moduleEl.getAttribute('primary-path'));
+    if (primary !== null) {
+      moduleEl.setAttribute('primary-path', await materializeRuntimeAssetUrl(primary));
+    }
+    const fallback = toAbsoluteModulePath(moduleEl.getAttribute('fallback-path'));
+    if (fallback !== null) {
+      moduleEl.setAttribute('fallback-path', await materializeRuntimeAssetUrl(fallback));
+    }
+  }
+
+  for (const pci of pcis) {
+    pci.setAttribute('data-base-url', `${origin}${baseUrl}`);
+    pci.setAttribute('data-forward-console', 'true');
+    if (options.componentsCdnUrl) {
+      pci.setAttribute('data-components-cdn-url', options.componentsCdnUrl);
+    }
+    if (options.componentsCssUrl) {
+      pci.setAttribute('data-components-css-url', options.componentsCssUrl);
+    }
+  }
+
+  const stylesheets = all.filter(el => el.localName === 'qti-stylesheet' || el.localName === 'stylesheet');
+  for (const stylesheet of stylesheets) {
+    const href = stylesheet.getAttribute('href')?.trim() || '';
+    if (!href || /^(data:|blob:|https?:)/i.test(href)) continue;
+    const resolved = resolveHref(itemPath, href);
+    if (!resolved) continue;
+    stylesheet.setAttribute('href', `${origin}${makePackageUrl(packageId, resolved)}`);
+  }
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
+function extractPackagePathFromUrl(packageId: string, url: string): string | null {
+  const pathname = new URL(url, window.location.origin).pathname;
+  const prefix = `${QTI_PKG_URL_PREFIX}/${encodeURIComponent(packageId)}/`;
+  if (!pathname.startsWith(prefix)) return null;
+
+  return pathname
+    .slice(prefix.length)
+    .split('/')
+    .map(segment => decodeURIComponent(segment))
+    .join('/');
+}
+
+async function loadScript(src: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+export async function ensureSaxonJsLoaded(saxonJsUrl = '/assets/saxon-js/SaxonJS2.rt.js'): Promise<void> {
+  const win = window as unknown as { SaxonJS?: unknown };
+  if (win.SaxonJS) return;
+
+  const candidates = Array.from(
+    new Set([
+      saxonJsUrl,
+      '/assets/saxon-js/SaxonJS2.rt.js',
+      'https://unpkg.com/saxon-js@2.7.0/SaxonJS2.rt.js',
+      'https://cdn.jsdelivr.net/npm/saxon-js@2.7.0/SaxonJS2.rt.js',
+    ]),
+  );
+
+  const errors: string[] = [];
+  for (const src of candidates) {
+    try {
+      await loadScript(src);
+      if (win.SaxonJS) return;
+      errors.push(`Loaded ${src} but window.SaxonJS is missing`);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  throw new Error(`Failed to load SaxonJS. Attempts: ${errors.join(' | ')}`);
+}
+
+export async function prepareQtiPackage(
+  file: File,
+  options: PrepareQtiPackageOptions = {},
+): Promise<PreparedQtiPackage> {
+  await ensurePackageServiceWorkerReady();
+  await ensureSaxonJsLoaded(options.saxonJsUrl);
+
+  const imported = await importQtiPackage(file, options);
+  const assessment = imported.assessments[0];
+  if (!assessment) {
+    throw new Error('No assessment test could be prepared from the package.');
+  }
+
+  const convertedXmlByPath = new Map<string, string>();
+  for (const item of assessment.items) {
+    const relativePath = extractPackagePathFromUrl(imported.packageId, item.href);
+    if (!relativePath) continue;
+
+    const response = await fetch(item.href, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Converted item XML missing for ${item.href} (${response.status})`);
+    }
+
+    const xml = await response.text();
+    const patched = await prepareItemXmlForRuntime(xml, relativePath, imported.packageId, {
+      componentsCdnUrl: options.componentsCdnUrl,
+      componentsCssUrl: options.componentsCssUrl,
+    });
+    convertedXmlByPath.set(relativePath, patched);
+    await putTextFileInPackageCache(imported.packageId, relativePath, patched, 'application/xml');
+  }
+
+  const testRelativePath = assessment.assessmentHref;
+  const testResponse = await fetch(assessment.testUrl, { cache: 'no-store' });
+  if (!testResponse.ok) {
+    throw new Error(`Converted test XML missing for ${assessment.testUrl} (${testResponse.status})`);
+  }
+
+  const normalizedTestXml = normalizeTestItemRefIdentifiers(
+    await testResponse.text(),
+    testRelativePath,
+    convertedXmlByPath,
+  );
+  await putTextFileInPackageCache(imported.packageId, testRelativePath, normalizedTestXml, 'application/xml');
+
+  const refs = extractItemRefs(normalizedTestXml).map(ref => {
+    const resolved = resolveHref(testRelativePath, ref.href) || ref.href;
+    return {
+      identifier: ref.identifier || resolved,
+      title: ref.identifier || resolved,
+    };
+  });
+
+  return {
+    packageId: imported.packageId,
+    testUrl: assessment.testUrl,
+    itemRefs: refs,
+    convertedItemCount: assessment.items.length,
+  };
+}
+
+export async function prepareQtiPackageFromUrl(
+  packageUrl: string,
+  options: PrepareQtiPackageOptions = {},
+): Promise<PreparedQtiPackage> {
+  const response = await fetch(packageUrl);
+  if (!response.ok) {
+    throw new Error(`Could not fetch ZIP from ${packageUrl} (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const fileName = packageUrl.split('/').pop() || 'package.zip';
+  const file = new File([blob], fileName, { type: blob.type || 'application/zip' });
+  return prepareQtiPackage(file, options);
+}
 
 export async function importQtiPackage(
   file: File,
