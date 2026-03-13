@@ -92,6 +92,40 @@ test('convert normalizes legacy bootstrap button classes', async () => {
   expect(item).not.toContain('class="btn-info small"');
 });
 
+test('convert preserves nested handlebars property paths for runtime nested config', async () => {
+  const handlebarsItem = `<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item tool-name="TAO">
+  <qti-item-body>
+    <qti-custom-interaction response-identifier="RESPONSE">
+      <qti-portable-custom-interaction custom-interaction-type-identifier="textReaderInteraction" module="textReaderInteraction">
+        <qti-interaction-modules>
+          <qti-interaction-module id="textReaderInteraction" primary-path="textReaderInteraction/runtime/textReaderInteraction.min.js"></qti-interaction-module>
+        </qti-interaction-modules>
+        <properties key="buttonLabels">
+          <property key="prev">&lt;</property>
+          <property key="next">&gt;</property>
+        </properties>
+        <markup>
+          <script type="text/x-handlebars-template">
+            <![CDATA[<button class="btn-info small">{{../buttonLabels.prev}}</button>]]>
+          </script>
+        </markup>
+      </qti-portable-custom-interaction>
+    </qti-custom-interaction>
+  </qti-item-body>
+</qti-assessment-item>`;
+
+  const files: ProcessedMap = new Map([
+    ['items/handlebars.xml', { type: 'item', content: handlebarsItem }]
+  ]);
+
+  const result = await convert(files);
+  const item = String(result.get('items/handlebars.xml')?.content || '');
+
+  expect(item).toContain('{{../buttonLabels.prev}}');
+  expect(item).not.toContain('buttonLabels__prev');
+});
+
 test('convert runs upgradePci for TAO legacy portable custom interaction structure', async () => {
   const legacyWrappedItem = `<?xml version="1.0" encoding="UTF-8"?>
 <qti-assessment-item tool-name="TAO">

@@ -349,26 +349,8 @@ function applyTaoStyleConversion($: cheerio.CheerioAPI): void {
   });
 }
 
-function convertHandlebarsPathsInExpression(expression: string): string {
-  const quotedPattern = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
-  const pathPattern = /(^|[^A-Za-z0-9_$@./-])((?:\.\.\/)+|@root\.|this\.)?([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)/g;
-  return expression
-    .split(quotedPattern)
-    .map((segment, index) => {
-      if (index % 2 === 1) return segment;
-      return segment.replace(pathPattern, (_match, prefix: string, scope: string, path: string) => {
-        const flattened = path.replace(/\./g, '__');
-        return `${prefix}${scope || ''}${flattened}`;
-      });
-    })
-    .join('');
-}
-
 function convertHandlebarsPathsInTemplate(template: string): string {
-  const mustachePattern = /(\{\{\{?)([\s\S]*?)(\}\}\}?)/g;
-  return template.replace(mustachePattern, (_match, start: string, body: string, end: string) => {
-    return `${start}${convertHandlebarsPathsInExpression(body)}${end}`;
-  });
+  return template;
 }
 
 function applyHandlebarsTemplateConversion($: cheerio.CheerioAPI): void {
