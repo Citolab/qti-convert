@@ -217,6 +217,22 @@ function getDirPath(filePath: string): string {
 
 const runtimeBlobUrlCache = new Map<string, string>();
 
+function rebaseCssUrls(cssText: string, sourceUrl: string): string {
+  return cssText.replace(/url\(([^)]+)\)/gi, (match, rawValue: string) => {
+    const unquoted = rawValue.trim().replace(/^['"]|['"]$/g, '');
+    if (!unquoted || /^(data:|blob:|https?:|#)/i.test(unquoted)) {
+      return match;
+    }
+
+    try {
+      const rebased = new URL(unquoted, sourceUrl).toString();
+      return `url("${rebased}")`;
+    } catch {
+      return match;
+    }
+  });
+}
+
 async function materializeRuntimeAssetUrl(url: string): Promise<string> {
   if (!/^(https?:)/i.test(url)) return url;
 
@@ -245,7 +261,14 @@ async function materializeRuntimeAssetUrl(url: string): Promise<string> {
     throw new Error(`Runtime asset missing for ${url} (${lastStatus ?? 'network error'})`);
   }
 
-  const blob = await response.blob();
+  let blob: Blob;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/css') || resolvedUrl.toLowerCase().endsWith('.css')) {
+    const cssText = rebaseCssUrls(await response.text(), resolvedUrl);
+    blob = new Blob([cssText], { type: 'text/css' });
+  } else {
+    blob = await response.blob();
+  }
   const blobUrl = URL.createObjectURL(blob);
   runtimeBlobUrlCache.set(resolvedUrl, blobUrl);
   runtimeBlobUrlCache.set(url, blobUrl);
@@ -315,7 +338,8 @@ async function prepareItemXmlForRuntime(
     if (!href || /^(data:|blob:|https?:)/i.test(href)) continue;
     const resolved = resolveHref(itemPath, href);
     if (!resolved) continue;
-    stylesheet.setAttribute('href', `${origin}${makePackageUrl(packageId, resolved)}`);
+    const absoluteUrl = `${origin}${makePackageUrl(packageId, resolved)}`;
+    stylesheet.setAttribute('href', await materializeRuntimeAssetUrl(absoluteUrl));
   }
 
   return new XMLSerializer().serializeToString(doc);
