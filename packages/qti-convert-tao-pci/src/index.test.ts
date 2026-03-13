@@ -33,6 +33,7 @@ test('convert applies tao pci enhancements and injects proxy module file', async
   expect(item).toContain('qti-layout-row');
   expect(item).toContain('__legacy_proxy_0');
   expect(item).toContain('modules/bootstrap/bootstrap.min.css');
+  expect(item).toContain('data-legacy-pci-source-module="textReaderInteraction"');
 
   const $ = cheerio.load(item, { xmlMode: true, xml: true });
   const legacyConfigRaw =

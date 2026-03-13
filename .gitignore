@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 .jest-test-results.json
+test-results/
 .firebase/
 storybook-static/
 

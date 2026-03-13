@@ -384,11 +384,11 @@ function applyHandlebarsTemplateConversion($: cheerio.CheerioAPI): void {
 
 function createLegacyProxyModuleSource(originalModuleId: string): string {
   const encodedModuleId = JSON.stringify(originalModuleId);
-  return `define(['qtiCustomInteractionContext', 'require'], function(qtiCustomInteractionContext, require) {
+  return `define(['require'], function(require) {
   'use strict';
 
-  var originalRegister = qtiCustomInteractionContext.register;
   var sourceModuleId = ${encodedModuleId};
+  var globalTarget = typeof window !== 'undefined' ? window : globalThis;
 
   function createInstanceBridge(legacyInstance) {
     return {
@@ -417,7 +417,93 @@ function createLegacyProxyModuleSource(originalModuleId: string): string {
     };
   }
 
-  function wrapLegacyRegistration(legacyRegistration) {
+  function normalizeState(state) {
+    if (typeof state === 'string' && state.indexOf('__qti_json__::') === 0) {
+      try {
+        return JSON.parse(state.substring('__qti_json__::'.length));
+      } catch (e) {
+        return state;
+      }
+    }
+    return state;
+  }
+
+  function ensureBootstrapModule() {
+    if (typeof require.defined === 'function' && require.defined('qtiCustomInteractionContext')) {
+      return;
+    }
+
+    define('qtiCustomInteractionContext', [], function() {
+      return {
+        register: function(pciInstance) {
+          var manager = globalTarget.PCIManager;
+          var config = globalTarget.__qtiLegacyBootstrapConfig || {};
+
+          if (!manager) {
+            throw new Error('window.PCIManager is not available for legacy TAO PCI bootstrap');
+          }
+
+          manager.pciInstance = pciInstance;
+
+          var pciConfig = {
+            properties: config.properties || {},
+            contextVariables: config.contextVariables || {},
+            templateVariables: config.templateVariables || {},
+            onready: function(instance) {
+              manager.pciInstance = instance;
+
+              if (manager.pendingBoundTo) {
+                manager.applyBoundTo(manager.pendingBoundTo);
+                manager.pendingBoundTo = null;
+              }
+
+              if (manager.pendingState && manager.pciInstance && typeof manager.pciInstance.setState === 'function') {
+                manager.pciInstance.setState(manager.pendingState);
+                manager.pendingState = null;
+              }
+
+              manager.notifyReady();
+            },
+            ondone: function(instance, response, state, status) {
+              var valid =
+                manager.pciInstance && typeof manager.pciInstance.checkValidity === 'function'
+                  ? manager.pciInstance.checkValidity()
+                  : undefined;
+              var customValidity =
+                manager.pciInstance && typeof manager.pciInstance.getCustomValidity === 'function'
+                  ? manager.pciInstance.getCustomValidity()
+                  : undefined;
+
+              manager.notifyInteractionChanged(
+                response,
+                typeof state === 'string' ? state : null,
+                valid,
+                customValidity
+              );
+            },
+            responseIdentifier: config.responseIdentifier || manager.responseIdentifier || '',
+            boundTo: config.boundTo || null
+          };
+
+          if (pciInstance && typeof pciInstance.getInstance === 'function') {
+            var dom = manager.markupEl || manager.container;
+            pciInstance.getInstance(dom, pciConfig, normalizeState(config.state) || undefined);
+            return;
+          }
+
+          manager.notifyError('Loaded PCI module has no getInstance().');
+        },
+        notifyReady: function() {
+          var manager = globalTarget.PCIManager;
+          if (manager && typeof manager.notifyReady === 'function') {
+            manager.notifyReady();
+          }
+        }
+      };
+    });
+  }
+
+  function wrapLegacyRegistration(qtiCustomInteractionContext, legacyRegistration) {
     function decodeHtmlEntities(value) {
       if (typeof value !== 'string' || value.indexOf('&') === -1) {
         return value;
@@ -499,14 +585,22 @@ function createLegacyProxyModuleSource(originalModuleId: string): string {
     };
   }
 
-  qtiCustomInteractionContext.register = function(registration) {
-    if (registration && typeof registration.getInstance === 'function') {
-      return originalRegister.call(qtiCustomInteractionContext, registration);
-    }
-    return originalRegister.call(qtiCustomInteractionContext, wrapLegacyRegistration(registration));
-  };
+  ensureBootstrapModule();
 
-  require([sourceModuleId], function () {}, function (err) {
+  require(['qtiCustomInteractionContext'], function(qtiCustomInteractionContext) {
+    var originalRegister = qtiCustomInteractionContext.register;
+
+    qtiCustomInteractionContext.register = function(registration) {
+      if (registration && typeof registration.getInstance === 'function') {
+        return originalRegister.call(qtiCustomInteractionContext, registration);
+      }
+      return originalRegister.call(qtiCustomInteractionContext, wrapLegacyRegistration(qtiCustomInteractionContext, registration));
+    };
+
+    require([sourceModuleId], function () {}, function (err) {
+      throw err;
+    });
+  }, function(err) {
     throw err;
   });
 

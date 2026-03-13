@@ -72,7 +72,11 @@ function getDirPath(filePath: string): string {
   return idx >= 0 ? normalized.slice(0, idx + 1) : '';
 }
 
-function prepareItemXmlForRuntime(xmlString: string, itemPath: string, packageId: string): string {
+function prepareItemXmlForRuntime(
+  xmlString: string,
+  itemPath: string,
+  packageId: string
+): string {
   let doc: Document;
   try {
     doc = new DOMParser().parseFromString(xmlString, 'application/xml');
@@ -85,7 +89,6 @@ function prepareItemXmlForRuntime(xmlString: string, itemPath: string, packageId
 
   const itemDir = getDirPath(itemPath);
   const baseUrl = makePackageUrl(packageId, itemDir);
-  const packageRootUrl = makePackageUrl(packageId, '');
   const origin = window.location.origin;
   const toAbsoluteModulePath = (value: string | null): string | null => {
     if (value === null) return null;
@@ -112,23 +115,7 @@ function prepareItemXmlForRuntime(xmlString: string, itemPath: string, packageId
 
   for (const pci of pcis) {
     pci.setAttribute('data-base-url', `${origin}${baseUrl}`);
-    const legacySourceModule = pci.getAttribute('data-legacy-pci-source-module')?.trim();
-    if (legacySourceModule) {
-      pci.setAttribute('module', legacySourceModule);
-      pci.removeAttribute('data-legacy-pci-source-module');
-      const modulesRoot = Array.from(pci.getElementsByTagName('*')).find(
-        el => el.localName === 'qti-interaction-modules' || el.localName === 'interactionModules'
-      );
-      if (modulesRoot) {
-        Array.from(modulesRoot.getElementsByTagName('*'))
-          .filter(
-            el =>
-              (el.localName === 'qti-interaction-module' || el.localName === 'module') &&
-              (el.getAttribute('id') || '').includes('__legacy_proxy_')
-          )
-          .forEach(el => el.remove());
-      }
-    }
+    pci.setAttribute('data-forward-console', 'true');
   }
 
   const stylesheets = all.filter(el => el.localName === 'qti-stylesheet' || el.localName === 'stylesheet');
@@ -396,8 +383,8 @@ async function preparePackageFromZip(zipUrl: string, saxonJsUrl: string): Promis
 
   for (const [path, processed] of taoOutput.entries()) {
     if (processed.type === 'other') {
+      const lower = path.toLowerCase();
       if (typeof processed.content === 'string') {
-        const lower = path.toLowerCase();
         const contentType = lower.endsWith('.css')
           ? 'text/css'
           : lower.endsWith('.js')
@@ -496,6 +483,112 @@ async function ensureComponentsLoaded(args: StoryArgs): Promise<void> {
     document.head.appendChild(link);
   }
   await import(/* @vite-ignore */ args.componentsCdnUrl);
+  patchPortableCustomInteractionForStorybook();
+}
+
+function patchPortableCustomInteractionForStorybook(): void {
+  const ctor = customElements.get('qti-portable-custom-interaction') as
+    | (CustomElementConstructor & { prototype: Record<string, unknown> })
+    | undefined;
+  if (!ctor) return;
+
+  const proto = ctor.prototype as Record<string, unknown> & {
+    __storySrcdocPatched?: boolean;
+    createIframe?: () => void;
+  };
+  if (proto.__storySrcdocPatched) return;
+  proto.__storySrcdocPatched = true;
+
+  proto.createIframe = function createIframeWithSrcdoc(this: Record<string, unknown> & HTMLElement): void {
+    const existingObjectUrl = this._iframeObjectUrl;
+    if (typeof existingObjectUrl === 'string' && existingObjectUrl) {
+      URL.revokeObjectURL(existingObjectUrl);
+      this._iframeObjectUrl = null;
+    }
+
+    const iframe = document.createElement('iframe');
+    this.iframe = iframe;
+    iframe.id = `pci-iframe-${this.responseIdentifier || ''}`;
+    iframe.setAttribute('title', 'QTI PCI Iframe');
+    iframe.setAttribute('aria-label', 'QTI PCI Iframe');
+    iframe.setAttribute('aria-hidden', 'false');
+    iframe.setAttribute('role', 'application');
+    iframe.style.width = '100%';
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
+    iframe.name = `qti-pci-${this.responseIdentifier || 'pci'}-${Date.now()}`;
+
+    iframe.onload = () => {
+      this._iframeLoaded = true;
+      const sendMessageToIframe = this.sendMessageToIframe as ((method: string, params: unknown) => void) | undefined;
+      const markup = this.querySelector('qti-interaction-markup');
+      if (markup) {
+        sendMessageToIframe?.call(this, 'setMarkup', markup.innerHTML);
+      }
+
+      const stylesheets = Array.from(this.querySelectorAll('qti-stylesheet'));
+      if (stylesheets.length) {
+        sendMessageToIframe?.call(
+          this,
+          'setStylesheets',
+          stylesheets.map(sheet => sheet.outerHTML).join('\n')
+        );
+      }
+
+      const properties = this.querySelector('properties');
+      if (properties) {
+        sendMessageToIframe?.call(this, 'setProperties', properties.innerHTML);
+      }
+
+      const addHyphenatedKeys = this['#addHyphenatedKeys'] as ((properties: Record<string, unknown>) => Record<string, unknown>) | undefined;
+      const toNestedProperties = this['#toNestedProperties'] as ((properties: Record<string, unknown>) => Record<string, unknown>) | undefined;
+      const unescapeDataAttributes = this['#unescapeDataAttributes'] as ((properties: Record<string, unknown>) => Record<string, unknown>) | undefined;
+
+      const baseDataset = { ...this.dataset } as Record<string, unknown>;
+      const propertiesObject = addHyphenatedKeys && toNestedProperties && unescapeDataAttributes
+        ? addHyphenatedKeys(toNestedProperties(unescapeDataAttributes(baseDataset)))
+        : baseDataset;
+      const storedStateRaw = (this.context as { state?: Record<string, string> } | undefined)?.state?.[
+        String(this.responseIdentifier || '')
+      ];
+      const storedState = typeof storedStateRaw === 'string' && storedStateRaw.length > 0 ? storedStateRaw : null;
+      const interactionModules = Array.from(this.querySelectorAll('qti-interaction-modules > qti-interaction-module')).map(
+        module => ({
+          id: module.getAttribute('id'),
+          primaryPath: module.getAttribute('primary-path'),
+          fallbackPath: module.getAttribute('fallback-path')
+        })
+      );
+      const initData = {
+        module: this.module,
+        customInteractionTypeIdentifier: this.customInteractionTypeIdentifier,
+        baseUrl: !this.baseUrl
+          ? window.location.origin
+          : String(this.baseUrl).startsWith('http') ||
+              String(this.baseUrl).startsWith('blob') ||
+              String(this.baseUrl).startsWith('base64')
+            ? this.baseUrl
+            : `${window.location.origin}${this.baseUrl}`,
+        responseIdentifier: this.responseIdentifier,
+        properties: propertiesObject,
+        contextVariables: this.getContextVariables?.() || {},
+        templateVariables: this.getTemplateVariables?.() || {},
+        dataAttributes: { ...this.dataset },
+        interactionModules,
+        boundTo: storedState ? null : this.boundTo,
+        state: storedState
+      };
+      const iframeWindow = iframe.contentWindow as (Window & { __qtiLegacyBootstrapConfig?: unknown }) | null;
+      if (iframeWindow) {
+        iframeWindow.__qtiLegacyBootstrapConfig = initData;
+      }
+      sendMessageToIframe?.call(this, 'initialize', initData);
+    };
+
+    const content = typeof this.generateIframeContent === 'function' ? this.generateIframeContent() : '';
+    iframe.srcdoc = content;
+    this.appendChild(iframe);
+  };
 }
 
 function mountPreview(root: HTMLElement, status: HTMLElement, prepared: PreparedPackage): void {
