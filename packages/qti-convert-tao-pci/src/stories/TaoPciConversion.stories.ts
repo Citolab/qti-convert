@@ -1,9 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/web-components-vite';
 import { expect, waitFor } from 'storybook/test';
-import {
-  prepareQtiPackageFromUrl,
-  type PreparedQtiPackage,
-} from '@citolab/qti-browser-import';
+import { prepareQtiPackageFromUrl, type PreparedQtiPackage } from '@citolab/qti-browser-import';
 
 interface StoryArgs {
   zipUrl: string;
@@ -157,7 +154,7 @@ export const ConvertAndRenderTaoPci: Story = {
         const prepared = await prepareQtiPackageFromUrl(args.zipUrl, {
           saxonJsUrl: args.saxonJsUrl,
           componentsCdnUrl: args.componentsCdnUrl,
-          componentsCssUrl: args.componentsCssUrl,
+          componentsCssUrl: args.componentsCssUrl
         });
         await waitForPackageUrl(prepared.testUrl);
         await ensureComponentsLoaded(args);
