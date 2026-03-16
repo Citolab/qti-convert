@@ -197,3 +197,41 @@ export const ConvertAndRenderTaoPci: Story = {
     }
   }
 };
+
+const baseStory: Story = {
+  render: ConvertAndRenderTaoPci.render,
+  play: ConvertAndRenderTaoPci.play,
+  parameters: ConvertAndRenderTaoPci.parameters
+};
+
+export const ConvertAndRenderLikert: Story = {
+  ...baseStory,
+  args: {
+    ...meta.args,
+    zipUrl: '/storybook-assets/likert.zip'
+  },
+  parameters: {
+    ...baseStory.parameters,
+    docs: {
+      description: {
+        story: 'Uses `/storybook-assets/likert.zip` from the local Storybook assets.'
+      }
+    }
+  }
+};
+
+export const ConvertAndRenderVerhoudingen: Story = {
+  ...baseStory,
+  args: {
+    ...meta.args,
+    zipUrl: '/storybook-assets/verhoudingen.zip'
+  },
+  parameters: {
+    ...baseStory.parameters,
+    docs: {
+      description: {
+        story: 'Uses `/storybook-assets/verhoudingen.zip` from the local Storybook assets.'
+      }
+    }
+  }
+};
