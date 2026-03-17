@@ -2,8 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { StorybookConfig } from '@storybook/web-components-vite';
 
-const defaultComponentsCdnDir = '/Users/marcelhoekstra/repos/qti-components/cdn';
-const defaultComponentsDistDir = '/Users/marcelhoekstra/repos/qti-components/dist';
+const packageRootDir = path.resolve(process.cwd(), '..', '..');
+const defaultComponentsCdnDir = path.resolve(
+  packageRootDir,
+  'node_modules/@citolab/qti-components/cdn',
+);
+const defaultComponentsDistDir = path.resolve(
+  packageRootDir,
+  'node_modules/@citolab/qti-components/dist',
+);
 const localComponentsCdnDir = process.env.QTI_COMPONENTS_CDN_DIR || defaultComponentsCdnDir;
 const localComponentsDistDir = process.env.QTI_COMPONENTS_DIST_DIR || defaultComponentsDistDir;
 

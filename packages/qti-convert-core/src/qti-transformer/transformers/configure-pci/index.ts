@@ -16,13 +16,60 @@ export interface ModuleResolutionConfig {
   };
 }
 
+export interface ConfigurePciOptions {
+  /**
+   * When provided, qti-interaction-module primary-path and fallback-path values
+   * will be normalized to be relative to the package root (stripping any leading
+   * base-URL prefixes that qti-components would otherwise double-prefix).
+   */
+  packageRootUrl?: string;
+  itemDirUrl?: string | null;
+  itemStemDirUrl?: string | null;
+}
+
 export async function configurePciAsync(
   $: cheerio.CheerioAPI,
   baseUrl: string,
-  getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
+  getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>,
+  options?: ConfigurePciOptions
 ) {
-  await configurePCI($, baseUrl, getModuleResolutionConfig);
+  await configurePCI($, baseUrl, getModuleResolutionConfig, options);
   return $;
+}
+
+function stripLeadingPrefix(value: string, prefix: string): string {
+  const withSlash = prefix.endsWith('/') ? prefix : `${prefix}/`;
+  if (value.startsWith(withSlash)) return value.slice(withSlash.length);
+  if (value === prefix) return '';
+  return value;
+}
+
+function normalizeModulePath(value: string | undefined, baseUrl: string, options: ConfigurePciOptions): string | undefined {
+  if (!value) return value;
+  if (/^(data:|blob:|https?:)/.test(value)) return value;
+  if (value.startsWith('/assets/')) return value;
+
+  const { packageRootUrl = '', itemDirUrl, itemStemDirUrl } = options;
+  const packageRootPath = packageRootUrl.replace(/^\/+/, '');
+  const pciBasePath = baseUrl.replace(/^\/+/, '');
+  const itemDirPath = (itemDirUrl || '').replace(/^\/+/, '');
+  const itemStemDirPath = (itemStemDirUrl || '').replace(/^\/+/, '');
+
+  let next = value.replace(/^\/+/, '');
+  for (let i = 0; i < 4; i++) {
+    const prev = next;
+    if (itemStemDirPath) next = stripLeadingPrefix(next, itemStemDirPath);
+    if (itemDirPath) next = stripLeadingPrefix(next, itemDirPath);
+    next = stripLeadingPrefix(next, pciBasePath);
+    next = stripLeadingPrefix(next, packageRootPath);
+    next = next.replace(/^\/+/, '');
+    if (next === prev) break;
+  }
+  if (baseUrl.endsWith('/modules')) {
+    if (next.startsWith('modules/')) next = next.slice('modules/'.length);
+    if (next.startsWith('/modules/')) next = next.slice('/modules/'.length);
+  }
+  return next;
 }
 
 // To support PCI's with module module_resolution.js and fallback_module_resolution.js you need to call this function.
@@ -31,7 +78,8 @@ export async function configurePciAsync(
 async function configurePCI(
   $: cheerio.CheerioAPI,
   baseUrl: string,
-  getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
+  getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>,
+  options?: ConfigurePciOptions
 ) {
   const customInteractionTypeIdentifiers: string[] = [];
   const portableCustomInteractions = $('qti-portable-custom-interaction');
@@ -42,6 +90,11 @@ async function configurePCI(
     for (const interaction of portableCustomInteractions) {
       // set data-base-url
       $(interaction).attr('data-base-url', baseUrl);
+      // always enable iframe isolation
+      if (!$(interaction).attr('data-use-iframe')) {
+        $(interaction).attr('data-use-iframe', '');
+      }
+
       let customInteractionTypeIdentifier = $(interaction).attr('custom-interaction-type-identifier');
       if (customInteractionTypeIdentifiers.includes(customInteractionTypeIdentifier)) {
         customInteractionTypeIdentifier = customInteractionTypeIdentifier + customInteractionTypeIdentifiers.length;
@@ -170,5 +223,15 @@ async function configurePCI(
         }
       }
     }
+  }
+
+  // Normalize module paths so qti-components can safely prefix baseUrl once.
+  if (options?.packageRootUrl) {
+    $('qti-interaction-module').each((_, el) => {
+      const primary = normalizeModulePath($(el).attr('primary-path'), baseUrl, options);
+      if (primary !== undefined) $(el).attr('primary-path', primary);
+      const fallback = normalizeModulePath($(el).attr('fallback-path'), baseUrl, options);
+      if (fallback !== undefined) $(el).attr('fallback-path', fallback);
+    });
   }
 }

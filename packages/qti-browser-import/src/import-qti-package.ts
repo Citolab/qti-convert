@@ -4,6 +4,7 @@ import { convert as convertTaoPci } from '@citolab/qti-convert-tao-pci';
 import { getUpgraderStylesheetBlobUrl } from './upgrader-stylesheet';
 import * as cheerio3 from 'cheerio';
 import JSZip from 'jszip';
+import { createModuleResolutionFetcher, detectPciBaseUrl } from './pci-helpers';
 import {
   deletePackageCache,
   ensurePackageServiceWorkerReady,
@@ -62,6 +63,65 @@ export interface PreparedQtiPackage {
   testUrl: string;
   itemRefs: { identifier: string; title: string }[];
   convertedItemCount: number;
+  assessments: ImportedAssessmentInfo[];
+  importErrors: string[];
+  itemsPerAssessment: { assessmentId: string; items: ImportedItemInfo[] }[];
+}
+
+function getDirname(path: string): string {
+  const normalized = normalizeZipPath(path);
+  const idx = normalized.lastIndexOf('/');
+  return idx >= 0 ? normalized.slice(0, idx + 1) : '';
+}
+
+function detectPackageRootDir(paths: string[]): string {
+  const manifestCandidates = paths
+    .map(normalizeZipPath)
+    .filter(path => path.toLowerCase().endsWith('imsmanifest.xml'))
+    .sort((a, b) => a.length - b.length);
+
+  if (manifestCandidates.length === 0) return '';
+  return getDirname(manifestCandidates[0]);
+}
+
+function rebaseToPackageRoot(path: string, packageRootDir: string): string {
+  const normalized = normalizeZipPath(path);
+  const root = normalizeZipPath(packageRootDir);
+  if (!root) return normalized;
+  if (normalized === root) return '';
+  return normalized.startsWith(root) ? normalized.slice(root.length) : normalized;
+}
+
+function pickAliasedModuleResolutionPath(
+  paths: string[],
+  filename: 'module_resolution' | 'fallback_module_resolution',
+): string | null {
+  const candidates = paths.filter(
+    (p) =>
+      p.endsWith(`/modules/${filename}.js`) ||
+      p.endsWith(`/modules/${filename}.json`),
+  );
+
+  if (candidates.length !== 1) return null;
+  return candidates[0];
+}
+
+function repairBareAttributesInXml(text: string): string {
+  return text.replace(/<[^>]+>/g, (tag) => {
+    if (
+      tag.startsWith('<!--') ||
+      tag.startsWith('<?') ||
+      tag.startsWith('<![CDATA[') ||
+      tag.startsWith('<!DOCTYPE')
+    ) {
+      return tag;
+    }
+
+    return tag.replace(
+      /("[^"]*"|'[^']*')|(\s)([\w:-]+)(?!\s*=)(?=[\s/>])/g,
+      (match, quoted, space, attr) => (quoted !== undefined ? match : `${space}${attr}=""`),
+    );
+  });
 }
 
 const upsertPciAttribute = (
@@ -151,6 +211,39 @@ function classifyXmlKind(xml: string): XmlKind {
   }
 }
 
+function isQti3Xml(xml: string): boolean {
+  if (
+    /<qti-assessment-item\b/i.test(xml) ||
+    /<qti-assessment-test\b/i.test(xml) ||
+    /imsqtiasi_v3p0|qtiv3p0/i.test(xml)
+  ) {
+    return true;
+  }
+
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const root = doc.documentElement;
+    const localName = root?.localName || '';
+    const namespace = root?.namespaceURI || '';
+
+    if (localName === 'qti-assessment-item' || localName === 'qti-assessment-test') {
+      return true;
+    }
+
+    return /imsqtiasi_v3p0|qtiv3p0/i.test(namespace);
+  } catch {
+    return false;
+  }
+}
+
+export const __test__ = {
+  detectPackageRootDir,
+  rebaseToPackageRoot,
+  pickAliasedModuleResolutionPath,
+  repairBareAttributesInXml,
+  isQti3Xml,
+};
+
 function getIdentifierFromItem(xml: string, fallback: string): string {
   try {
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
@@ -215,6 +308,20 @@ function getDirPath(filePath: string): string {
   return idx >= 0 ? normalized.slice(0, idx + 1) : '';
 }
 
+function getItemStemDirPath(filePath: string): string | null {
+  const normalized = normalizeZipPath(filePath);
+  const last = normalized.split('/').pop() || '';
+  const dot = last.lastIndexOf('.');
+  if (dot <= 0) return null;
+
+  const withoutExt = last.slice(0, dot);
+  const baseDir = normalized.slice(0, normalized.length - last.length).replace(/\/+$/, '');
+  const parent = baseDir.split('/').filter(Boolean).pop() || '';
+  if (parent.toLowerCase() !== 'items') return null;
+
+  return `${baseDir}/${withoutExt}`;
+}
+
 const runtimeBlobUrlCache = new Map<string, string>();
 
 function rebaseCssUrls(cssText: string, sourceUrl: string): string {
@@ -275,12 +382,48 @@ async function materializeRuntimeAssetUrl(url: string): Promise<string> {
   return blobUrl;
 }
 
+async function tryMaterializeRuntimeAssetUrl(url: string): Promise<string | null> {
+  try {
+    return await materializeRuntimeAssetUrl(url);
+  } catch {
+    return null;
+  }
+}
+
 async function prepareItemXmlForRuntime(
   xmlString: string,
   itemPath: string,
   packageId: string,
   options: Pick<PrepareQtiPackageOptions, 'componentsCdnUrl' | 'componentsCssUrl'> = {},
 ): Promise<string> {
+  const packageRootUrl = makePackageUrl(packageId, '');
+  const itemDir = getDirPath(itemPath);
+  const itemDirUrl = itemDir ? makePackageUrl(packageId, itemDir) : null;
+  const itemStemDir = getItemStemDirPath(itemPath);
+  const itemStemDirUrl = itemStemDir ? makePackageUrl(packageId, itemStemDir) : null;
+
+  if (xmlString.includes('qti-portable-custom-interaction')) {
+    const pciBaseUrl = await detectPciBaseUrl({
+      packageRootUrl,
+      itemDirUrl,
+      itemStemDirUrl,
+      xmlText: xmlString,
+    });
+    const getModuleResolutionConfig = createModuleResolutionFetcher({
+      packageRootUrl,
+      itemDirUrl,
+      itemStemDirUrl,
+    });
+
+    xmlString = (
+      await qtiTransform(xmlString).configurePciAsync(
+        pciBaseUrl,
+        getModuleResolutionConfig,
+        { packageRootUrl, itemDirUrl, itemStemDirUrl },
+      )
+    ).xml();
+  }
+
   let doc: Document;
   try {
     doc = new DOMParser().parseFromString(xmlString, 'application/xml');
@@ -291,7 +434,6 @@ async function prepareItemXmlForRuntime(
   const parseError = doc.getElementsByTagName('parsererror')[0];
   if (parseError) return Promise.resolve(xmlString);
 
-  const itemDir = getDirPath(itemPath);
   const baseUrl = makePackageUrl(packageId, itemDir);
   const origin = window.location.origin;
   const toAbsoluteModulePath = (value: string | null): string | null => {
@@ -309,16 +451,37 @@ async function prepareItemXmlForRuntime(
     el => el.localName === 'qti-portable-custom-interaction' || el.localName === 'portableCustomInteraction',
   );
   const interactionModules = all.filter(el => el.localName === 'qti-interaction-module' || el.localName === 'module');
+  const interactionModuleContainers = all.filter(
+    el => el.localName === 'qti-interaction-modules' || el.localName === 'modules',
+  );
 
   for (const moduleEl of interactionModules) {
     const primary = toAbsoluteModulePath(moduleEl.getAttribute('primary-path'));
-    if (primary !== null) {
-      moduleEl.setAttribute('primary-path', await materializeRuntimeAssetUrl(primary));
-    }
     const fallback = toAbsoluteModulePath(moduleEl.getAttribute('fallback-path'));
-    if (fallback !== null) {
-      moduleEl.setAttribute('fallback-path', await materializeRuntimeAssetUrl(fallback));
+    const hasFallback = Boolean(fallback);
+
+    if (primary !== null) {
+      if (hasFallback) {
+        const materializedPrimary = await tryMaterializeRuntimeAssetUrl(primary);
+        if (materializedPrimary) {
+          moduleEl.setAttribute('primary-path', materializedPrimary);
+        }
+      } else {
+        moduleEl.setAttribute('primary-path', await materializeRuntimeAssetUrl(primary));
+      }
     }
+
+    if (fallback !== null) {
+      const materializedFallback = await tryMaterializeRuntimeAssetUrl(fallback);
+      if (materializedFallback) {
+        moduleEl.setAttribute('fallback-path', materializedFallback);
+      }
+    }
+  }
+
+  for (const modulesEl of interactionModuleContainers) {
+    modulesEl.removeAttribute('primary-configuration');
+    modulesEl.removeAttribute('secondary-configuration');
   }
 
   for (const pci of pcis) {
@@ -448,11 +611,34 @@ export async function prepareQtiPackage(
     };
   });
 
+  // Build a map from resolved item path → normalized itemRefIdentifier so we can
+  // keep `assessment.items[*].itemRefIdentifier` in sync with the stored test XML.
+  const normalizedRefIdentifierByPath = new Map<string, string>();
+  for (const ref of extractItemRefs(normalizedTestXml)) {
+    const resolved = resolveHref(testRelativePath, ref.href);
+    if (resolved && ref.identifier) {
+      normalizedRefIdentifierByPath.set(resolved, ref.identifier);
+    }
+  }
+
+  const updatedAssessments = imported.assessments.map(a => ({
+    ...a,
+    items: a.items.map(item => {
+      const normalizedId = item.originalHref
+        ? normalizedRefIdentifierByPath.get(item.originalHref)
+        : undefined;
+      return normalizedId ? { ...item, itemRefIdentifier: normalizedId } : item;
+    }),
+  }));
+
   return {
     packageId: imported.packageId,
     testUrl: assessment.testUrl,
     itemRefs: refs,
     convertedItemCount: assessment.items.length,
+    assessments: updatedAssessments,
+    importErrors: imported.importErrors,
+    itemsPerAssessment: updatedAssessments.map(a => ({ assessmentId: a.id, items: a.items })),
   };
 }
 
@@ -517,22 +703,20 @@ export async function importQtiPackage(
       !p.includes('.DS_Store') &&
       !zip.files[p].dir,
   );
+  const packageRootDir = detectPackageRootDir(zipFilePaths);
   const normalizedToZipKey = new Map<string, string>();
   for (const zipKey of zipFilePaths) {
-    normalizedToZipKey.set(normalizeZipPath(zipKey), zipKey);
+    normalizedToZipKey.set(rebaseToPackageRoot(zipKey, packageRootDir), zipKey);
   }
 
   const xmlContentsByPath = new Map<string, string>();
-  for (const relativePath of zipFilePaths) {
-    const normalizedPath = normalizeZipPath(relativePath);
-    const entry = zip.files[relativePath];
+  for (const zipKey of zipFilePaths) {
+    const normalizedPath = rebaseToPackageRoot(zipKey, packageRootDir);
+    const entry = zip.files[zipKey];
     const ext = normalizedPath.split('.').pop()?.toLowerCase() || '';
     if (ext === 'xml') {
       const rawText = await entry.async('string');
-      const text = rawText.replace(/<[^>]+>/g, (tag) =>
-        tag.replace(/("[^"]*"|'[^']*')|(\s)([\w:-]+)(?!\s*=)(?=[\s/>])/g,
-          (m, quoted, space, attr) => quoted !== undefined ? m : `${space}${attr}=""`),
-      );
+      const text = repairBareAttributesInXml(rawText);
       xmlContentsByPath.set(normalizedPath, text);
       await putTextFileInPackageCache(packageId, normalizedPath, text);
     } else {
@@ -550,15 +734,8 @@ export async function importQtiPackage(
       normalizedToZipKey.has(rootJs) || normalizedToZipKey.has(rootJson);
     if (hasRoot) return;
 
-    const candidates = Array.from(normalizedToZipKey.keys()).filter(
-      (p) =>
-        p.endsWith(`/modules/${filename}.js`) ||
-        p.endsWith(`/modules/${filename}.json`),
-    );
-    if (candidates.length === 0) return;
-    if (candidates.length !== 1) return;
-
-    const pick = candidates[0];
+    const pick = pickAliasedModuleResolutionPath(Array.from(normalizedToZipKey.keys()), filename);
+    if (!pick) return;
     const zipKey = normalizedToZipKey.get(pick);
     if (!zipKey) return;
     try {
@@ -652,7 +829,9 @@ export async function importQtiPackage(
     const originalContent = xmlContentsByPath.get(relativePath);
     if (!originalContent) continue;
 
-    let qti3Xml = await convertQti2toQti3(originalContent, xsltJsonUrl);
+    let qti3Xml = isQti3Xml(originalContent)
+      ? originalContent
+      : await convertQti2toQti3(originalContent, xsltJsonUrl);
     const folderPath =
       relativePath.substring(0, relativePath.lastIndexOf('/') + 1) || '';
 
@@ -691,7 +870,9 @@ export async function importQtiPackage(
 
   if (testFilePath && testIdentifier) {
     const originalContent = xmlContentsByPath.get(testFilePath) || '';
-    const qti3Xml = await convertQti2toQti3(originalContent, xsltJsonUrl);
+    const qti3Xml = isQti3Xml(originalContent)
+      ? originalContent
+      : await convertQti2toQti3(originalContent, xsltJsonUrl);
     const testBaseRef = `${QTI_PKG_URL_PREFIX}/${encodeURIComponent(packageId)}/`;
     let transformResult = qtiTransform(qti3Xml)
       .objectToImg()

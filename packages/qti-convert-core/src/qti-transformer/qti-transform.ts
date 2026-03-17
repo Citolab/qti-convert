@@ -23,8 +23,8 @@ import {
   stylesheetsInline
 } from './transformers';
 import { customInteraction } from './transformers/custom-interaction';
-import { ModuleResolutionConfig } from './transformers/configure-pci';
-export { type ModuleResolutionConfig } from './transformers/configure-pci';
+import { ModuleResolutionConfig, ConfigurePciOptions } from './transformers/configure-pci';
+export { type ModuleResolutionConfig, type ConfigurePciOptions } from './transformers/configure-pci';
 import type { StylesheetsInlineOptions } from './transformers/stylesheets-inline';
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
@@ -50,7 +50,8 @@ interface QtiTransformAPI {
   ): Promise<QtiTransformAPI>;
   configurePciAsync(
     baseUrl: string,
-    getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
+    getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>,
+    options?: ConfigurePciOptions
   ): Promise<QtiTransformAPI>;
   upgradePci(): QtiTransformAPI;
   stylesheetsInline(
@@ -157,9 +158,10 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
     },
     async configurePciAsync(
       baseUrl: string,
-      getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>
+      getModuleResolutionConfig: (url: string) => Promise<ModuleResolutionConfig>,
+      options?: ConfigurePciOptions
     ) {
-      await configurePciAsync($, baseUrl, getModuleResolutionConfig);
+      await configurePciAsync($, baseUrl, getModuleResolutionConfig, options);
       return api;
     },
     upgradePci() {

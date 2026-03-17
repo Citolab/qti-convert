@@ -18,7 +18,8 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --target es2022 --dts --outDir dist",
-    "build:yalc": "npm run build && yalc publish --push"
+    "build:yalc": "npm run build && yalc publish --push",
+    "test": "vitest run src/*.test.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
@@ -32,6 +33,7 @@
     "@citolab/qti-convert": "^0.3.52",
     "@citolab/qti-convert-tao-pci": "^0.1.0",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

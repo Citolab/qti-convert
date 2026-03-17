@@ -11,6 +11,7 @@ interface StoryArgs {
 
 const meta: Meta<StoryArgs> = {
   title: 'TAO PCI/Converted ZIP Preview',
+  tags: ['test'],
   parameters: {
     layout: 'fullscreen',
     docs: {

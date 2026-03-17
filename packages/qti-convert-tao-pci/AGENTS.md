@@ -60,6 +60,16 @@ Only proceed if **all** of the following are true:
 
 **Always ask for user confirmation before making any changes to `qti-portable-custom-interaction` in `qti-components`.** Describe exactly what you intend to change and why conversion alone cannot solve it.
 
+## Storybook and test rules
+
+- End-to-end TAO PCI render checks belong in this package's Storybook stories, not in low-level unit tests.
+- Prefer adding or extending `play` assertions in `src/stories/TaoPciConversion.stories.ts` when fixing runtime regressions that only show up in a browser.
+- Keep Storybook CI-safe:
+  - do not depend on machine-local absolute paths
+  - prefer package-local `node_modules/@citolab/qti-components/{cdn,dist}` assets
+  - keep `prepare-storybook-assets.mjs` tolerant of missing local override files
+- Unit tests in `src/index.test.ts` should cover conversion output shape; Storybook tests should cover actual rendered PCI behavior.
+
 ## File map
 
 | File | Purpose |
