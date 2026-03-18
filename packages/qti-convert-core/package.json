@@ -46,7 +46,7 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest",
+    "test": "vitest run",
     "lint": "eslint \"src/**/*.ts\""
   },
   "dependencies": {

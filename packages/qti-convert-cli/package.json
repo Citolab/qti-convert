@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "@citolab/qti-convert": "^0.4.0",
