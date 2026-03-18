@@ -90,10 +90,6 @@ async function configurePCI(
     for (const interaction of portableCustomInteractions) {
       // set data-base-url
       $(interaction).attr('data-base-url', baseUrl);
-      // always enable iframe isolation
-      if (!$(interaction).attr('data-use-iframe')) {
-        $(interaction).attr('data-use-iframe', '');
-      }
 
       let customInteractionTypeIdentifier = $(interaction).attr('custom-interaction-type-identifier');
       if (customInteractionTypeIdentifiers.includes(customInteractionTypeIdentifier)) {
