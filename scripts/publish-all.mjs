@@ -32,7 +32,7 @@ const internalPackageNames = new Set(packages.map(pkg => pkg.name));
 const packageByName = new Map(packages.map(pkg => [pkg.name, pkg]));
 
 function printUsage() {
-  console.error('Usage: npm run publish:all -- <version> [--dry-run] [--skip-tests] [--skip-build] [--allow-dirty]');
+  console.error('Usage: npm run publish:all -- <version> [--dry-run] [--skip-tests] [--skip-build] [--allow-dirty] [--skip-github-release]');
 }
 
 function isValidVersion(version) {
@@ -57,6 +57,14 @@ function runCapture(command, args, options = {}) {
     encoding: 'utf8',
     ...options
   });
+}
+
+function ensureCommandAvailable(command) {
+  const result = runCapture(command, ['--version']);
+  if (result.status !== 0) {
+    console.error(`Required command is not available: ${command}`);
+    process.exit(result.status ?? 1);
+  }
 }
 
 function updateDependencyBlock(deps, version) {
@@ -105,12 +113,70 @@ function ensureGitIsClean() {
   }
 }
 
+function ensureTagDoesNotExist(tagName) {
+  const localTag = runCapture('git', ['rev-parse', '--verify', '--quiet', `refs/tags/${tagName}`]);
+  if (localTag.status === 0) {
+    console.error(`Git tag already exists locally: ${tagName}`);
+    process.exit(1);
+  }
+
+  const remoteTag = runCapture('git', ['ls-remote', '--tags', 'origin', tagName]);
+  if (remoteTag.status !== 0) {
+    process.exit(remoteTag.status ?? 1);
+  }
+  if (remoteTag.stdout.trim()) {
+    console.error(`Git tag already exists on origin: ${tagName}`);
+    process.exit(1);
+  }
+}
+
+function stageReleaseFiles(files) {
+  const existingFiles = files.filter(file => existsSync(resolve(repoRoot, file)));
+  if (existingFiles.length > 0) {
+    run('git', ['add', ...existingFiles]);
+  }
+}
+
+function hasStagedChanges() {
+  const result = runCapture('git', ['diff', '--cached', '--quiet']);
+  return result.status === 1;
+}
+
+function createReleaseCommit(version) {
+  if (!hasStagedChanges()) {
+    console.log('No release files changed; using current HEAD for tag/release.');
+    return;
+  }
+
+  run('git', ['commit', '-m', `Release v${version}`]);
+}
+
+function createGitHubRelease(version, tagName) {
+  ensureCommandAvailable('gh');
+
+  const authStatus = runCapture('gh', ['auth', 'status']);
+  if (authStatus.status !== 0) {
+    console.error('GitHub CLI is not authenticated. Run `gh auth login` or provide GH_TOKEN/GITHUB_TOKEN.');
+    process.exit(authStatus.status ?? 1);
+  }
+
+  const existingRelease = runCapture('gh', ['release', 'view', tagName]);
+  if (existingRelease.status === 0) {
+    console.log(`GitHub Release already exists for ${tagName}; skipping creation.`);
+    return;
+  }
+
+  run('gh', ['release', 'create', tagName, '--title', `v${version}`, '--generate-notes']);
+}
+
 const args = process.argv.slice(2);
 const version = args.find(arg => !arg.startsWith('--'));
 const dryRun = args.includes('--dry-run');
 const skipTests = args.includes('--skip-tests');
 const skipBuild = args.includes('--skip-build');
 const allowDirty = args.includes('--allow-dirty');
+const skipGitHubRelease = args.includes('--skip-github-release');
+const tagName = `v${version}`;
 
 if (!version || !isValidVersion(version)) {
   printUsage();
@@ -119,6 +185,10 @@ if (!version || !isValidVersion(version)) {
 
 if (!allowDirty) {
   ensureGitIsClean();
+}
+
+if (!dryRun && !skipGitHubRelease) {
+  ensureTagDoesNotExist(tagName);
 }
 
 for (const pkg of packages) {
@@ -160,4 +230,21 @@ for (const pkg of packages) {
 
   console.log(`Publishing ${pkg.name}@${version}`);
   run('npm', publishArgs);
+}
+
+if (!dryRun && !skipGitHubRelease) {
+  const releaseFiles = [
+    'package-lock.json',
+    ...packages.map(pkg => `${pkg.dir}/package.json`),
+    ...packages
+      .map(pkg => `${pkg.dir}/package-lock.json`)
+      .filter(file => existsSync(resolve(repoRoot, file)))
+  ];
+
+  stageReleaseFiles(releaseFiles);
+  createReleaseCommit(version);
+  run('git', ['tag', tagName]);
+  run('git', ['push', 'origin', 'HEAD']);
+  run('git', ['push', 'origin', tagName]);
+  createGitHubRelease(version, tagName);
 }
