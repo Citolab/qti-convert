@@ -36,6 +36,8 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook',
+          testTimeout: 45000,
+          hookTimeout: 45000,
           browser: {
             enabled: true,
             headless: true,

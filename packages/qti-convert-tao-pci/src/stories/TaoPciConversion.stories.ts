@@ -190,7 +190,7 @@ export const ConvertAndRenderTaoPci: Story = {
     docs: {
       description: {
         story:
-          'Defaults to `/external-pci/PCI.zip` (served from `/Users/marcelhoekstra/Downloads`) and local qti-components (`/local-qti-components-cdn/index.js`, `/local-qti-components-dist/item.css`). `.storybook/main.ts` auto-maps `/Users/marcelhoekstra/repos/qti-components/{cdn,dist}`; override with `QTI_COMPONENTS_CDN_DIR` and `QTI_COMPONENTS_DIST_DIR` if needed.'
+          'Defaults to the repository fixture `/external-pci/PCI.zip` from `storybook-assets` and local qti-components (`/local-qti-components-cdn/index.js`, `/local-qti-components-dist/item.css`). `.storybook/main.ts` auto-maps the installed `@citolab/qti-components` package; override with `QTI_COMPONENTS_CDN_DIR` and `QTI_COMPONENTS_DIST_DIR` if needed.'
       }
     }
   }
