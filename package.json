@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:core": "npm run build --workspace=@citolab/qti-convert",
-    "build:cli": "npm run build --workspace=@citolab/qti-convert-cli", 
+    "build:cli": "npm run build --workspace=@citolab/qti-convert-cli",
     "build:tao-pci": "npm run build --workspace=@citolab/qti-convert-tao-pci",
     "test": "npm run test --workspaces --if-present",
     "test:core": "npm run test --workspace=@citolab/qti-convert",
@@ -30,6 +30,8 @@
     "deploy": "firebase deploy --only hosting:qti-components",
     "list-outdated-dependencies": "npx npm-check-updates --format repo --peer",
     "update-dependencies": "npx npm-check-updates --peer -u && npm install",
+    "publish:all": "node scripts/publish-all.mjs",
+    "publish:all:dry-run": "node scripts/publish-all.mjs --dry-run --allow-dirty",
     "yalc:push:tao-pci": "cd packages/qti-convert-tao-pci && yalc publish --push"
   },
   "devDependencies": {
@@ -48,7 +50,6 @@
     "eslint-plugin-sort-imports-es6-autofix": "^0.6.0",
     "jest-environment-jsdom": "^30.3.0",
     "nodemon": "^3.1.14",
-    "np": "^11.0.2",
     "path-browserify": "^1.0.1",
     "prettier": "3.8.1",
     "qti30upgrader": "github:Citolab/qti30Upgrader",
