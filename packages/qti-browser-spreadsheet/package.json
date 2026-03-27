@@ -1,0 +1,34 @@
+{
+  "name": "@citolab/qti-browser-spreadsheet",
+  "version": "0.4.0",
+  "description": "Browser-side spreadsheet to QTI package conversion helpers",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Citolab/qti-convert",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --target es2022 --dts --outDir dist",
+    "test": "vitest run src/*.test.ts"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.82",
+    "jszip": "^3.10.1",
+    "papaparse": "^5.5.3",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
