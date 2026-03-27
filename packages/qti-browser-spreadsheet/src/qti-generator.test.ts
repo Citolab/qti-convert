@@ -324,4 +324,37 @@ item-1,choice_box_2,Response Option,Rule by citizens,,B`,
     expect(item).toContain('<qti-extended-text-interaction');
     expect(item).toContain('expected-length="200"');
   });
+
+  test('writes stimulus images into the qti package and item xml', async () => {
+    const result = await generateQtiPackageFromQuestions(
+      [
+        {
+          type: 'multiple_choice',
+          prompt: 'What do you see?',
+          stimulusImages: [
+            {
+              fileName: 'image1.png',
+              mimeType: 'image/png',
+              data: new Uint8Array([137, 80, 78, 71])
+            }
+          ],
+          options: [
+            { id: 'A', text: 'A cat' },
+            { id: 'B', text: 'A dog' }
+          ]
+        }
+      ],
+      {
+        packageIdentifier: 'image-demo'
+      }
+    );
+
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const item = await zip.file('items/item-001.xml')?.async('string');
+    const image = await zip.file('assets/image1.png')?.async('uint8array');
+
+    expect(item).toContain('<img src="../assets/image1.png"');
+    expect(image).toBeDefined();
+    expect(Array.from(image || [])).toEqual([137, 80, 78, 71]);
+  });
 });

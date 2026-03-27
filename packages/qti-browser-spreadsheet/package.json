@@ -24,6 +24,7 @@
     "@mlc-ai/web-llm": "^0.2.82",
     "jszip": "^3.10.1",
     "papaparse": "^5.5.3",
+    "pdfjs-dist": "^4.10.38",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

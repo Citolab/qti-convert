@@ -3,3 +3,5 @@ export * from './spreadsheet-parser';
 export * from './mapping';
 export * from './qti-generator';
 export * from './convert-spreadsheet';
+export * from './docx-parser';
+export * from './pdf-parser';

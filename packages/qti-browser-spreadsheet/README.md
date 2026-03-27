@@ -1,16 +1,24 @@
 # @citolab/qti-browser-spreadsheet
 
-Browser-side helpers for converting CSV and Excel datasets into QTI 3.0 packages.
+Browser-side helpers for converting CSV, Excel, and DOCX datasets into QTI 3.0 packages.
 
 The conversion is best-effort. The package tries to interpret spreadsheet structure conservatively and generate valid QTI output, but it does not guarantee that every CSV or Excel file will be converted correctly or completely without review.
 
-The package supports a hybrid flow:
+The package supports two related flows:
 
 1. Parse CSV with `papaparse` or Excel with `xlsx`
 2. Use a deterministic conversion path for recognized spreadsheet formats
 3. Fall back to a local LLM such as WebLLM for unknown spreadsheet shapes
 4. Generate QTI deterministically with JavaScript
 5. Download the resulting zip in the browser
+
+For DOCX input, the package:
+
+1. Reads `word/document.xml` from the `.docx` zip
+2. Extracts paragraph text conservatively
+3. Tries to detect actual numbered items while skipping likely booklet boilerplate
+4. Normalizes detected items into the same question format used by the spreadsheet pipeline
+5. Generates QTI deterministically
 
 ## Install
 
@@ -23,6 +31,7 @@ npm install @citolab/qti-browser-spreadsheet
 ```ts
 import {
   convertSpreadsheetToQtiPackage,
+  convertDocxToQtiPackage,
   DEFAULT_WEB_LLM_MODEL,
   createWebLlmQuestionInferer
 } from '@citolab/qti-browser-spreadsheet';
@@ -39,6 +48,11 @@ const result = await convertSpreadsheetToQtiPackage(file, inferQuestions, {
 
 const blob = result.packageBlob;
 console.log(result.summary);
+
+const docxResult = await convertDocxToQtiPackage(docxFile, {
+  packageIdentifier: 'docx-package',
+  testTitle: 'Imported DOCX Test'
+});
 ```
 
 If you do not pass a custom inference function, `convertSpreadsheetToQtiPackage(...)` now creates a WebLLM engine itself and uses a default model:
@@ -51,7 +65,7 @@ const result = await convertSpreadsheetToQtiPackage(file, {
 });
 ```
 
-Current default: `Llama-3.2-1B-Instruct-q4f32_1-MLC`
+Current default: `Qwen2.5-7B-Instruct-q4f16_1-MLC`
 
 You can override the model or supply your own engine factory:
 
@@ -73,6 +87,15 @@ These formats bypass the LLM entirely:
 - row-oriented exports with columns such as `SE_ItemLabel`, `element_type`, `Element_type_displayLabel`, `Element_Text_Plain`, and `Element_Text_HTML`
 
 The row-oriented Excel path groups rows by item label, extracts prompt, stimulus, options, and correct answer conservatively, and is intended for the export format used by the existing Python importer.
+
+DOCX extraction also bypasses the LLM. It uses conservative heuristics to:
+
+- identify numbered items such as `1.`, `1)` or `Question 1`
+- collect answer options such as `A.`, `B.`, `C.`
+- treat preceding non-boilerplate paragraphs as candidate stimulus text
+- ignore likely booklet metadata and instructions where possible
+
+DOCX support is intentionally conservative and should be treated as best-effort.
 
 ## LLM output contract
 
@@ -123,6 +146,15 @@ The `summary` contains:
 - `skippedItems`
 - `warnings`
 - `errors`
+
+`convertDocxToQtiPackage(...)` returns:
+
+- `document`
+- `preview`
+- `questions`
+- `packageBlob`
+- `packageName`
+- `summary`
 
 Progress events include:
 

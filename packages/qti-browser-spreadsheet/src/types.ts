@@ -26,11 +26,20 @@ export type StructuredOption = {
   isCorrectAnswer?: boolean;
 };
 
+export type StructuredMediaAsset = {
+  id?: string;
+  fileName: string;
+  mimeType: string;
+  data: Uint8Array;
+  altText?: string;
+};
+
 export type StructuredQuestion = {
   type?: 'multiple_choice' | 'extended_text';
   identifier?: string;
   title?: string;
   stimulus?: string;
+  stimulusImages?: StructuredMediaAsset[];
   prompt: string;
   options?: StructuredOption[];
   correctResponse?: string;

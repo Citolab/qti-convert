@@ -4,6 +4,7 @@ import {
   ConversionSummary,
   GenerateQtiPackageOptions,
   QuestionLayout,
+  StructuredMediaAsset,
   StructuredOption,
   StructuredQuestion
 } from './types';
@@ -14,6 +15,7 @@ type NormalizedItem = {
   title: string;
   type: 'multiple_choice' | 'extended_text';
   stimulus: string;
+  stimulusImages: Array<StructuredMediaAsset & { id: string }>;
   prompt: string;
   expectedLength: number;
   layout: Exclude<QuestionLayout, 'auto'>;
@@ -125,6 +127,10 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
   const title = (question.title || prompt).trim();
   const layout = shouldUseTwoColumnLayout(stimulus, question.layout) ? 'two_column' : 'single_column';
   const maxScore = Number.isFinite(question.points) ? Number(question.points) : (options.pointsDefault ?? 1);
+  const stimulusImages = (question.stimulusImages || []).map((asset, assetIndex) => ({
+    ...asset,
+    id: sanitizeIdentifier(asset.id || `${identifier}-image-${assetIndex + 1}`, `${identifier}-image-${assetIndex + 1}`)
+  }));
 
   if (type === 'extended_text') {
     return {
@@ -134,6 +140,7 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
         title,
         type,
         stimulus,
+        stimulusImages,
         prompt,
         expectedLength: question.expectedLength && question.expectedLength > 0 ? question.expectedLength : 200,
         layout,
@@ -183,6 +190,7 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
       title,
       type,
       stimulus,
+      stimulusImages,
       prompt,
       expectedLength: 200,
       layout,
@@ -207,6 +215,14 @@ const renderXhtmlTextBlock = (text: string, className?: string): string => {
   return `<div xmlns="http://www.w3.org/1999/xhtml"${className ? ` class="${escapeXml(className)}"` : ''}>${paragraphs || `<p>${escapeXml(text)}</p>`}</div>`;
 };
 
+const renderStimulusImages = (item: NormalizedItem): string =>
+  item.stimulusImages
+    .map(
+      image =>
+        `<div xmlns="http://www.w3.org/1999/xhtml" class="qti-item-image"><img src="../assets/${escapeXml(image.fileName)}" alt="${escapeXml(image.altText || '')}"/></div>`
+    )
+    .join('\n');
+
 const renderInteraction = (item: NormalizedItem): string => {
   if (item.type === 'extended_text') {
     return `<qti-extended-text-interaction xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" response-identifier="RESPONSE" expected-length="${item.expectedLength}">
@@ -227,6 +243,7 @@ const renderItemBody = (item: NormalizedItem): string => {
     <div xmlns="http://www.w3.org/1999/xhtml" class="qti-layout-row">
       <div class="qti-layout-col6">
         ${renderXhtmlTextBlock(item.stimulus)}
+        ${renderStimulusImages(item)}
       </div>
       <div class="qti-layout-col6">
         ${item.type === 'extended_text' ? renderXhtmlTextBlock(item.prompt) : ''}
@@ -238,6 +255,7 @@ const renderItemBody = (item: NormalizedItem): string => {
 
   return `<qti-item-body>
     ${item.stimulus ? renderXhtmlTextBlock(item.stimulus, 'qti-item-stimulus') : ''}
+    ${item.stimulusImages.length > 0 ? renderStimulusImages(item) : ''}
     ${item.type === 'multiple_choice' ? renderInteraction(item) : `${renderXhtmlTextBlock(item.prompt)}\n    ${renderInteraction(item)}`}
   </qti-item-body>`;
 };
@@ -272,6 +290,11 @@ const renderAssessmentItem = (item: NormalizedItem): string => `<?xml version="1
   adaptive="false"
   time-dependent="false">
 ${renderResponseDeclaration(item)}
+  <qti-outcome-declaration identifier="MAX_SCORE" cardinality="single" base-type="float">
+    <qti-default-value>
+      <qti-value>${item.maxScore}</qti-value>
+    </qti-default-value>
+  </qti-outcome-declaration>
   <qti-outcome-declaration identifier="SCORE" cardinality="single" base-type="float">
     <qti-default-value>
       <qti-value>0</qti-value>
@@ -320,6 +343,7 @@ ${items
   .map(
     item => `    <resource identifier="${escapeXml(item.identifier)}" type="imsqti_item_xmlv3p0" href="items/${escapeXml(item.identifier)}.xml">
       <file href="items/${escapeXml(item.identifier)}.xml"/>
+${item.stimulusImages.map(image => `      <file href="assets/${escapeXml(image.fileName)}"/>`).join('\n')}
     </resource>`
   )
   .join('\n')}
@@ -369,6 +393,9 @@ export const generateQtiPackageFromQuestions = async (
   });
   for (const [index, item] of items.entries()) {
     zip.file(`items/${item.identifier}.xml`, renderAssessmentItem(item));
+    for (const image of item.stimulusImages) {
+      zip.file(`assets/${image.fileName}`, image.data);
+    }
     options.onProgress?.({
       stage: 'item_generated',
       message: `Generated item ${index + 1} of ${items.length}.`,

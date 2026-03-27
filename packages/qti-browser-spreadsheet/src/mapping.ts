@@ -25,7 +25,7 @@ export type WebLlmLikeEngine = {
   };
 };
 
-export const DEFAULT_WEB_LLM_MODEL = 'Llama-3.2-1B-Instruct-q4f32_1-MLC';
+export const DEFAULT_WEB_LLM_MODEL = 'Qwen2.5-7B-Instruct-q4f16_1-MLC';
 const DEFAULT_CHUNK_SIZE = 5;
 const MAX_CELL_LENGTH = 120;
 const MAX_COLUMNS = 24;
