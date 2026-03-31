@@ -30,6 +30,5 @@
     "paths": {
       "@citolab/qti-components/qti-convert": ["src/lib/qti-converter"]
     }
-  },
-  "include": ["src/**/*.ts", "./jest.config.ts"]
+  }
 }

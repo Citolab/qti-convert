@@ -13,14 +13,15 @@ type NormalizedItem = {
   questionIndex: number;
   identifier: string;
   title: string;
-  type: 'multiple_choice' | 'extended_text';
+  type: 'multiple_choice' | 'extended_text' | 'short_text';
   stimulus: string;
+  generalFeedback: string;
   stimulusImages: Array<StructuredMediaAsset & { id: string }>;
   prompt: string;
   expectedLength: number;
   layout: Exclude<QuestionLayout, 'auto'>;
   maxScore: number;
-  options: Array<Required<Pick<StructuredOption, 'id' | 'text'>> & { isCorrectAnswer: boolean }>;
+  options: Array<Required<Pick<StructuredOption, 'id' | 'text'>> & { isCorrectAnswer: boolean; feedback: string }>;
   correctResponse: string;
   correctIdentifiers: string[];
   selectionMode: 'single' | 'multiple';
@@ -47,6 +48,52 @@ const sanitizeIdentifier = (value: string, fallback: string): string => {
   return sanitized || fallback;
 };
 
+const dedupeAdjacentTextLines = (value: string): string => {
+  const lines = value
+    .split(/\r?\n/)
+    .map(line => line.trimEnd());
+  const deduped: string[] = [];
+  for (const line of lines) {
+    if (deduped.length === 0 || deduped[deduped.length - 1].trim() !== line.trim()) {
+      deduped.push(line);
+    }
+  }
+  return deduped.join('\n').trim();
+};
+
+const ensureUniqueItems = (items: NormalizedItem[]): NormalizedItem[] => {
+  const identifierCounts = new Map<string, number>();
+  const fileNameCounts = new Map<string, number>();
+
+  return items.map(item => {
+    const nextIdentifierCount = (identifierCounts.get(item.identifier) || 0) + 1;
+    identifierCounts.set(item.identifier, nextIdentifierCount);
+    const identifier =
+      nextIdentifierCount === 1 ? item.identifier : `${item.identifier}-${nextIdentifierCount}`;
+
+    const stimulusImages = item.stimulusImages.map(image => {
+      const nextFileCount = (fileNameCounts.get(image.fileName) || 0) + 1;
+      fileNameCounts.set(image.fileName, nextFileCount);
+      if (nextFileCount === 1) {
+        return image;
+      }
+      const dotIndex = image.fileName.lastIndexOf('.');
+      const baseName = dotIndex >= 0 ? image.fileName.slice(0, dotIndex) : image.fileName;
+      const extension = dotIndex >= 0 ? image.fileName.slice(dotIndex) : '';
+      return {
+        ...image,
+        fileName: `${baseName}-${nextFileCount}${extension}`
+      };
+    });
+
+    return {
+      ...item,
+      identifier,
+      stimulusImages
+    };
+  });
+};
+
 const shouldUseTwoColumnLayout = (stimulus: string, layout: QuestionLayout | undefined): boolean => {
   if (!stimulus) {
     return false;
@@ -66,7 +113,8 @@ const normalizeOptions = (options: StructuredOption[] | undefined): NormalizedIt
     .map((option, index) => ({
       id: sanitizeIdentifier(option.id || String.fromCharCode(65 + index), `CHOICE_${index + 1}`),
       text: (option.text || '').trim(),
-      isCorrectAnswer: Boolean(option.isCorrectAnswer)
+      isCorrectAnswer: Boolean(option.isCorrectAnswer),
+      feedback: (option.feedback || '').trim()
     }))
     .filter(option => option.text);
 
@@ -105,7 +153,7 @@ const resolveCorrectIdentifiers = (
 };
 
 const normalizeQuestion = (question: StructuredQuestion, index: number, options: GenerateQtiPackageOptions): NormalizedQuestionResult => {
-  const prompt = (question.prompt || '').trim();
+  const prompt = dedupeAdjacentTextLines((question.prompt || '').trim());
   if (!prompt) {
     return {
       warnings: [],
@@ -120,8 +168,11 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
     };
   }
 
-  const type = question.type === 'extended_text' ? 'extended_text' : 'multiple_choice';
-  const stimulus = (question.stimulus || '').trim();
+  const type =
+    question.type === 'extended_text' ? 'extended_text' : question.type === 'short_text' ? 'short_text' : 'multiple_choice';
+  const rawStimulus = dedupeAdjacentTextLines((question.stimulus || '').trim());
+  const stimulus = rawStimulus === prompt ? '' : rawStimulus;
+  const generalFeedback = dedupeAdjacentTextLines((question.generalFeedback || '').trim());
   const fallbackIdentifier = `item-${padNumber(index + 1)}`;
   const identifier = sanitizeIdentifier(question.identifier || fallbackIdentifier, fallbackIdentifier);
   const title = (question.title || prompt).trim();
@@ -132,7 +183,7 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
     id: sanitizeIdentifier(asset.id || `${identifier}-image-${assetIndex + 1}`, `${identifier}-image-${assetIndex + 1}`)
   }));
 
-  if (type === 'extended_text') {
+  if (type === 'extended_text' || type === 'short_text') {
     return {
       item: {
         questionIndex: index + 1,
@@ -140,15 +191,17 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
         title,
         type,
         stimulus,
+        generalFeedback,
         stimulusImages,
         prompt,
-        expectedLength: question.expectedLength && question.expectedLength > 0 ? question.expectedLength : 200,
+        expectedLength:
+          question.expectedLength && question.expectedLength > 0 ? question.expectedLength : type === 'short_text' ? 64 : 200,
         layout,
         maxScore,
         options: [],
         correctResponse: (question.correctResponse || '').trim(),
         correctIdentifiers: [],
-        selectionMode: 'single'
+        selectionMode: question.selectionMode === 'multiple' ? 'multiple' : 'single'
       },
       warnings: [],
       errors: []
@@ -190,6 +243,7 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
       title,
       type,
       stimulus,
+      generalFeedback,
       stimulusImages,
       prompt,
       expectedLength: 200,
@@ -198,7 +252,14 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
       options: normalizedOptions,
       correctResponse: rawCorrectResponse,
       correctIdentifiers,
-      selectionMode: correctIdentifiers.length > 1 ? 'multiple' : 'single'
+      selectionMode:
+        question.selectionMode === 'multiple'
+          ? 'multiple'
+          : question.selectionMode === 'single'
+            ? 'single'
+            : correctIdentifiers.length > 1
+              ? 'multiple'
+              : 'single'
     },
     warnings,
     errors: []
@@ -229,12 +290,25 @@ const renderInteraction = (item: NormalizedItem): string => {
         </qti-extended-text-interaction>`;
   }
 
-  return `<qti-choice-interaction xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" response-identifier="RESPONSE" max-choices="${item.selectionMode === 'multiple' ? item.correctIdentifiers.length : 1}">
+  if (item.type === 'short_text') {
+    return `<qti-text-entry-interaction xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" response-identifier="RESPONSE" expected-length="${item.expectedLength}"/>`;
+  }
+
+  return `<qti-choice-interaction xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" response-identifier="RESPONSE" max-choices="${item.selectionMode === 'multiple' ? Math.max(item.correctIdentifiers.length, 2) : 1}">
         <qti-prompt>${escapeXml(item.prompt)}</qti-prompt>
 ${item.options
   .map(option => `        <qti-simple-choice identifier="${escapeXml(option.id)}">${escapeXml(option.text)}</qti-simple-choice>`)
   .join('\n')}
       </qti-choice-interaction>`;
+};
+
+const renderFeedbackBlocks = (item: NormalizedItem): string => {
+  const optionFeedback = item.options
+    .filter(option => option.feedback)
+    .map(option => renderXhtmlTextBlock(`${option.text}: ${option.feedback}`, 'qti-item-option-feedback'))
+    .join('\n    ');
+  const generalFeedback = item.generalFeedback ? renderXhtmlTextBlock(item.generalFeedback, 'qti-item-general-feedback') : '';
+  return [optionFeedback, generalFeedback].filter(Boolean).join('\n    ');
 };
 
 const renderItemBody = (item: NormalizedItem): string => {
@@ -246,8 +320,9 @@ const renderItemBody = (item: NormalizedItem): string => {
         ${renderStimulusImages(item)}
       </div>
       <div class="qti-layout-col6">
-        ${item.type === 'extended_text' ? renderXhtmlTextBlock(item.prompt) : ''}
+        ${item.type === 'extended_text' || item.type === 'short_text' ? renderXhtmlTextBlock(item.prompt) : ''}
         ${renderInteraction(item)}
+        ${renderFeedbackBlocks(item)}
       </div>
     </div>
   </qti-item-body>`;
@@ -257,12 +332,24 @@ const renderItemBody = (item: NormalizedItem): string => {
     ${item.stimulus ? renderXhtmlTextBlock(item.stimulus, 'qti-item-stimulus') : ''}
     ${item.stimulusImages.length > 0 ? renderStimulusImages(item) : ''}
     ${item.type === 'multiple_choice' ? renderInteraction(item) : `${renderXhtmlTextBlock(item.prompt)}\n    ${renderInteraction(item)}`}
+    ${renderFeedbackBlocks(item)}
   </qti-item-body>`;
 };
 
 const renderResponseDeclaration = (item: NormalizedItem): string => {
   if (item.type === 'extended_text') {
     return `  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"/>`;
+  }
+
+  if (item.type === 'short_text') {
+    if (!item.correctResponse) {
+      return `  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"/>`;
+    }
+    return `  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string">
+    <qti-correct-response>
+      <qti-value>${escapeXml(item.correctResponse)}</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>`;
   }
 
   if (item.correctIdentifiers.length === 0) {
@@ -277,7 +364,7 @@ ${item.correctIdentifiers.map(identifier => `      <qti-value>${escapeXml(identi
 };
 
 const renderResponseProcessing = (item: NormalizedItem): string =>
-  item.type === 'multiple_choice' && item.correctIdentifiers.length > 0
+  ((item.type === 'multiple_choice' && item.correctIdentifiers.length > 0) || (item.type === 'short_text' && item.correctResponse))
     ? `  <qti-response-processing template="https://purl.imsglobal.org/spec/qti/v3p0/rptemplates/match_correct.xml"/>`
     : '';
 
@@ -355,7 +442,7 @@ export const generateQtiPackageFromQuestions = async (
   options: GenerateQtiPackageOptions = {}
 ): Promise<{ blob: Blob; packageName: string; summary: ConversionSummary }> => {
   const normalizedResults = questions.map((question, index) => normalizeQuestion(question, index, options));
-  const items = normalizedResults.flatMap(result => (result.item ? [result.item] : []));
+  const items = ensureUniqueItems(normalizedResults.flatMap(result => (result.item ? [result.item] : [])));
   const warnings = normalizedResults.flatMap(result => result.warnings);
   const errors = normalizedResults.flatMap(result => result.errors);
 

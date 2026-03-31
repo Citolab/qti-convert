@@ -484,10 +484,11 @@ const extractResponseContent = (
 const requestQuestions = async (
   engine: WebLlmLikeEngine,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  settings: WebLlmSettings = {}
 ): Promise<string> => {
   const response = await engine.chat.completions.create({
-    temperature: 0,
+    temperature: settings.temperature ?? 0,
     messages: [
       {
         role: 'system',
@@ -505,6 +506,13 @@ const requestQuestions = async (
     throw new Error('WebLLM returned an empty question response.');
   }
   return content;
+};
+
+const buildSystemPrompt = (basePrompt: string, settings: WebLlmSettings = {}): string => {
+  const prompt = settings.systemPrompt?.trim() || basePrompt;
+  const instructions = settings.instructions?.trim();
+
+  return instructions ? `${prompt}\n\nAdditional import instructions:\n${instructions}` : prompt;
 };
 
 const chunkRows = (rows: SpreadsheetData['rows'], chunkSize: number): SpreadsheetData['rows'][] => {
@@ -595,8 +603,12 @@ export const createWebLlmQuestionInferer =
       try {
         content = await requestQuestions(
           engine,
-          'You convert spreadsheet rows into normalized question JSON. Respond with strict JSON only. Preserve row order.',
-          createChunkQuestionPrompt(spreadsheet, rowsInChunk, humanChunkIndex, chunks.length)
+          buildSystemPrompt(
+            'You convert spreadsheet rows into normalized question JSON. Respond with strict JSON only. Preserve row order.',
+            settings
+          ),
+          createChunkQuestionPrompt(spreadsheet, rowsInChunk, humanChunkIndex, chunks.length),
+          settings
         );
       } catch (error) {
         if (!isContextWindowError(error)) {
@@ -608,8 +620,9 @@ export const createWebLlmQuestionInferer =
         });
         content = await requestQuestions(
           engine,
-          'Return strict JSON only.',
-          createCompactQuestionPrompt(spreadsheet, rowsInChunk)
+          buildSystemPrompt('Return strict JSON only.', settings),
+          createCompactQuestionPrompt(spreadsheet, rowsInChunk),
+          settings
         );
       }
 
@@ -626,8 +639,12 @@ export const createWebLlmQuestionInferer =
         });
         const retryContent = await requestQuestions(
           engine,
-          'Return valid minified JSON only. Use double-quoted property names, double-quoted string values, no trailing commas, no comments, no markdown fences.',
-          `${createCompactQuestionPrompt(spreadsheet, rowsInChunk)}\n\nYour previous response was invalid JSON. Return valid JSON only.`
+          buildSystemPrompt(
+            'Return valid minified JSON only. Use double-quoted property names, double-quoted string values, no trailing commas, no comments, no markdown fences.',
+            settings
+          ),
+          `${createCompactQuestionPrompt(spreadsheet, rowsInChunk)}\n\nYour previous response was invalid JSON. Return valid JSON only.`,
+          settings
         );
         parsedQuestions = inferQuestionsFromRawResponse(retryContent).questions;
       }

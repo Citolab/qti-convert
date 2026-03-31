@@ -17,10 +17,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build:core && npm run build:browser-import && npm run build:browser-spreadsheet && npm run build:tao-pci && npm run build:cli",
+    "build": "npm run build:core && npm run build:browser-import && npm run build:local-ai && npm run build:tao-pci && npm run build:cli",
     "build:core": "npm run build --workspace=@citolab/qti-convert",
     "build:browser-import": "npm run build --workspace=@citolab/qti-browser-import",
-    "build:browser-spreadsheet": "npm run build --workspace=@citolab/qti-browser-spreadsheet",
+    "build:local-ai": "npm run build --workspace=@citolab/qti-convert-local-ai",
     "build:cli": "npm run build --workspace=@citolab/qti-convert-cli",
     "build:tao-pci": "npm run build --workspace=@citolab/qti-convert-tao-pci",
     "test": "npm run test --workspaces --if-present",

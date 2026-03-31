@@ -1,6 +1,6 @@
-# @citolab/qti-browser-spreadsheet
+# @citolab/qti-convert-local-ai
 
-Browser-side helpers for converting CSV, Excel, and DOCX datasets into QTI 3.0 packages.
+Browser-side helpers for converting CSV, Excel, Brightspace QuestestInterop XML, Moodle quiz XML, and DOCX datasets into QTI 3.0 packages.
 
 The conversion is best-effort. The package tries to interpret spreadsheet structure conservatively and generate valid QTI output, but it does not guarantee that every CSV or Excel file will be converted correctly or completely without review.
 
@@ -20,10 +20,22 @@ For DOCX input, the package:
 4. Normalizes detected items into the same question format used by the spreadsheet pipeline
 5. Generates QTI deterministically
 
+For Brightspace QuestestInterop XML input, the package:
+
+1. Detects the XML format from the `.xml` file name or input content
+2. Extracts item identifiers, labels, question text, response choices, and correct responses
+3. Converts recognized items directly to QTI 3.0 without using the local LLM
+
+For Moodle quiz XML input, the package:
+
+1. Detects the `quiz` XML root
+2. Extracts common `multichoice` questions, choices, and correct answers
+3. Converts recognized items directly to QTI 3.0 without using the local LLM
+
 ## Install
 
 ```sh
-npm install @citolab/qti-browser-spreadsheet
+npm install @citolab/qti-convert-local-ai
 ```
 
 ## Example
@@ -34,7 +46,7 @@ import {
   convertDocxToQtiPackage,
   DEFAULT_WEB_LLM_MODEL,
   createWebLlmQuestionInferer
-} from '@citolab/qti-browser-spreadsheet';
+} from '@citolab/qti-convert-local-ai';
 
 const inferQuestions = createWebLlmQuestionInferer(engine);
 
@@ -96,6 +108,15 @@ DOCX extraction also bypasses the LLM. It uses conservative heuristics to:
 - ignore likely booklet metadata and instructions where possible
 
 DOCX support is intentionally conservative and should be treated as best-effort.
+
+Brightspace QuestestInterop XML conversion also bypasses the LLM and currently targets these common structures:
+
+- single-correct multiple choice
+- multiple-select multiple choice
+- short text / fill-in with an exact correct response
+- essay / open response
+
+Moodle quiz XML conversion also bypasses the LLM and currently targets the common `multichoice` export structure.
 
 ## LLM output contract
 

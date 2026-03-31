@@ -1,6 +1,6 @@
 export type SpreadsheetRow = Record<string, string>;
 
-export type SpreadsheetFormat = 'csv' | 'xlsx';
+export type SpreadsheetFormat = 'csv' | 'xlsx' | 'xml';
 
 export type SpreadsheetData = {
   columns: string[];
@@ -24,6 +24,7 @@ export type StructuredOption = {
   id?: string;
   text: string;
   isCorrectAnswer?: boolean;
+  feedback?: string;
 };
 
 export type StructuredMediaAsset = {
@@ -35,10 +36,11 @@ export type StructuredMediaAsset = {
 };
 
 export type StructuredQuestion = {
-  type?: 'multiple_choice' | 'extended_text';
+  type?: 'multiple_choice' | 'extended_text' | 'short_text';
   identifier?: string;
   title?: string;
   stimulus?: string;
+  generalFeedback?: string;
   stimulusImages?: StructuredMediaAsset[];
   prompt: string;
   options?: StructuredOption[];
@@ -46,6 +48,7 @@ export type StructuredQuestion = {
   expectedLength?: number;
   layout?: QuestionLayout;
   points?: number;
+  selectionMode?: 'single' | 'multiple';
 };
 
 export type ConversionIssue = {
@@ -117,6 +120,7 @@ export type WebLlmSettings = {
   chunkSize?: number;
   temperature?: number;
   systemPrompt?: string;
+  instructions?: string;
   engine?: unknown;
   createEngine?: (settings: WebLlmSettings) => Promise<unknown>;
   initProgressCallback?: (progress: unknown) => void;

@@ -32,6 +32,17 @@ const ANSWER_COLUMN_CANDIDATES = [
   'is_correct',
   'IsCorrect'
 ];
+const QUESTESTINTEROP_REQUIRED_COLUMNS = [
+  'identifier',
+  'title',
+  'prompt',
+  'generalFeedback',
+  'questionType',
+  'selectionMode',
+  'correctResponse',
+  'optionsJson',
+  'expectedLength'
+] as const;
 
 const decodeHtmlEntities = (value: string): string =>
   value
@@ -218,7 +229,71 @@ const inferRowExportQuestions = (spreadsheet: SpreadsheetData): StructuredQuesti
   return questions.length > 0 ? questions : null;
 };
 
+const inferQuestestInteropQuestions = (spreadsheet: SpreadsheetData): StructuredQuestion[] | null => {
+  if (spreadsheet.format !== 'xml') {
+    return null;
+  }
+
+  const hasRequiredColumns = QUESTESTINTEROP_REQUIRED_COLUMNS.every(column => spreadsheet.columns.includes(column));
+  if (!hasRequiredColumns) {
+    return null;
+  }
+
+  const questions = spreadsheet.rows
+    .map<StructuredQuestion | null>(row => {
+      const prompt = (row.prompt || '').trim();
+      if (!prompt) {
+        return null;
+      }
+
+      let options: Array<{ id: string; text: string; feedback?: string }> = [];
+      const rawOptions = (row.optionsJson || '').trim();
+      if (rawOptions) {
+        try {
+          const parsed = JSON.parse(rawOptions);
+          if (Array.isArray(parsed)) {
+            options = parsed
+              .map(option => ({
+                id: String(option?.id || '').trim(),
+                text: String(option?.text || '').trim(),
+                feedback: String(option?.feedback || '').trim() || undefined
+              }))
+              .filter(option => option.id && option.text);
+          }
+        } catch {
+          options = [];
+        }
+      }
+
+      return {
+        type:
+          row.questionType === 'short_text'
+            ? 'short_text'
+            : row.questionType === 'extended_text'
+              ? 'extended_text'
+              : 'multiple_choice',
+        identifier: (row.identifier || '').trim() || undefined,
+        title: (row.title || '').trim() || undefined,
+        prompt,
+        generalFeedback: (row.generalFeedback || '').trim() || undefined,
+        options: options.length > 0 ? options : undefined,
+        correctResponse: (row.correctResponse || '').trim() || undefined,
+        expectedLength: Number.parseInt((row.expectedLength || '').trim(), 10) || undefined,
+        selectionMode: (row.selectionMode || '').trim() === 'multiple' ? 'multiple' : 'single',
+        layout: 'single_column' as const
+      };
+    })
+    .filter((question): question is StructuredQuestion => question !== null);
+
+  return questions.length > 0 ? questions : null;
+};
+
 const inferQuestionsDeterministically = (spreadsheet: SpreadsheetData): StructuredQuestion[] | null => {
+  const questestInteropQuestions = inferQuestestInteropQuestions(spreadsheet);
+  if (questestInteropQuestions) {
+    return questestInteropQuestions;
+  }
+
   const rowExportQuestions = inferRowExportQuestions(spreadsheet);
   if (rowExportQuestions) {
     return rowExportQuestions;

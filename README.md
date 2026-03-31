@@ -7,7 +7,7 @@ Published packages:
 - `@citolab/qti-convert`: core conversion and transformation APIs
 - `@citolab/qti-convert-cli`: command line tools
 - `@citolab/qti-browser-import`: browser-side QTI package import and cache URL rewriting
-- `@citolab/qti-browser-spreadsheet`: browser-side CSV/XLSX to QTI package conversion helpers
+- `@citolab/qti-convert-local-ai`: browser-side CSV/XLSX to QTI package conversion helpers
 - `@citolab/qti-convert-tao-pci`: TAO PCI conversion helpers
 
 ## Install
@@ -18,7 +18,7 @@ Install the package you need:
 npm install @citolab/qti-convert
 npm install @citolab/qti-convert-cli
 npm install @citolab/qti-browser-import
-npm install @citolab/qti-browser-spreadsheet
+npm install @citolab/qti-convert-local-ai
 npm install @citolab/qti-convert-tao-pci
 ```
 
@@ -144,7 +144,7 @@ getAllResourcesRecursively(allResources, 'path/to/qti-folder');
 
 ## Browser Spreadsheet Import
 
-`@citolab/qti-browser-spreadsheet` provides browser-side CSV/XLSX parsing, LLM mapping helpers, and deterministic QTI 3.0 package generation.
+`@citolab/qti-convert-local-ai` provides browser-side CSV/XLSX parsing, LLM mapping helpers, and deterministic QTI 3.0 package generation.
 
 ## TAO PCI
 

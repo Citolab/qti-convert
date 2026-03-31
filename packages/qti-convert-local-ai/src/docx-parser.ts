@@ -49,7 +49,7 @@ const DOCX_IMAGE_MIME_TYPES: Record<string, string> = {
 };
 
 const logDocxDebug = (label: string, data: unknown): void => {
-  console.log(`[qti-browser-spreadsheet][docx] ${label}`, data);
+  console.log(`[qti-convert-local-ai][docx] ${label}`, data);
 };
 
 const decodeXmlEntities = (value: string): string =>
@@ -112,10 +112,11 @@ const extractResponseContent = (rawContent: string | Array<{ text?: string }> | 
 const requestLlmJson = async (
   engine: WebLlmLikeEngine,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  options: GenerateQtiPackageOptions = {}
 ): Promise<string> => {
   const response = await engine.chat.completions.create({
-    temperature: 0,
+    temperature: options.llmSettings?.temperature ?? 0,
     messages: [
       {
         role: 'system',
@@ -133,6 +134,13 @@ const requestLlmJson = async (
     throw new Error('WebLLM returned an empty DOCX response.');
   }
   return content;
+};
+
+const buildDocxSystemPrompt = (basePrompt: string, options: GenerateQtiPackageOptions = {}): string => {
+  const prompt = options.llmSettings?.systemPrompt?.trim() || basePrompt;
+  const instructions = options.llmSettings?.instructions?.trim();
+
+  return instructions ? `${prompt}\n\nAdditional import instructions:\n${instructions}` : prompt;
 };
 
 const paragraphXmlToText = (paragraphXml: string): string => {
@@ -563,7 +571,8 @@ const buildDocxNormalizationPrompt = (blocks: string[]): string =>
 const segmentDocxParagraphsWithLlm = async (
   engine: WebLlmLikeEngine,
   paragraphs: string[],
-  onProgress?: GenerateQtiPackageOptions['onProgress']
+  onProgress?: GenerateQtiPackageOptions['onProgress'],
+  options: GenerateQtiPackageOptions = {}
 ): Promise<number[][]> => {
   const segmentedItems: number[][] = [];
   let startIndex = 0;
@@ -583,8 +592,9 @@ const segmentDocxParagraphsWithLlm = async (
 
     const rawResponse = await requestLlmJson(
       engine,
-      'You segment DOCX document blocks into assessment items. Return strict JSON only.',
-      buildDocxSegmentationPrompt(chunk)
+      buildDocxSystemPrompt('You segment DOCX document blocks into assessment items. Return strict JSON only.', options),
+      buildDocxSegmentationPrompt(chunk),
+      options
     );
     const parsed = parseDocxJson(rawResponse);
     const chunkItems = normalizeSegmentation(parsed, startIndex, endIndex);
@@ -627,7 +637,8 @@ const normalizeDocxItemsWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: DocxBlock[],
   itemBlockIndexes: number[][],
-  onProgress?: GenerateQtiPackageOptions['onProgress']
+  onProgress?: GenerateQtiPackageOptions['onProgress'],
+  options: GenerateQtiPackageOptions = {}
 ): Promise<StructuredQuestion[]> => {
   const groupedBlockIndexes = assignImageBlocksToSegmentedItems(blocks, itemBlockIndexes);
   logDocxDebug(
@@ -654,8 +665,12 @@ const normalizeDocxItemsWithLlm = async (
     const blockTexts = itemBlocks.map(block => (block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`));
     const rawResponse = await requestLlmJson(
       engine,
-      'You convert DOCX item blocks into structured assessment question JSON. Return strict JSON only.',
-      buildDocxNormalizationPrompt(blockTexts)
+      buildDocxSystemPrompt(
+        'You convert DOCX item blocks into structured assessment question JSON. Return strict JSON only.',
+        options
+      ),
+      buildDocxNormalizationPrompt(blockTexts),
+      options
     );
     logDocxDebug('DOCX item normalization raw response', {
       itemIndex: index,
@@ -667,7 +682,7 @@ const normalizeDocxItemsWithLlm = async (
     try {
       normalized = inferQuestionsFromRawResponse(rawResponse).questions;
     } catch (error) {
-      console.warn('[qti-browser-spreadsheet][docx] Failed to normalize DOCX item response.', {
+      console.warn('[qti-convert-local-ai][docx] Failed to normalize DOCX item response.', {
         itemIndex: index,
         blockIndexes,
         blockTexts,
@@ -1216,9 +1231,9 @@ export const convertDocxToQtiPackage = async (
       options.onProgress?.(event);
     });
     const blockTexts = document.blocks.map(block => (block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`));
-    const segmentedItems = await segmentDocxParagraphsWithLlm(engine, blockTexts, options.onProgress);
+    const segmentedItems = await segmentDocxParagraphsWithLlm(engine, blockTexts, options.onProgress, options);
     logDocxDebug('Raw DOCX segmentation indexes from LLM', segmentedItems);
-    questions = await normalizeDocxItemsWithLlm(engine, document.blocks, segmentedItems, options.onProgress);
+    questions = await normalizeDocxItemsWithLlm(engine, document.blocks, segmentedItems, options.onProgress, options);
   } catch (error) {
     console.warn('DOCX LLM parsing failed. Falling back to heuristic extraction.', {
       error,
