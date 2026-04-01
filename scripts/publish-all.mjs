@@ -19,6 +19,10 @@ const packages = [
     dir: 'packages/qti-browser-import'
   },
   {
+    name: '@citolab/qti-convert-local-ai',
+    dir: 'packages/qti-convert-local-ai'
+  },
+  {
     name: '@citolab/qti-convert-tao-pci',
     dir: 'packages/qti-convert-tao-pci'
   },
