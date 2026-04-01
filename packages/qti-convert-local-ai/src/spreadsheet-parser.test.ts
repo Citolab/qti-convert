@@ -19,6 +19,24 @@ Capital of France?,Paris,Berlin,A,2
     });
   });
 
+  test('parses csv files when papaparse is resolved through default export interop', async () => {
+    const file = new File(
+      [`Question,Answer A,Answer B,Correct\nLargest mammal?,Elephant,Blue whale,B`],
+      'questions.csv',
+      { type: 'text/csv' }
+    );
+
+    const spreadsheet = await parseSpreadsheet(file);
+
+    expect(spreadsheet.format).toBe('csv');
+    expect(spreadsheet.rows[0]).toEqual({
+      Question: 'Largest mammal?',
+      'Answer A': 'Elephant',
+      'Answer B': 'Blue whale',
+      Correct: 'B'
+    });
+  });
+
   test('parses xlsx buffers and preserves the selected sheet name', async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Questions');

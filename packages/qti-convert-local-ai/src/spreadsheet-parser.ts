@@ -1,4 +1,4 @@
-import * as Papa from 'papaparse';
+import Papa from 'papaparse';
 import { Buffer as BrowserBuffer } from 'buffer';
 import ExcelJS from 'exceljs';
 import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from './types';
