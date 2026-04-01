@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.82",
+    "buffer": "^6.0.3",
     "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
     "papaparse": "^5.5.3",

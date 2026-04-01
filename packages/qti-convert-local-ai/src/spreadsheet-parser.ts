@@ -1,4 +1,5 @@
 import * as Papa from 'papaparse';
+import { Buffer as BrowserBuffer } from 'buffer';
 import ExcelJS from 'exceljs';
 import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from './types';
 
@@ -135,10 +136,29 @@ const parseCsv = (csvText: string): SpreadsheetData => {
   };
 };
 
+const ensureBufferCompatibility = (): void => {
+  if (typeof globalThis.Buffer === 'undefined') {
+    Object.defineProperty(globalThis, 'Buffer', {
+      configurable: true,
+      writable: true,
+      value: BrowserBuffer
+    });
+    return;
+  }
+
+  if (typeof globalThis.Buffer.isBuffer !== 'function') {
+    Object.defineProperty(globalThis.Buffer, 'isBuffer', {
+      configurable: true,
+      writable: true,
+      value: () => false
+    });
+  }
+};
+
 const parseWorkbook = async (buffer: ArrayBuffer, sheetName?: string): Promise<SpreadsheetData> => {
   const workbook = new ExcelJS.Workbook();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await workbook.xlsx.load(Buffer.from(new Uint8Array(buffer)) as any);
+  ensureBufferCompatibility();
+  await workbook.xlsx.load(BrowserBuffer.from(buffer) as never);
 
   const worksheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0];
   if (!worksheet) {

@@ -29,7 +29,13 @@ Capital of France?,Paris,Berlin,A,2
       { header: 'Correct', key: 'Correct' },
       { header: 'Points', key: 'Points' }
     ];
-    worksheet.addRow({ Question: 'Largest planet?', 'Answer A': 'Mars', 'Answer B': 'Jupiter', Correct: 'B', Points: 3 });
+    worksheet.addRow({
+      Question: 'Largest planet?',
+      'Answer A': 'Mars',
+      'Answer B': 'Jupiter',
+      Correct: 'B',
+      Points: 3
+    });
     const buffer = new Uint8Array(await workbook.xlsx.writeBuffer());
 
     const spreadsheet = await parseSpreadsheet(buffer, { sheetName: 'Questions', format: 'xlsx' });
@@ -37,6 +43,33 @@ Capital of France?,Paris,Berlin,A,2
     expect(spreadsheet.sheetName).toBe('Questions');
     expect(spreadsheet.rows[0].Question).toBe('Largest planet?');
     expect(spreadsheet.rows[0].Points).toBe('3');
+  });
+
+  test('parses xlsx input without relying on the Node Buffer global', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Questions');
+    worksheet.columns = [
+      { header: 'Question', key: 'Question' },
+      { header: 'Answer A', key: 'Answer A' },
+      { header: 'Answer B', key: 'Answer B' },
+      { header: 'Correct', key: 'Correct' }
+    ];
+    worksheet.addRow({ Question: 'Largest ocean?', 'Answer A': 'Atlantic', 'Answer B': 'Pacific', Correct: 'B' });
+    const buffer = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+    const originalBuffer = globalThis.Buffer;
+    // Simulate the browser runtime where Buffer is not available.
+    globalThis.Buffer = undefined;
+
+    try {
+      const spreadsheet = await parseSpreadsheet(buffer, { sheetName: 'Questions', format: 'xlsx' });
+
+      expect(spreadsheet.sheetName).toBe('Questions');
+      expect(spreadsheet.rows[0].Question).toBe('Largest ocean?');
+      expect(spreadsheet.rows[0].Correct).toBe('B');
+    } finally {
+      globalThis.Buffer = originalBuffer;
+    }
   });
 
   test('builds compact dataset previews', async () => {
