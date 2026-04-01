@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { createQuestionPrompt, inferQuestionsFromRawResponse } from './mapping';
+import {
+  createQuestionPrompt,
+  createWebLlmQuestionInferer,
+  inferQuestionsFromRawResponse,
+  type WebLlmLikeEngine
+} from './mapping';
 
 describe('question inference helpers', () => {
   test('extracts normalized multiple choice questions from JSON responses', () => {
@@ -152,5 +157,60 @@ describe('question inference helpers', () => {
     expect(prompt).toContain('Chunk trimmed for local model limits');
     expect(prompt).toContain('Question 13');
     expect(prompt).not.toContain('x'.repeat(300));
+  });
+
+  test('splits malformed chunks into smaller retries', async () => {
+    const responses = [
+      'not json',
+      'still not json',
+      JSON.stringify({
+        questions: [
+          {
+            type: 'extended_text',
+            prompt: 'Q1',
+            correctResponse: 'A1'
+          }
+        ]
+      }),
+      JSON.stringify({
+        questions: [
+          {
+            type: 'extended_text',
+            prompt: 'Q2',
+            correctResponse: 'A2'
+          }
+        ]
+      })
+    ];
+
+    const engine: WebLlmLikeEngine = {
+      chat: {
+        completions: {
+          create: async () => ({
+            choices: [
+              {
+                message: {
+                  content: responses.shift() || ''
+                }
+              }
+            ]
+          })
+        }
+      }
+    };
+
+    const inferQuestions = createWebLlmQuestionInferer(engine, { chunkSize: 2 });
+    const questions = await inferQuestions({
+      columns: ['text', 'answer'],
+      rows: [
+        { text: 'Q1', answer: 'A1' },
+        { text: 'Q2', answer: 'A2' }
+      ],
+      format: 'csv'
+    });
+
+    expect(questions).toHaveLength(2);
+    expect(questions[0].prompt).toBe('Q1');
+    expect(questions[1].prompt).toBe('Q2');
   });
 });

@@ -14,6 +14,13 @@ export type ConvertSpreadsheetToQtiOptions = ParseSpreadsheetOptions & GenerateQ
 
 const isQuestionInferenceFunction = (value: unknown): value is QuestionInferenceFunction => typeof value === 'function';
 const normalizeColumnName = (value: string) => value.trim().toLowerCase();
+const emptySummary = () => ({
+  totalQuestions: 0,
+  generatedItems: 0,
+  skippedItems: 0,
+  warnings: [],
+  errors: []
+});
 
 const ROW_EXPORT_REQUIRED_COLUMNS = [
   'SE_ItemLabel',
@@ -353,6 +360,82 @@ const inferQuestionsDeterministically = (spreadsheet: SpreadsheetData): Structur
   return null;
 };
 
+const QUESTION_COLUMN_HINTS = [
+  'question',
+  'prompt',
+  'stem',
+  'text',
+  'item',
+  'vraag',
+  'vraagtekst',
+  'title'
+];
+const ANSWER_COLUMN_HINTS = ['answer', 'correct', 'key', 'response', 'solution', 'antwoord'];
+const OPTION_COLUMN_HINTS = ['option', 'choice', 'answer a', 'answer b', 'answer c', 'answer d', 'answer e'];
+const SINGLE_LETTER_OPTION_COLUMNS = new Set(['a', 'b', 'c', 'd', 'e', 'f']);
+
+const countFilledTextCells = (row: SpreadsheetRow): number =>
+  Object.values(row).filter(value => {
+    const trimmed = String(value || '').trim();
+    return trimmed.length >= 2 && /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(trimmed);
+  }).length;
+
+const hasQuestionLikeValue = (row: SpreadsheetRow): boolean =>
+  Object.values(row).some(value => {
+    const trimmed = String(value || '').trim();
+    if (trimmed.length < 8) {
+      return false;
+    }
+    return (
+      /\?$/.test(trimmed) ||
+      /^((question|vraag)\s*)?\d{1,3}[.):-]\s+\S+/i.test(trimmed) ||
+      trimmed.split(/\s+/).length >= 4
+    );
+  });
+
+const hasOptionLikeSpread = (row: SpreadsheetRow): boolean => countFilledTextCells(row) >= 3;
+
+const assessSpreadsheetProcessability = (
+  spreadsheet: SpreadsheetData
+): { processable: true } | { processable: false; reason: string } => {
+  if (spreadsheet.rows.length === 0) {
+    return {
+      processable: false,
+      reason: 'The spreadsheet is empty.'
+    };
+  }
+
+  const normalizedColumns = spreadsheet.columns.map(normalizeColumnName);
+  const hasQuestionColumn = normalizedColumns.some(
+    column => QUESTION_COLUMN_HINTS.some(hint => column.includes(hint)) || SINGLE_LETTER_OPTION_COLUMNS.has(column)
+  );
+  const hasAnswerColumn = normalizedColumns.some(column => ANSWER_COLUMN_HINTS.some(hint => column.includes(hint)));
+  const optionLikeColumnCount = normalizedColumns.filter(
+    column => OPTION_COLUMN_HINTS.some(hint => column.includes(hint)) || SINGLE_LETTER_OPTION_COLUMNS.has(column)
+  ).length;
+
+  if ((hasQuestionColumn && hasAnswerColumn) || (hasQuestionColumn && optionLikeColumnCount >= 2)) {
+    return { processable: true };
+  }
+
+  const sampleRows = spreadsheet.rows.slice(0, 50);
+  const rowsWithQuestionLikeValue = sampleRows.filter(hasQuestionLikeValue).length;
+  const rowsWithOptionLikeSpread = sampleRows.filter(hasOptionLikeSpread).length;
+  const rowsWithEnoughText = sampleRows.filter(row => countFilledTextCells(row) >= 2).length;
+
+  if (
+    (rowsWithQuestionLikeValue >= 2 && rowsWithEnoughText >= 2) ||
+    (rowsWithQuestionLikeValue >= 1 && rowsWithOptionLikeSpread >= 2)
+  ) {
+    return { processable: true };
+  }
+
+  return {
+    processable: false,
+    reason: 'The spreadsheet does not appear to contain question-like rows or answer columns that can be converted to QTI.'
+  };
+};
+
 export async function convertSpreadsheetToQtiPackage(
   input: File | Blob | ArrayBuffer | Uint8Array | string,
   options?: ConvertSpreadsheetToQtiOptions
@@ -393,6 +476,27 @@ export async function convertSpreadsheetToQtiPackage(
     message: 'Inferring structured questions from parsed spreadsheet JSON.'
   });
   const deterministicQuestions = inferQuestionsDeterministically(spreadsheet);
+  if (!deterministicQuestions) {
+    const processability = assessSpreadsheetProcessability(spreadsheet);
+    if (!processability.processable) {
+      options.onProgress?.({
+        stage: 'mapping_completed',
+        message: processability.reason,
+        data: {
+          processable: false
+        }
+      });
+
+      return {
+        spreadsheet,
+        preview,
+        processable: false,
+        reason: processability.reason,
+        questions: [],
+        summary: emptySummary()
+      };
+    }
+  }
   const questions = deterministicQuestions
     ? deterministicQuestions
     : await inferQuestions(spreadsheet, {
@@ -408,6 +512,7 @@ export async function convertSpreadsheetToQtiPackage(
   return {
     spreadsheet,
     preview,
+    processable: true,
     questions,
     packageBlob: blob,
     packageName,

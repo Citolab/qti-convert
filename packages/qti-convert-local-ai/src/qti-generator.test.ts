@@ -68,6 +68,7 @@ describe('generateQtiPackageFromQuestions', () => {
     expect(result.questions[0].prompt).toBe('2+2?');
     expect(item).toContain('2+2?');
     expect(item).toContain('<qti-value>B</qti-value>');
+    expect(result.processable).toBe(true);
     expect(result.summary.generatedItems).toBe(1);
     expect(progressStages).toEqual([
       'parse_started',
@@ -123,6 +124,7 @@ Pick one,Left,Right`, {
     const item = await zip.file('items/item-1.xml')?.async('string');
 
     expect(result.questions).toHaveLength(1);
+    expect(result.processable).toBe(true);
     expect(item).toContain('Pick one');
     expect(result.summary.generatedItems).toBe(1);
     expect(progressStages).toContain('llm_loading_started');
@@ -190,6 +192,7 @@ Q6,A6,B6`,
 
     expect(prompts).toHaveLength(3);
     expect(result.questions).toHaveLength(6);
+    expect(result.processable).toBe(true);
     expect(result.questions[0].identifier).toBe('item-1');
     expect(result.questions[5].identifier).toBe('item-6');
     expect(result.questions[5].prompt).toBe('Q6');
@@ -210,11 +213,39 @@ What is 2+2?,B,3,4,5,6,7`, {
     const item = await zip.file('items/item-1.xml')?.async('string');
 
     expect(result.questions[0].prompt).toBe('What is 2+2?');
+    expect(result.processable).toBe(true);
     expect(item).toContain('What is 2+2?');
     expect(item).toContain('>4<');
     expect(item).toContain('<qti-value>B</qti-value>');
     expect(item).not.toContain('longer shared text if present');
     expect(item).not.toContain('Option 1');
+  });
+
+  test('returns an unprocessable result for unrelated spreadsheets without calling the llm', async () => {
+    const progressStages: string[] = [];
+    const result = await convertSpreadsheetToQtiPackage(
+      `Name,Department,Extension
+Alice,Finance,1042
+Bob,Operations,2041`,
+      {
+        llmSettings: {
+          createEngine: async () => {
+            throw new Error('LLM should not be called for unprocessable spreadsheets');
+          }
+        },
+        onProgress: event => {
+          progressStages.push(event.stage);
+        }
+      }
+    );
+
+    expect(result.processable).toBe(false);
+    expect(result.reason).toContain('does not appear to contain question-like rows');
+    expect(result.questions).toHaveLength(0);
+    expect(result.packageBlob).toBeUndefined();
+    expect(result.packageName).toBeUndefined();
+    expect(result.summary.generatedItems).toBe(0);
+    expect(progressStages).toEqual(['parse_started', 'parse_completed', 'mapping_started', 'mapping_completed']);
   });
 
   test('uses deterministic parsing for row-oriented item export spreadsheets', async () => {

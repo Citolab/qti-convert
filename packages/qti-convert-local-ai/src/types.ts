@@ -148,8 +148,10 @@ export type GenerateQtiPackageOptions = {
 export type SpreadsheetToQtiResult = {
   spreadsheet: SpreadsheetData;
   preview: DatasetPreview;
+  processable: boolean;
+  reason?: string;
   questions: StructuredQuestion[];
-  packageBlob: Blob;
-  packageName: string;
+  packageBlob?: Blob;
+  packageName?: string;
   summary: ConversionSummary;
 };

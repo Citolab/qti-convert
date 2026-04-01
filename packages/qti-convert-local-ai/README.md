@@ -204,10 +204,14 @@ For non-deterministic spreadsheet shapes, the LLM should return normalized quest
 
 - `spreadsheet`
 - `preview`
+- `processable`
+- `reason` when `processable` is `false`
 - `questions`
 - `packageBlob`
 - `packageName`
 - `summary`
+
+If a spreadsheet does not look like question content, the converter returns `processable: false`, leaves `questions` empty, and skips package generation instead of sending the file to the local LLM.
 
 `convertDocxToQtiPackage(...)` returns:
 

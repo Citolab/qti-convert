@@ -523,6 +523,11 @@ const chunkRows = (rows: SpreadsheetData['rows'], chunkSize: number): Spreadshee
   return chunks;
 };
 
+const splitRowsInHalf = (rows: SpreadsheetData['rows']): [SpreadsheetData['rows'], SpreadsheetData['rows']] => {
+  const midpoint = Math.ceil(rows.length / 2);
+  return [rows.slice(0, midpoint), rows.slice(midpoint)];
+};
+
 const reindexQuestions = (questions: StructuredQuestion[], offset: number): StructuredQuestion[] =>
   questions.map((question, index) => {
     const globalNumber = offset + index + 1;
@@ -592,14 +597,15 @@ export const createWebLlmQuestionInferer =
     const chunks = chunkRows(spreadsheet.rows, Math.max(1, settings.chunkSize || DEFAULT_CHUNK_SIZE));
     const mergedQuestions: StructuredQuestion[] = [];
 
-    for (const [chunkIndex, rowsInChunk] of chunks.entries()) {
+    const resolveChunkQuestions = async (
+      rowsInChunk: SpreadsheetData['rows'],
+      chunkIndex: number,
+      chunkCount: number,
+      fallbackDepth = 0
+    ): Promise<StructuredQuestion[]> => {
       const humanChunkIndex = chunkIndex + 1;
-      context?.reportProgress?.({
-        stage: 'chunk_started',
-        message: `Processing chunk ${humanChunkIndex} of ${chunks.length}.`
-      });
-
       let content = '';
+
       try {
         content = await requestQuestions(
           engine,
@@ -607,7 +613,7 @@ export const createWebLlmQuestionInferer =
             'You convert spreadsheet rows into normalized question JSON. Respond with strict JSON only. Preserve row order.',
             settings
           ),
-          createChunkQuestionPrompt(spreadsheet, rowsInChunk, humanChunkIndex, chunks.length),
+          createChunkQuestionPrompt(spreadsheet, rowsInChunk, humanChunkIndex, chunkCount),
           settings
         );
       } catch (error) {
@@ -626,28 +632,59 @@ export const createWebLlmQuestionInferer =
         );
       }
 
-      let parsedQuestions: StructuredQuestion[];
       try {
-        parsedQuestions = inferQuestionsFromRawResponse(content).questions;
+        return inferQuestionsFromRawResponse(content).questions;
       } catch (error) {
         if (!isJsonParseError(error)) {
           throw error;
         }
+
         context?.reportProgress?.({
           stage: 'mapping_started',
           message: `Chunk ${humanChunkIndex} returned invalid JSON. Retrying with stricter JSON instructions.`
         });
-        const retryContent = await requestQuestions(
-          engine,
-          buildSystemPrompt(
-            'Return valid minified JSON only. Use double-quoted property names, double-quoted string values, no trailing commas, no comments, no markdown fences.',
+
+        try {
+          const retryContent = await requestQuestions(
+            engine,
+            buildSystemPrompt(
+              'Return valid minified JSON only. Use double-quoted property names, double-quoted string values, no trailing commas, no comments, no markdown fences.',
+              settings
+            ),
+            `${createCompactQuestionPrompt(spreadsheet, rowsInChunk)}\n\nYour previous response was invalid JSON. Return valid JSON only.`,
             settings
-          ),
-          `${createCompactQuestionPrompt(spreadsheet, rowsInChunk)}\n\nYour previous response was invalid JSON. Return valid JSON only.`,
-          settings
-        );
-        parsedQuestions = inferQuestionsFromRawResponse(retryContent).questions;
+          );
+          return inferQuestionsFromRawResponse(retryContent).questions;
+        } catch (retryError) {
+          if (!isJsonParseError(retryError) || rowsInChunk.length <= 1) {
+            throw retryError;
+          }
+
+          const [leftRows, rightRows] = splitRowsInHalf(rowsInChunk);
+          if (leftRows.length === 0 || rightRows.length === 0) {
+            throw retryError;
+          }
+
+          context?.reportProgress?.({
+            stage: 'mapping_started',
+            message: `Chunk ${humanChunkIndex} still returned invalid JSON. Splitting ${rowsInChunk.length} rows into smaller chunks (depth ${fallbackDepth + 1}).`
+          });
+
+          const leftQuestions = await resolveChunkQuestions(leftRows, chunkIndex, chunkCount, fallbackDepth + 1);
+          const rightQuestions = await resolveChunkQuestions(rightRows, chunkIndex, chunkCount, fallbackDepth + 1);
+          return [...leftQuestions, ...rightQuestions];
+        }
       }
+    };
+
+    for (const [chunkIndex, rowsInChunk] of chunks.entries()) {
+      const humanChunkIndex = chunkIndex + 1;
+      context?.reportProgress?.({
+        stage: 'chunk_started',
+        message: `Processing chunk ${humanChunkIndex} of ${chunks.length}.`
+      });
+
+      const parsedQuestions = await resolveChunkQuestions(rowsInChunk, chunkIndex, chunks.length);
 
       mergedQuestions.push(...reindexQuestions(parsedQuestions, mergedQuestions.length));
       context?.reportProgress?.({
