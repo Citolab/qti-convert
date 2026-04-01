@@ -478,10 +478,11 @@ export async function convertSpreadsheetToQtiPackage(
   const deterministicQuestions = inferQuestionsDeterministically(spreadsheet);
   if (!deterministicQuestions) {
     const processability = assessSpreadsheetProcessability(spreadsheet);
-    if (!processability.processable) {
+    if (processability.processable === false) {
+      const { reason } = processability;
       options.onProgress?.({
         stage: 'mapping_completed',
-        message: processability.reason,
+        message: reason,
         data: {
           processable: false
         }
@@ -491,7 +492,7 @@ export async function convertSpreadsheetToQtiPackage(
         spreadsheet,
         preview,
         processable: false,
-        reason: processability.reason,
+        reason,
         questions: [],
         summary: emptySummary()
       };
