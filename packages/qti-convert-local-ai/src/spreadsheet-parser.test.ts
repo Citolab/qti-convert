@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { describe, expect, test } from 'vitest';
 import { buildDatasetPreview, parseSpreadsheet } from './spreadsheet-parser';
 
@@ -20,14 +20,19 @@ Capital of France?,Paris,Berlin,A,2
   });
 
   test('parses xlsx buffers and preserves the selected sheet name', async () => {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet([
-      { Question: 'Largest planet?', 'Answer A': 'Mars', 'Answer B': 'Jupiter', Correct: 'B', Points: 3 }
-    ]);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Questions');
-    const arrayBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Questions');
+    worksheet.columns = [
+      { header: 'Question', key: 'Question' },
+      { header: 'Answer A', key: 'Answer A' },
+      { header: 'Answer B', key: 'Answer B' },
+      { header: 'Correct', key: 'Correct' },
+      { header: 'Points', key: 'Points' }
+    ];
+    worksheet.addRow({ Question: 'Largest planet?', 'Answer A': 'Mars', 'Answer B': 'Jupiter', Correct: 'B', Points: 3 });
+    const buffer = new Uint8Array(await workbook.xlsx.writeBuffer());
 
-    const spreadsheet = await parseSpreadsheet(arrayBuffer, { sheetName: 'Questions', format: 'xlsx' });
+    const spreadsheet = await parseSpreadsheet(buffer, { sheetName: 'Questions', format: 'xlsx' });
 
     expect(spreadsheet.sheetName).toBe('Questions');
     expect(spreadsheet.rows[0].Question).toBe('Largest planet?');

@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { createWebLlmEngine } from './mapping';
 import { convertSpreadsheetToQtiPackage } from './convert-spreadsheet';
 import { convertDocxToQtiPackage } from './docx-parser';
@@ -272,11 +272,12 @@ const chooseAmbiguousMode = async (
   }
 };
 
-const createWorkbookFileFromText = (text: string, fileName: string): File => {
-  const sheet = XLSX.utils.aoa_to_sheet([['text'], [text]]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1');
-  const workbookBytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+const createWorkbookFileFromText = async (text: string, fileName: string): Promise<File> => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Sheet1');
+  sheet.addRow(['text']);
+  sheet.addRow([text]);
+  const workbookBytes = await workbook.xlsx.writeBuffer();
   return new File([workbookBytes], `${getFileBaseName(fileName)}.xlsx`, {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
@@ -391,7 +392,7 @@ const convertFetchedSource = async (
     throw new Error(`Remote source was classified as "${inferredMode}", but only HTML/text processing is available for this response.`);
   }
 
-  const workbookFile = createWorkbookFileFromText(normalizedText, responseFileName || route.fileName);
+  const workbookFile = await createWorkbookFileFromText(normalizedText, responseFileName || route.fileName);
   const result = await convertSpreadsheetToQtiPackage(workbookFile, options);
   return {
     questions: result.questions,

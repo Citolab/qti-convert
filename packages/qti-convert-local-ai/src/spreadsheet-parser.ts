@@ -1,5 +1,5 @@
 import * as Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from './types';
 
 const EMPTY_CELL = '';
@@ -135,27 +135,33 @@ const parseCsv = (csvText: string): SpreadsheetData => {
   };
 };
 
-const parseWorkbook = (buffer: ArrayBuffer, sheetName?: string): SpreadsheetData => {
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const targetSheetName = sheetName || workbook.SheetNames[0];
-  if (!targetSheetName) {
-    throw new Error('Workbook does not contain any sheets.');
-  }
-  const worksheet = workbook.Sheets[targetSheetName];
+const parseWorkbook = async (buffer: ArrayBuffer, sheetName?: string): Promise<SpreadsheetData> => {
+  const workbook = new ExcelJS.Workbook();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await workbook.xlsx.load(Buffer.from(new Uint8Array(buffer)) as any);
+
+  const worksheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0];
   if (!worksheet) {
-    throw new Error(`Sheet "${sheetName}" was not found.`);
+    throw new Error(sheetName ? `Sheet "${sheetName}" was not found.` : 'Workbook does not contain any sheets.');
   }
 
-  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-    defval: EMPTY_CELL,
-    raw: false
+  const targetSheetName = worksheet.name;
+  let columns: string[] = [];
+  const rawRows: Record<string, unknown>[] = [];
+
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      const headerValues = row.values as ExcelJS.CellValue[];
+      columns = headerValues.slice(1).map(value => normalizeCellValue(value));
+    } else {
+      const rowData: Record<string, unknown> = {};
+      columns.forEach((col, index) => {
+        rowData[col] = row.getCell(index + 1).text ?? EMPTY_CELL;
+      });
+      rawRows.push(rowData);
+    }
   });
-  const headerRow = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(worksheet, {
-    header: 1,
-    raw: false,
-    blankrows: false
-  })[0];
-  const columns = (headerRow || []).map(value => normalizeCellValue(value)).filter(Boolean);
+
   const rows = normalizeRows(rawRows, columns);
   return {
     columns: columns.length > 0 ? columns : normalizeColumns(rows),
@@ -450,7 +456,7 @@ export const parseSpreadsheet = async (
 
   const buffer = await toArrayBuffer(input);
   return {
-    ...parseWorkbook(buffer, options.sheetName),
+    ...await parseWorkbook(buffer, options.sheetName),
     fileName
   };
 };
