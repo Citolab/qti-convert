@@ -1,36 +1,19 @@
 # @citolab/qti-convert-local-ai
 
-Browser-side helpers for converting CSV, Excel, Brightspace QuestestInterop XML, Moodle quiz XML, and DOCX datasets into QTI 3.0 packages.
+Browser-side helpers for converting spreadsheets, XML exports, DOCX, PDF, Google Forms, Microsoft Forms, and selected remote URLs into QTI 3.0 packages.
 
-The conversion is best-effort. The package tries to interpret spreadsheet structure conservatively and generate valid QTI output, but it does not guarantee that every CSV or Excel file will be converted correctly or completely without review.
+The conversion is best-effort. The package uses deterministic parsing for recognized formats and falls back to a local LLM such as WebLLM for unfamiliar structures. Processing is intended to run in the browser.
 
-The package supports two related flows:
+## Supported inputs
 
-1. Parse CSV with `papaparse` or Excel with `xlsx`
-2. Use a deterministic conversion path for recognized spreadsheet formats
-3. Fall back to a local LLM such as WebLLM for unknown spreadsheet shapes
-4. Generate QTI deterministically with JavaScript
-5. Download the resulting zip in the browser
-
-For DOCX input, the package:
-
-1. Reads `word/document.xml` from the `.docx` zip
-2. Extracts paragraph text conservatively
-3. Tries to detect actual numbered items while skipping likely booklet boilerplate
-4. Normalizes detected items into the same question format used by the spreadsheet pipeline
-5. Generates QTI deterministically
-
-For Brightspace QuestestInterop XML input, the package:
-
-1. Detects the XML format from the `.xml` file name or input content
-2. Extracts item identifiers, labels, question text, response choices, and correct responses
-3. Converts recognized items directly to QTI 3.0 without using the local LLM
-
-For Moodle quiz XML input, the package:
-
-1. Detects the `quiz` XML root
-2. Extracts common `multichoice` questions, choices, and correct answers
-3. Converts recognized items directly to QTI 3.0 without using the local LLM
+- CSV and Excel spreadsheets
+- Brightspace QuestestInterop XML
+- Moodle quiz XML
+- DOCX
+- PDF
+- Google Forms
+- Microsoft Forms
+- Remote URLs that resolve to spreadsheets, DOCX, PDF, HTML/text, Google Forms, or Microsoft Forms
 
 ## Install
 
@@ -38,13 +21,72 @@ For Moodle quiz XML input, the package:
 npm install @citolab/qti-convert-local-ai
 ```
 
+## Main APIs
+
+The package exports:
+
+- `convertSpreadsheetToQtiPackage(...)`
+- `convertDocxToQtiPackage(...)`
+- `convertPdfToQtiPackage(...)`
+- `convertGoogleFormToQtiPackage(...)`
+- `convertMicrosoftFormToQtiPackage(...)`
+- `convertRemoteSourceToQtiPackage(...)`
+- `createWebLlmQuestionInferer(...)`
+- `DEFAULT_WEB_LLM_MODEL`
+
 ## Example
 
 ```ts
 import {
-  convertSpreadsheetToQtiPackage,
-  convertDocxToQtiPackage,
   DEFAULT_WEB_LLM_MODEL,
+  convertDocxToQtiPackage,
+  convertGoogleFormToQtiPackage,
+  convertPdfToQtiPackage,
+  convertRemoteSourceToQtiPackage,
+  convertSpreadsheetToQtiPackage
+} from '@citolab/qti-convert-local-ai';
+
+const spreadsheetResult = await convertSpreadsheetToQtiPackage(file, {
+  packageIdentifier: 'demo-package',
+  testTitle: 'Imported Test',
+  llmSettings: {
+    model: DEFAULT_WEB_LLM_MODEL
+  },
+  onProgress(event) {
+    console.log(event.stage, event.message);
+  }
+});
+
+const docxResult = await convertDocxToQtiPackage(docxFile, {
+  packageIdentifier: 'docx-package',
+  testTitle: 'Imported DOCX Test'
+});
+
+const pdfResult = await convertPdfToQtiPackage(pdfFile, {
+  packageIdentifier: 'pdf-package',
+  testTitle: 'Imported PDF Test'
+});
+
+const googleFormResult = await convertGoogleFormToQtiPackage(
+  'https://docs.google.com/forms/d/e/.../viewform'
+);
+
+const remoteResult = await convertRemoteSourceToQtiPackage(
+  'https://docs.google.com/spreadsheets/d/.../edit'
+);
+
+console.log(spreadsheetResult.summary);
+console.log(docxResult.summary);
+console.log(pdfResult.summary);
+console.log(googleFormResult.summary);
+console.log(remoteResult.summary);
+```
+
+If you want to provide your own inference function instead of letting the package create one from `llmSettings`, that is still supported:
+
+```ts
+import {
+  convertSpreadsheetToQtiPackage,
   createWebLlmQuestionInferer
 } from '@citolab/qti-convert-local-ai';
 
@@ -52,71 +94,78 @@ const inferQuestions = createWebLlmQuestionInferer(engine);
 
 const result = await convertSpreadsheetToQtiPackage(file, inferQuestions, {
   packageIdentifier: 'demo-package',
-  testTitle: 'Imported Test',
-  onProgress(event) {
-    console.log(event.stage, event.message);
-  }
-});
-
-const blob = result.packageBlob;
-console.log(result.summary);
-
-const docxResult = await convertDocxToQtiPackage(docxFile, {
-  packageIdentifier: 'docx-package',
-  testTitle: 'Imported DOCX Test'
+  testTitle: 'Imported Test'
 });
 ```
 
-If you do not pass a custom inference function, `convertSpreadsheetToQtiPackage(...)` now creates a WebLLM engine itself and uses a default model:
-
-```ts
-const result = await convertSpreadsheetToQtiPackage(file, {
-  llmSettings: {
-    model: DEFAULT_WEB_LLM_MODEL
-  }
-});
-```
-
-Current default: `Qwen2.5-7B-Instruct-q4f16_1-MLC`
-
-You can override the model or supply your own engine factory:
-
-```ts
-const result = await convertSpreadsheetToQtiPackage(file, {
-  llmSettings: {
-    model: 'Llama-3.1-8B-Instruct',
-    temperature: 0
-  }
-});
-```
+Current default WebLLM model: `Qwen2.5-7B-Instruct-q4f16_1-MLC`
 
 ## Deterministic formats
 
-These formats bypass the LLM entirely:
+These inputs bypass the spreadsheet-structure LLM path entirely:
 
-- `text, answer, a, b, c, d, e`
-- `text, answer`
+- common spreadsheet shapes such as `text, answer, a, b, c, d, e`
+- common spreadsheet shapes such as `text, answer`
 - row-oriented exports with columns such as `SE_ItemLabel`, `element_type`, `Element_type_displayLabel`, `Element_Text_Plain`, and `Element_Text_HTML`
+- Brightspace QuestestInterop XML
+- Moodle quiz XML `multichoice`
+- Google Forms public payloads
+- Microsoft Forms runtime form definitions
 
 The row-oriented Excel path groups rows by item label, extracts prompt, stimulus, options, and correct answer conservatively, and is intended for the export format used by the existing Python importer.
 
-DOCX extraction also bypasses the LLM. It uses conservative heuristics to:
+DOCX extraction is intentionally conservative. It tries to:
 
 - identify numbered items such as `1.`, `1)` or `Question 1`
 - collect answer options such as `A.`, `B.`, `C.`
 - treat preceding non-boilerplate paragraphs as candidate stimulus text
 - ignore likely booklet metadata and instructions where possible
 
-DOCX support is intentionally conservative and should be treated as best-effort.
+PDF extraction uses local parsing plus local LLM segmentation/normalization, with a heuristic fallback if the LLM path fails.
 
-Brightspace QuestestInterop XML conversion also bypasses the LLM and currently targets these common structures:
+## Forms and remote URLs
 
-- single-correct multiple choice
-- multiple-select multiple choice
-- short text / fill-in with an exact correct response
-- essay / open response
+Google Forms conversion supports these public-form structures:
 
-Moodle quiz XML conversion also bypasses the LLM and currently targets the common `multichoice` export structure.
+- multiple choice
+- checkboxes
+- dropdown
+- short answer
+- paragraph
+- linear scale
+- grid questions, expanded into one QTI item per grid row
+
+Microsoft Forms conversion currently supports these common structures:
+
+- choice
+- multi-select choice
+- text field
+- rating
+- net promoter score
+- matrix / likert-style rows, expanded into one QTI item per row
+
+`convertRemoteSourceToQtiPackage(...)` accepts URLs and routes them to the appropriate parser for:
+
+- Google Sheets
+- Google Docs
+- Google Forms
+- Microsoft Forms
+- direct `.xlsx`, `.xls`, `.csv`, `.docx`, and `.pdf` URLs
+- generic HTML/text fallback
+
+## Remote source proxy
+
+`convertRemoteSourceToQtiPackage(...)` uses this default proxy when `proxyUrl` is omitted:
+
+`https://corsproxy.io/?url={url}`
+
+You can override it by passing `proxyUrl`, or disable the default proxy by passing an empty string:
+
+```ts
+await convertRemoteSourceToQtiPackage(remoteUrl, {
+  proxyUrl: ''
+});
+```
 
 ## LLM output contract
 
@@ -149,12 +198,37 @@ For non-deterministic spreadsheet shapes, the LLM should return normalized quest
 }
 ```
 
-## Progress and result
+## Progress and results
 
 `convertSpreadsheetToQtiPackage(...)` returns:
 
 - `spreadsheet`
 - `preview`
+- `questions`
+- `packageBlob`
+- `packageName`
+- `summary`
+
+`convertDocxToQtiPackage(...)` returns:
+
+- `document`
+- `preview`
+- `questions`
+- `packageBlob`
+- `packageName`
+- `summary`
+
+`convertPdfToQtiPackage(...)` returns:
+
+- `document`
+- `preview`
+- `questions`
+- `packageBlob`
+- `packageName`
+- `summary`
+
+Google Forms, Microsoft Forms, and remote source conversion return:
+
 - `questions`
 - `packageBlob`
 - `packageName`
@@ -167,15 +241,6 @@ The `summary` contains:
 - `skippedItems`
 - `warnings`
 - `errors`
-
-`convertDocxToQtiPackage(...)` returns:
-
-- `document`
-- `preview`
-- `questions`
-- `packageBlob`
-- `packageName`
-- `summary`
 
 Progress events include:
 
@@ -193,7 +258,7 @@ Progress events include:
 
 ## Scope
 
-The package supports multiple-choice and extended-text items, plus optional one-column or two-column item-body layouts driven by the structured question JSON.
+The package supports multiple-choice, short-text, and extended-text items, plus optional one-column or two-column item-body layouts driven by the structured question JSON.
 
 ## License
 

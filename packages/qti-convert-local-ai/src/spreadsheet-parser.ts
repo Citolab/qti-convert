@@ -1,4 +1,4 @@
-import Papa from 'papaparse';
+import * as Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from './types';
 

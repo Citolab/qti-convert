@@ -5,3 +5,6 @@ export * from './qti-generator';
 export * from './convert-spreadsheet';
 export * from './docx-parser';
 export * from './pdf-parser';
+export * from './google-form';
+export * from './microsoft-form';
+export * from './remote-source';
