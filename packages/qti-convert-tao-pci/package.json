@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-convert-tao-pci",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "TAO PCI conversion helpers for qti-convert",
   "type": "module",
   "license": "Apache-2.0",
@@ -31,8 +31,8 @@
     "build-storybook": "npm run prepare:storybook-assets && storybook build"
   },
   "dependencies": {
-    "@citolab/qti-browser-import": "^0.4.5",
-    "@citolab/qti-convert": "^0.4.5",
+    "@citolab/qti-browser-import": "^0.4.6",
+    "@citolab/qti-convert": "^0.4.6",
     "cheerio": "^1.2.0"
   },
   "devDependencies": {
