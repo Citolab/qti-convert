@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-browser-import",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "description": "Browser-side QTI package import and cache URL rewriting",
   "type": "module",
   "license": "Apache-2.0",
@@ -26,12 +26,12 @@
     "jszip": "^3.10.1"
   },
   "peerDependencies": {
-    "@citolab/qti-convert": "^0.4.8",
-    "@citolab/qti-convert-tao-pci": "^0.4.8"
+    "@citolab/qti-convert": "^0.4.9",
+    "@citolab/qti-convert-tao-pci": "^0.4.9"
   },
   "devDependencies": {
-    "@citolab/qti-convert": "^0.4.8",
-    "@citolab/qti-convert-tao-pci": "^0.4.8",
+    "@citolab/qti-convert": "^0.4.9",
+    "@citolab/qti-convert-tao-pci": "^0.4.9",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
