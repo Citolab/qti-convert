@@ -83,42 +83,45 @@ describe('generateQtiPackageFromQuestions', () => {
 
   test('uses built-in WebLLM inference with overridable llmSettings', async () => {
     const progressStages: string[] = [];
-    const result = await convertSpreadsheetToQtiPackage(`Question,Answer A,Answer B
-Pick one,Left,Right`, {
-      packageIdentifier: 'llm-demo',
-      llmSettings: {
-        model: 'Qwen-Test-Model',
-        createEngine: async () => ({
-          chat: {
-            completions: {
-              create: async () => ({
-                choices: [
-                  {
-                    message: {
-                      content: JSON.stringify({
-                        questions: [
-                          {
-                            type: 'multiple_choice',
-                            prompt: 'Pick one',
-                            options: [
-                              { id: 'A', text: 'Left', isCorrectAnswer: true },
-                              { id: 'B', text: 'Right', isCorrectAnswer: false }
-                            ]
-                          }
-                        ]
-                      })
+    const result = await convertSpreadsheetToQtiPackage(
+      `Question,Answer A,Answer B
+Pick one,Left,Right`,
+      {
+        packageIdentifier: 'llm-demo',
+        llmSettings: {
+          model: 'Qwen-Test-Model',
+          createEngine: async () => ({
+            chat: {
+              completions: {
+                create: async () => ({
+                  choices: [
+                    {
+                      message: {
+                        content: JSON.stringify({
+                          questions: [
+                            {
+                              type: 'multiple_choice',
+                              prompt: 'Pick one',
+                              options: [
+                                { id: 'A', text: 'Left', isCorrectAnswer: true },
+                                { id: 'B', text: 'Right', isCorrectAnswer: false }
+                              ]
+                            }
+                          ]
+                        })
+                      }
                     }
-                  }
-                ]
-              })
+                  ]
+                })
+              }
             }
-          }
-        })
-      },
-      onProgress: event => {
-        progressStages.push(event.stage);
+          })
+        },
+        onProgress: event => {
+          progressStages.push(event.stage);
+        }
       }
-    });
+    );
 
     const zip = await JSZip.loadAsync(await result.packageBlob.arrayBuffer());
     const item = await zip.file('items/item-1.xml')?.async('string');
@@ -190,7 +193,7 @@ Q6,A6,B6`,
       }
     );
 
-    expect(prompts).toHaveLength(3);
+    expect(prompts).toHaveLength(4); // 1 column mapping + 3 chunks
     expect(result.questions).toHaveLength(6);
     expect(result.processable).toBe(true);
     expect(result.questions[0].identifier).toBe('item-1');
@@ -199,15 +202,18 @@ Q6,A6,B6`,
   });
 
   test('uses deterministic parsing for text answer a-e spreadsheets', async () => {
-    const result = await convertSpreadsheetToQtiPackage(`text,answer,a,b,c,d,e
-What is 2+2?,B,3,4,5,6,7`, {
-      packageIdentifier: 'deterministic-demo',
-      llmSettings: {
-        createEngine: async () => {
-          throw new Error('LLM should not be called for deterministic spreadsheet format');
+    const result = await convertSpreadsheetToQtiPackage(
+      `text,answer,a,b,c,d,e
+What is 2+2?,B,3,4,5,6,7`,
+      {
+        packageIdentifier: 'deterministic-demo',
+        llmSettings: {
+          createEngine: async () => {
+            throw new Error('LLM should not be called for deterministic spreadsheet format');
+          }
         }
       }
-    });
+    );
 
     const zip = await JSZip.loadAsync(await result.packageBlob.arrayBuffer());
     const item = await zip.file('items/item-1.xml')?.async('string');

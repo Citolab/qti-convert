@@ -1,5 +1,11 @@
 import { buildDatasetPreview, parseSpreadsheet, ParseSpreadsheetOptions } from './spreadsheet-parser';
-import { createWebLlmQuestionInfererFromSettings } from './mapping';
+import {
+  createWebLlmQuestionInfererFromSettings,
+  createWebLlmEngine,
+  inferColumnMappingWithLlm,
+  applyColumnMappingToSpreadsheet,
+  type ColumnMapping
+} from './mapping';
 import { generateQtiPackageFromQuestions } from './qti-generator';
 import {
   GenerateQtiPackageOptions,
@@ -118,7 +124,8 @@ const orderedUnique = (values: string[]): string[] => {
   });
 };
 
-const truthy = (value: string): boolean => ['1', 'true', 'yes', 'y', 'ja', 'correct', 'x'].includes(value.trim().toLowerCase());
+const truthy = (value: string): boolean =>
+  ['1', 'true', 'yes', 'y', 'ja', 'correct', 'x'].includes(value.trim().toLowerCase());
 
 const parseLetterKeys = (raw: string, optionCount: number): string[] =>
   orderedUnique((raw.toUpperCase().match(/[A-Z]/g) || []).filter(letter => letter.charCodeAt(0) - 65 < optionCount));
@@ -201,9 +208,7 @@ const inferRowExportQuestions = (spreadsheet: SpreadsheetData): StructuredQuesti
 
     const prompt = normalizeTextChunks(questionRows.map(contentFromRow));
     const options = optionRows.map(contentFromRow).filter(Boolean);
-    const stimulusParts = stimulusRows
-      .map(contentFromRow)
-      .filter(text => text && text !== prompt);
+    const stimulusParts = stimulusRows.map(contentFromRow).filter(text => text && text !== prompt);
     const stimulus = normalizeTextChunks(stimulusParts);
 
     if (!prompt && options.length === 0 && !stimulus) {
@@ -228,7 +233,8 @@ const inferRowExportQuestions = (spreadsheet: SpreadsheetData): StructuredQuesti
               text
             }))
           : undefined,
-      correctResponse: options.length > 0 ? inferRowExportAnswer(groupRows, optionRows, options, answerColumn) : undefined,
+      correctResponse:
+        options.length > 0 ? inferRowExportAnswer(groupRows, optionRows, options, answerColumn) : undefined,
       layout: effectiveStimulus ? 'auto' : 'single_column'
     });
   }
@@ -360,19 +366,48 @@ const inferQuestionsDeterministically = (spreadsheet: SpreadsheetData): Structur
   return null;
 };
 
-const QUESTION_COLUMN_HINTS = [
-  'question',
-  'prompt',
-  'stem',
-  'text',
-  'item',
-  'vraag',
-  'vraagtekst',
-  'title'
-];
+// These hints are used for quick heuristic checks before falling back to LLM mapping
+const QUESTION_COLUMN_HINTS = ['question', 'prompt', 'stem', 'text', 'item', 'vraag', 'vraagtekst', 'title'];
 const ANSWER_COLUMN_HINTS = ['answer', 'correct', 'key', 'response', 'solution', 'antwoord'];
 const OPTION_COLUMN_HINTS = ['option', 'choice', 'answer a', 'answer b', 'answer c', 'answer d', 'answer e'];
 const SINGLE_LETTER_OPTION_COLUMNS = new Set(['a', 'b', 'c', 'd', 'e', 'f']);
+
+// Try LLM-based column mapping when deterministic mapping fails
+const inferQuestionsWithLlmColumnMapping = async (
+  spreadsheet: SpreadsheetData,
+  options: ConvertSpreadsheetToQtiOptions
+): Promise<{ questions: StructuredQuestion[] | null; mapping: ColumnMapping | null }> => {
+  try {
+    options.onProgress?.({
+      stage: 'mapping_started',
+      message: 'Using LLM to identify column mappings...'
+    });
+
+    const engine = await createWebLlmEngine(options.llmSettings, event => {
+      options.onProgress?.(event);
+    });
+
+    const mapping = await inferColumnMappingWithLlm(engine, spreadsheet, options.llmSettings);
+
+    options.onProgress?.({
+      stage: 'mapping_completed',
+      message: `LLM identified column mapping with ${mapping.confidence} confidence.`,
+      data: mapping
+    });
+
+    if (mapping.confidence !== 'low' && mapping.questionColumn) {
+      const questions = applyColumnMappingToSpreadsheet(spreadsheet, mapping);
+      if (questions && questions.length > 0) {
+        return { questions, mapping };
+      }
+    }
+
+    return { questions: null, mapping };
+  } catch (error) {
+    console.warn('[qti-convert-local-ai][spreadsheet] LLM column mapping failed:', error);
+    return { questions: null, mapping: null };
+  }
+};
 
 const countFilledTextCells = (row: SpreadsheetRow): number =>
   Object.values(row).filter(value => {
@@ -432,7 +467,8 @@ const assessSpreadsheetProcessability = (
 
   return {
     processable: false,
-    reason: 'The spreadsheet does not appear to contain question-like rows or answer columns that can be converted to QTI.'
+    reason:
+      'The spreadsheet does not appear to contain question-like rows or answer columns that can be converted to QTI.'
   };
 };
 
@@ -476,7 +512,19 @@ export async function convertSpreadsheetToQtiPackage(
     message: 'Inferring structured questions from parsed spreadsheet JSON.'
   });
   const deterministicQuestions = inferQuestionsDeterministically(spreadsheet);
-  if (!deterministicQuestions) {
+
+  // Conversion strategy:
+  // 1. Try deterministic mapping with known column patterns
+  // 2. If that fails, try LLM-based column mapping (faster than full inference)
+  // 3. If column mapping doesn't produce results, fall back to full LLM question inference
+
+  let questions: StructuredQuestion[];
+  let mappingMethod = 'deterministic';
+
+  if (deterministicQuestions) {
+    questions = deterministicQuestions;
+  } else {
+    // Check if spreadsheet looks processable before using LLM
     const processability = assessSpreadsheetProcessability(spreadsheet);
     if (processability.processable === false) {
       const { reason } = processability;
@@ -497,17 +545,43 @@ export async function convertSpreadsheetToQtiPackage(
         summary: emptySummary()
       };
     }
-  }
-  const questions = deterministicQuestions
-    ? deterministicQuestions
-    : await inferQuestions(spreadsheet, {
+
+    // Try LLM column mapping first (faster and more structured)
+    const { questions: llmMappedQuestions, mapping } = await inferQuestionsWithLlmColumnMapping(spreadsheet, options);
+
+    if (llmMappedQuestions && llmMappedQuestions.length > 0) {
+      questions = llmMappedQuestions;
+      mappingMethod = 'llm-column-mapping';
+      options.onProgress?.({
+        stage: 'mapping_completed',
+        message: `LLM column mapping resolved ${questions.length} question${questions.length === 1 ? '' : 's'} (confidence: ${mapping?.confidence || 'unknown'}).`,
+        data: { questions, mapping }
+      });
+    } else {
+      // Fall back to full LLM question inference
+      options.onProgress?.({
+        stage: 'mapping_started',
+        message: 'Column mapping insufficient, using full LLM question inference...'
+      });
+      questions = await inferQuestions(spreadsheet, {
         reportProgress: options.onProgress
       });
-  options.onProgress?.({
-    stage: 'mapping_completed',
-    message: `${deterministicQuestions ? 'Resolved deterministic mapping for' : 'Resolved'} ${questions.length} structured question${questions.length === 1 ? '' : 's'}.`,
-    data: questions
-  });
+      mappingMethod = 'llm-full-inference';
+      options.onProgress?.({
+        stage: 'mapping_completed',
+        message: `Full LLM inference resolved ${questions.length} question${questions.length === 1 ? '' : 's'}.`,
+        data: questions
+      });
+    }
+  }
+
+  if (mappingMethod === 'deterministic') {
+    options.onProgress?.({
+      stage: 'mapping_completed',
+      message: `Deterministic mapping resolved ${questions.length} question${questions.length === 1 ? '' : 's'}.`,
+      data: questions
+    });
+  }
   const { blob, packageName, summary } = await generateQtiPackageFromQuestions(questions, options);
 
   return {

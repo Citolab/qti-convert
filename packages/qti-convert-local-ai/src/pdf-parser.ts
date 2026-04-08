@@ -3,6 +3,11 @@ import { createWebLlmEngine, inferQuestionsFromRawResponse, type WebLlmLikeEngin
 import { extractQuestionsFromParagraphs } from './docx-parser';
 import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from './types';
 import { generateQtiPackageFromQuestions } from './qti-generator';
+import {
+  buildBatchedNormalizationPrompt,
+  buildSingleItemNormalizationPrompt,
+  buildSegmentationPrompt
+} from './shared-prompts';
 
 type PdfInput = File | Blob | ArrayBuffer | Uint8Array;
 
@@ -60,12 +65,16 @@ export type PdfToQtiResult = {
 };
 
 const PDF_SEGMENTATION_CHUNK_SIZE = 36;
+const PDF_NORMALIZATION_BATCH_SIZE = 8; // Normalize multiple items per LLM call
 const PDF_Y_TOLERANCE = 3;
 const PDF_RENDER_SCALE = 2;
 
 try {
   if (!GlobalWorkerOptions.workerSrc) {
-    GlobalWorkerOptions.workerSrc = new URL('../../../pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
+    GlobalWorkerOptions.workerSrc = new URL(
+      '../../../pdfjs-dist/legacy/build/pdf.worker.mjs',
+      import.meta.url
+    ).toString();
   }
 } catch {
   // Ignore worker URL setup issues here; getDocument will raise a clearer runtime error if loading fails.
@@ -227,7 +236,8 @@ const salvagePdfQuestionsFromRawResponse = (rawResponse: string, blockTexts: str
         prompt,
         stimulus: stimulus && stimulus !== prompt ? stimulus : undefined,
         options: type === 'multiple_choice' && options.length >= 2 ? options : undefined,
-        points: typeof raw.points === 'number' ? raw.points : typeof raw.points === 'string' ? Number(raw.points) : undefined,
+        points:
+          typeof raw.points === 'number' ? raw.points : typeof raw.points === 'string' ? Number(raw.points) : undefined,
         layout: pickFirstString(raw.layout) === 'two_column' ? 'two_column' : 'auto',
         correctResponse: pickFirstString(raw.correctResponse, raw.answer),
         selectionMode: pickFirstString(raw.selectionMode) === 'multiple' ? 'multiple' : 'single'
@@ -236,55 +246,28 @@ const salvagePdfQuestionsFromRawResponse = (rawResponse: string, blockTexts: str
     .filter(question => question.prompt);
 };
 
-const buildPdfSegmentationPrompt = (
-  blocks: Array<{ index: number; text: string }>
-): string =>
-  [
-    'Split these ordered PDF text blocks into assessment items.',
-    'Return strict JSON only.',
-    'Use this shape: {"ignoredBlocks":[0,1],"items":[{"blockIndexes":[2,3,4]},{"blockIndexes":[5,6]}]}.',
-    'Decide which blocks are relevant assessment content and which are irrelevant document chrome.',
-    'Figure out item boundaries from the content itself instead of relying on numbering only.',
-    'Keep answer options with the item they belong to when a block clearly contains choice alternatives.',
-    'If a parent item contains subparts, you may return multiple item groups or one group that will later normalize into multiple questions.',
-    'Preserve original order.',
-    JSON.stringify(blocks, null, 2)
-  ].join('\n\n');
+const buildPdfSegmentationPrompt = (blocks: Array<{ index: number; text: string }>): string =>
+  buildSegmentationPrompt('PDF', blocks);
 
 const buildPdfNormalizationPrompt = (blocks: string[]): string =>
-  [
-    'Convert these ordered PDF item blocks into normalized question JSON.',
-    'Return strict JSON only.',
-    'Return {"questions":[...]}',
-    'You may return more than one question if the blocks contain subquestions such as a, b, c.',
-    'Question shape: {"type":"multiple_choice"|"extended_text","stimulus":"...","prompt":"...","options":[{"id":"A","text":"...","isCorrectAnswer":false}],"points":1,"layout":"auto"}',
-    'Decide from the content whether this is multiple choice or extended text.',
-    'Ignore irrelevant document chrome or repeated page text.',
-    'For open items or fill-in items, return type "extended_text".',
-    'Only return multiple questions if the content clearly contains multiple real assessment items.',
-    JSON.stringify(
-      blocks.map((text, index) => ({
-        index,
-        text
-      })),
-      null,
-      2
-    )
-  ].join('\n\n');
+  buildSingleItemNormalizationPrompt('PDF', blocks);
+
+// Batched version that processes multiple items at once
+const buildBatchedPdfNormalizationPrompt = (itemGroups: Array<{ itemIndex: number; blocks: string[] }>): string =>
+  buildBatchedNormalizationPrompt('PDF', itemGroups);
 
 const normalizeSegmentation = (rawValue: unknown, rangeStart: number, rangeEnd: number): number[][] => {
-  const items = typeof rawValue === 'object' && rawValue && Array.isArray((rawValue as PdfSegmentation).items)
-    ? (rawValue as PdfSegmentation).items || []
-    : [];
+  const items =
+    typeof rawValue === 'object' && rawValue && Array.isArray((rawValue as PdfSegmentation).items)
+      ? (rawValue as PdfSegmentation).items || []
+      : [];
 
   const normalized = items
     .map(item => {
       if (!Array.isArray(item.blockIndexes)) {
         return [];
       }
-      const rawIndexes = item.blockIndexes
-        .map(value => Number(value))
-        .filter(index => Number.isInteger(index));
+      const rawIndexes = item.blockIndexes.map(value => Number(value)).filter(index => Number.isInteger(index));
       const looksLocal = rawIndexes.every(index => index >= 0 && index < rangeEnd - rangeStart);
       const resolvedIndexes = looksLocal ? rawIndexes.map(index => index + rangeStart) : rawIndexes;
       return resolvedIndexes.filter(index => index >= rangeStart && index < rangeEnd);
@@ -422,16 +405,13 @@ const canvasToPngBytes = async (canvas: OffscreenCanvas | HTMLCanvasElement): Pr
   }
 
   const blob = await new Promise<Blob>((resolve, reject) => {
-    (canvas as HTMLCanvasElement).toBlob(
-      value => {
-        if (value) {
-          resolve(value);
-        } else {
-          reject(new Error('Failed to convert PDF canvas to blob.'));
-        }
-      },
-      'image/png'
-    );
+    (canvas as HTMLCanvasElement).toBlob(value => {
+      if (value) {
+        resolve(value);
+      } else {
+        reject(new Error('Failed to convert PDF canvas to blob.'));
+      }
+    }, 'image/png');
   });
   return new Uint8Array(await blob.arrayBuffer());
 };
@@ -439,7 +419,14 @@ const canvasToPngBytes = async (canvas: OffscreenCanvas | HTMLCanvasElement): Pr
 const extractPdfPageImages = async (page: any, pageNumber: number): Promise<PdfImageAsset[]> => {
   const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
   const operatorList = await page.getOperatorList();
-  const imageBoxes: Array<{ left: number; top: number; width: number; height: number; topPdf: number; bottomPdf: number }> = [];
+  const imageBoxes: Array<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    topPdf: number;
+    bottomPdf: number;
+  }> = [];
   const transformStack: number[][] = [];
   let currentTransform = [1, 0, 0, 1, 0, 0];
 
@@ -459,18 +446,20 @@ const extractPdfPageImages = async (page: any, pageNumber: number): Promise<PdfI
       currentTransform = multiplyMatrix(currentTransform, args as number[]);
       continue;
     }
-    if (
-      fn !== OPS.paintImageXObject &&
-      fn !== OPS.paintInlineImageXObject &&
-      fn !== OPS.paintImageMaskXObject
-    ) {
+    if (fn !== OPS.paintImageXObject && fn !== OPS.paintInlineImageXObject && fn !== OPS.paintImageMaskXObject) {
       continue;
     }
 
     const corners = [
       viewport.convertToViewportPoint(currentTransform[4], currentTransform[5]),
-      viewport.convertToViewportPoint(currentTransform[4] + currentTransform[0], currentTransform[5] + currentTransform[1]),
-      viewport.convertToViewportPoint(currentTransform[4] + currentTransform[2], currentTransform[5] + currentTransform[3]),
+      viewport.convertToViewportPoint(
+        currentTransform[4] + currentTransform[0],
+        currentTransform[5] + currentTransform[1]
+      ),
+      viewport.convertToViewportPoint(
+        currentTransform[4] + currentTransform[2],
+        currentTransform[5] + currentTransform[3]
+      ),
       viewport.convertToViewportPoint(
         currentTransform[4] + currentTransform[0] + currentTransform[2],
         currentTransform[5] + currentTransform[1] + currentTransform[3]
@@ -487,7 +476,12 @@ const extractPdfPageImages = async (page: any, pageNumber: number): Promise<PdfI
     if (width < 24 || height < 24) {
       continue;
     }
-    const yValues = [currentTransform[5], currentTransform[5] + currentTransform[1], currentTransform[5] + currentTransform[3], currentTransform[5] + currentTransform[1] + currentTransform[3]];
+    const yValues = [
+      currentTransform[5],
+      currentTransform[5] + currentTransform[1],
+      currentTransform[5] + currentTransform[3],
+      currentTransform[5] + currentTransform[1] + currentTransform[3]
+    ];
     imageBoxes.push({
       left,
       top,
@@ -652,6 +646,40 @@ const segmentPdfBlocksWithLlm = async (
   return segmentedItems;
 };
 
+type BatchedNormalizationResult = {
+  items: Array<{
+    itemIndex: number;
+    questions: StructuredQuestion[];
+  }>;
+};
+
+const parseBatchedNormalizationResponse = (rawResponse: string): BatchedNormalizationResult => {
+  const parsed = parsePdfJson(rawResponse);
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('LLM batch normalization response is not an object.');
+  }
+  const items = (parsed as Record<string, unknown>).items;
+  if (!Array.isArray(items)) {
+    // Fallback: try to treat as single item response
+    const questions = inferQuestionsFromRawResponse(rawResponse).questions;
+    return { items: [{ itemIndex: 0, questions }] };
+  }
+  return {
+    items: items.map((item: unknown, fallbackIndex: number) => {
+      if (typeof item !== 'object' || item === null) {
+        return { itemIndex: fallbackIndex, questions: [] };
+      }
+      const itemObj = item as Record<string, unknown>;
+      const itemIndex = typeof itemObj.itemIndex === 'number' ? itemObj.itemIndex : fallbackIndex;
+      let questions: StructuredQuestion[] = [];
+      if (Array.isArray(itemObj.questions)) {
+        questions = inferQuestionsFromRawResponse(JSON.stringify({ questions: itemObj.questions })).questions;
+      }
+      return { itemIndex, questions };
+    })
+  };
+};
+
 const normalizePdfItemsWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: PdfTextBlock[],
@@ -661,17 +689,31 @@ const normalizePdfItemsWithLlm = async (
   options: GenerateQtiPackageOptions = {}
 ): Promise<StructuredQuestion[]> => {
   const questions: StructuredQuestion[] = [];
+  const totalItems = itemBlockIndexes.length;
+  let batchIndex = 0;
 
-  for (const [index, blockIndexes] of itemBlockIndexes.entries()) {
+  // Process items in batches
+  for (let startIdx = 0; startIdx < totalItems; startIdx += PDF_NORMALIZATION_BATCH_SIZE) {
+    const endIdx = Math.min(startIdx + PDF_NORMALIZATION_BATCH_SIZE, totalItems);
+    const batchItems = itemBlockIndexes.slice(startIdx, endIdx);
+    batchIndex += 1;
+    const totalBatches = Math.ceil(totalItems / PDF_NORMALIZATION_BATCH_SIZE);
+
     onProgress?.({
       stage: 'chunk_started',
-      message: `Normalizing PDF item ${index + 1} of ${itemBlockIndexes.length}.`
+      message: `Normalizing PDF items ${startIdx + 1}-${endIdx} of ${totalItems} (batch ${batchIndex}/${totalBatches}).`
     });
 
-    const blockTexts = blockIndexes
-      .map(blockIndex => blocks[blockIndex]?.text)
-      .filter((value): value is string => Boolean(value));
-    let questionCount = 0;
+    // Prepare batch data: each item has its blocks
+    const itemGroups = batchItems.map((blockIndexes, localIdx) => {
+      const globalIdx = startIdx + localIdx;
+      const blockTexts = blockIndexes
+        .map(blockIndex => blocks[blockIndex]?.text)
+        .filter((value): value is string => Boolean(value));
+      return { itemIndex: globalIdx, blocks: blockTexts };
+    });
+
+    let batchQuestionCount = 0;
     try {
       const rawResponse = await requestLlmJson(
         engine,
@@ -679,89 +721,107 @@ const normalizePdfItemsWithLlm = async (
           'You convert PDF item blocks into structured assessment question JSON. Return strict JSON only.',
           options
         ),
-        buildPdfNormalizationPrompt(blockTexts),
+        buildBatchedPdfNormalizationPrompt(itemGroups),
         options
       );
-      logPdfDebug('PDF item normalization raw response', {
-        itemIndex: index,
-        blockIndexes,
-        blockTexts,
+      logPdfDebug('PDF batch normalization raw response', {
+        batchIndex,
+        itemRange: [startIdx, endIdx],
+        itemGroups: itemGroups.map(g => ({ itemIndex: g.itemIndex, blockCount: g.blocks.length })),
         rawResponse
       });
 
-      let normalized: StructuredQuestion[];
+      let batchResult: BatchedNormalizationResult;
       try {
-        normalized = inferQuestionsFromRawResponse(rawResponse).questions;
+        batchResult = parseBatchedNormalizationResponse(rawResponse);
       } catch (error) {
-        const salvaged = salvagePdfQuestionsFromRawResponse(rawResponse, blockTexts);
-        if (salvaged.length === 0) {
+        // Salvage: try to parse as single-item response
+        const salvaged = salvagePdfQuestionsFromRawResponse(
+          rawResponse,
+          itemGroups.flatMap(g => g.blocks)
+        );
+        if (salvaged.length > 0) {
+          logPdfDebug('Salvaged PDF batch normalization result', {
+            batchIndex,
+            questionCount: salvaged.length
+          });
+          // Distribute salvaged questions evenly across items in batch
+          batchResult = {
+            items: itemGroups.map((g, i) => ({ itemIndex: g.itemIndex, questions: i === 0 ? salvaged : [] }))
+          };
+        } else {
           throw error;
         }
-        logPdfDebug('Salvaged PDF item normalization result', {
-          itemIndex: index,
-          blockIndexes,
-          blockTexts,
-          questionCount: salvaged.length,
-          questions: salvaged.map(question => ({
-            prompt: question.prompt,
-            type: question.type,
-            optionCount: question.options?.length || 0
-          }))
-        });
-        normalized = salvaged;
       }
-      const itemPages = Array.from(new Set(blockIndexes.map(blockIndex => blocks[blockIndex]?.pageNumber).filter((value): value is number => Number.isFinite(value))));
-      const itemYValues = blockIndexes.map(blockIndex => blocks[blockIndex]?.y).filter((value): value is number => Number.isFinite(value));
-      const itemTop = itemYValues.length > 0 ? Math.max(...itemYValues) : Number.NEGATIVE_INFINITY;
-      const itemBottom = itemYValues.length > 0 ? Math.min(...itemYValues) : Number.POSITIVE_INFINITY;
-      const itemImages = images.filter(image => {
-        if (!itemPages.includes(image.pageNumber)) {
-          return false;
-        }
-        if (!Number.isFinite(itemTop) || !Number.isFinite(itemBottom)) {
-          return true;
-        }
-        return image.bottom <= itemTop + 60 && image.top >= itemBottom - 220;
-      });
-      const normalizedQuestions = normalized.map((question, questionIndex) => ({
-        ...question,
-        stimulusImages:
-          questionIndex === 0 && itemImages.length > 0
-            ? [...(question.stimulusImages || []), ...itemImages]
-            : question.stimulusImages,
-        identifier: question.identifier || `item-${index + 1}-${questionIndex + 1}`
-      }));
-      questions.push(...normalizedQuestions);
-      questionCount = normalizedQuestions.length;
+
+      // Process each item in the batch result
+      for (const itemResult of batchResult.items) {
+        const globalItemIndex = itemResult.itemIndex;
+        const blockIndexes = itemBlockIndexes[globalItemIndex];
+        if (!blockIndexes) continue;
+
+        const normalized = itemResult.questions;
+        const itemPages = Array.from(
+          new Set(
+            blockIndexes
+              .map(blockIndex => blocks[blockIndex]?.pageNumber)
+              .filter((value): value is number => Number.isFinite(value))
+          )
+        );
+        const itemYValues = blockIndexes
+          .map(blockIndex => blocks[blockIndex]?.y)
+          .filter((value): value is number => Number.isFinite(value));
+        const itemTop = itemYValues.length > 0 ? Math.max(...itemYValues) : Number.NEGATIVE_INFINITY;
+        const itemBottom = itemYValues.length > 0 ? Math.min(...itemYValues) : Number.POSITIVE_INFINITY;
+        const itemImages = images.filter(image => {
+          if (!itemPages.includes(image.pageNumber)) {
+            return false;
+          }
+          if (!Number.isFinite(itemTop) || !Number.isFinite(itemBottom)) {
+            return true;
+          }
+          return image.bottom <= itemTop + 60 && image.top >= itemBottom - 220;
+        });
+        const normalizedQuestions = normalized.map((question, questionIndex) => ({
+          ...question,
+          stimulusImages:
+            questionIndex === 0 && itemImages.length > 0
+              ? [...(question.stimulusImages || []), ...itemImages]
+              : question.stimulusImages,
+          identifier: question.identifier || `item-${globalItemIndex + 1}-${questionIndex + 1}`
+        }));
+        questions.push(...normalizedQuestions);
+        batchQuestionCount += normalizedQuestions.length;
+      }
     } catch (error) {
-      console.warn('[qti-convert-local-ai][pdf] Falling back to heuristic normalization for PDF item.', {
-        itemIndex: index,
-        blockIndexes,
-        blockTexts,
+      console.warn('[qti-convert-local-ai][pdf] Falling back to heuristic normalization for PDF batch.', {
+        batchIndex,
+        itemRange: [startIdx, endIdx],
         error
       });
-      const fallbackQuestions = extractQuestionsFromParagraphs(blockTexts).map((question, questionIndex) => ({
-        ...question,
-        identifier: question.identifier || `item-${index + 1}-${questionIndex + 1}`
-      }));
-      if (fallbackQuestions.length > 0) {
-        questions.push(
-          ...fallbackQuestions.map((question, questionIndex) => ({
-            ...question,
-            identifier: question.identifier || `item-${index + 1}-${questionIndex + 1}`
-          }))
-        );
-        questionCount = fallbackQuestions.length;
+      // Fallback: heuristic extraction for each item in batch
+      for (let localIdx = 0; localIdx < batchItems.length; localIdx++) {
+        const globalIdx = startIdx + localIdx;
+        const blockIndexes = batchItems[localIdx];
+        const blockTexts = blockIndexes
+          .map(blockIndex => blocks[blockIndex]?.text)
+          .filter((value): value is string => Boolean(value));
+        const fallbackQuestions = extractQuestionsFromParagraphs(blockTexts).map((question, questionIndex) => ({
+          ...question,
+          identifier: question.identifier || `item-${globalIdx + 1}-${questionIndex + 1}`
+        }));
+        questions.push(...fallbackQuestions);
+        batchQuestionCount += fallbackQuestions.length;
       }
     }
 
     onProgress?.({
       stage: 'chunk_completed',
-      message: `Normalized PDF item ${index + 1} of ${itemBlockIndexes.length}.`,
+      message: `Normalized PDF items ${startIdx + 1}-${endIdx} of ${totalItems}.`,
       data: {
-        chunkIndex: index + 1,
-        chunkCount: itemBlockIndexes.length,
-        questionCount
+        chunkIndex: batchIndex,
+        chunkCount: totalBatches,
+        questionCount: batchQuestionCount
       }
     });
   }
@@ -802,7 +862,14 @@ export const convertPdfToQtiPackage = async (
     const blockTexts = document.blocks.map(block => block.text);
     const segmentedItems = await segmentPdfBlocksWithLlm(engine, blockTexts, options.onProgress, options);
     logPdfDebug('Raw PDF segmentation indexes from LLM', segmentedItems);
-    questions = await normalizePdfItemsWithLlm(engine, document.blocks, segmentedItems, document.images, options.onProgress, options);
+    questions = await normalizePdfItemsWithLlm(
+      engine,
+      document.blocks,
+      segmentedItems,
+      document.images,
+      options.onProgress,
+      options
+    );
   } catch (error) {
     console.warn('PDF LLM parsing failed. Falling back to heuristic extraction.', {
       error,

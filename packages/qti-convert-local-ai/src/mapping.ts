@@ -202,11 +202,7 @@ const parseCandidate = (candidate: string): unknown => {
 
 const parseJsonWithRepair = (rawResponse: string): unknown => {
   const extractedCandidate = extractJsonString(rawResponse);
-  const candidates = [
-    extractedCandidate,
-    ...collectBalancedJsonCandidates(rawResponse),
-    rawResponse.trim()
-  ];
+  const candidates = [extractedCandidate, ...collectBalancedJsonCandidates(rawResponse), rawResponse.trim()];
   const seen = new Set<string>();
 
   for (const candidate of candidates) {
@@ -235,7 +231,8 @@ const normalizeOption = (rawOption: Record<string, unknown>, index: number): Str
 
 const normalizeQuestion = (rawQuestion: Record<string, unknown>, index: number): StructuredQuestion => {
   const rawType = pickFirstString(rawQuestion.type, rawQuestion.item_type, rawQuestion.question_type);
-  const type = rawType === 'extended_text' || rawType === 'open_text' || rawType === 'essay' ? 'extended_text' : 'multiple_choice';
+  const type =
+    rawType === 'extended_text' || rawType === 'open_text' || rawType === 'essay' ? 'extended_text' : 'multiple_choice';
   const options = Array.isArray(rawQuestion.options)
     ? rawQuestion.options.map((option, optionIndex) => normalizeOption(option as Record<string, unknown>, optionIndex))
     : undefined;
@@ -251,7 +248,12 @@ const normalizeQuestion = (rawQuestion: Record<string, unknown>, index: number):
     stimulus: pickFirstString(rawQuestion.stimulus, rawQuestion.passage, rawQuestion.context),
     prompt: pickFirstString(rawQuestion.prompt, rawQuestion.question, rawQuestion.text) || '',
     options,
-    correctResponse: pickFirstString(rawQuestion.correctResponse, rawQuestion.correct_response, rawQuestion.answer, rawQuestion.key),
+    correctResponse: pickFirstString(
+      rawQuestion.correctResponse,
+      rawQuestion.correct_response,
+      rawQuestion.answer,
+      rawQuestion.key
+    ),
     expectedLength: Number.isFinite(expectedLength) && expectedLength > 0 ? expectedLength : undefined,
     layout,
     points: Number.isFinite(points) ? points : undefined
@@ -334,7 +336,9 @@ export const normalizeStructuredQuestions = (rawValue: unknown): StructuredQuest
     throw new Error('LLM response did not contain any questions.');
   }
 
-  const questions = rawQuestions.map((question, index) => normalizeQuestion(question as Record<string, unknown>, index));
+  const questions = rawQuestions.map((question, index) =>
+    normalizeQuestion(question as Record<string, unknown>, index)
+  );
   for (const [index, question] of questions.entries()) {
     if (!question.prompt) {
       throw new Error(`Question ${index + 1} is missing a prompt.`);
@@ -393,11 +397,7 @@ export const inferQuestionsFromRawResponse = (rawResponse: string): MappingInfer
 };
 
 export const createQuestionPrompt = (spreadsheet: SpreadsheetData): string => {
-  const payload = JSON.stringify(
-    buildChunkPromptPayload(spreadsheet, spreadsheet.rows, 1, 1),
-    null,
-    2
-  );
+  const payload = JSON.stringify(buildChunkPromptPayload(spreadsheet, spreadsheet.rows, 1, 1), null, 2);
 
   return [
     'Convert these spreadsheet rows into question JSON.',
@@ -419,11 +419,7 @@ const createChunkQuestionPrompt = (
   chunkIndex: number,
   chunkCount: number
 ): string => {
-  const payload = JSON.stringify(
-    buildChunkPromptPayload(spreadsheet, chunkRows, chunkIndex, chunkCount),
-    null,
-    2
-  );
+  const payload = JSON.stringify(buildChunkPromptPayload(spreadsheet, chunkRows, chunkIndex, chunkCount), null, 2);
   return [
     'Convert these spreadsheet rows into question JSON.',
     'Return JSON only.',
@@ -436,14 +432,11 @@ const createChunkQuestionPrompt = (
   ].join('\n\n');
 };
 
-const createCompactQuestionPrompt = (
-  spreadsheet: SpreadsheetData,
-  chunkRows: SpreadsheetData['rows']
-): string => {
+const createCompactQuestionPrompt = (spreadsheet: SpreadsheetData, chunkRows: SpreadsheetData['rows']): string => {
   const columns = spreadsheet.columns.slice(0, 12);
-  const sampleRows = chunkRows.slice(0, 3).map(row =>
-    Object.fromEntries(columns.map(column => [column, truncateText(String(row[column] || ''), 60)]))
-  );
+  const sampleRows = chunkRows
+    .slice(0, 3)
+    .map(row => Object.fromEntries(columns.map(column => [column, truncateText(String(row[column] || ''), 60)])));
   return [
     'Return JSON only.',
     'Convert spreadsheet rows into {"questions":[...]}',
@@ -469,12 +462,9 @@ const isContextWindowError = (error: unknown): boolean =>
 
 const isJsonParseError = (error: unknown): boolean =>
   error instanceof SyntaxError ||
-  (error instanceof Error &&
-    (error.message.includes('JSON') || error.message.includes('property name')));
+  (error instanceof Error && (error.message.includes('JSON') || error.message.includes('property name')));
 
-const extractResponseContent = (
-  rawContent: string | Array<{ text?: string }> | undefined
-): string =>
+const extractResponseContent = (rawContent: string | Array<{ text?: string }> | undefined): string =>
   typeof rawContent === 'string'
     ? rawContent
     : Array.isArray(rawContent)
@@ -544,7 +534,11 @@ const asWebLlmEngine = (value: unknown): WebLlmLikeEngine => value as WebLlmLike
 
 export const createWebLlmEngine = async (
   settings: WebLlmSettings = {},
-  reportProgress?: (event: { stage: 'llm_loading_started' | 'llm_loading_completed'; message: string; data?: unknown }) => void
+  reportProgress?: (event: {
+    stage: 'llm_loading_started' | 'llm_loading_completed';
+    message: string;
+    data?: unknown;
+  }) => void
 ): Promise<WebLlmLikeEngine> => {
   if (settings.engine) {
     return asWebLlmEngine(settings.engine);
@@ -714,4 +708,220 @@ export const createWebLlmQuestionInfererFromSettings = (settings: WebLlmSettings
     const inferer = createWebLlmQuestionInferer(engine, settings);
     return inferer(spreadsheet, context);
   };
+};
+
+// ============================================================================
+// LLM-Based Column Mapping for Spreadsheets
+// ============================================================================
+
+export type ColumnMapping = {
+  questionColumn?: string;
+  answerColumn?: string;
+  optionColumns?: string[];
+  pointsColumn?: string;
+  stimulusColumn?: string;
+  identifierColumn?: string;
+  confidence: 'high' | 'medium' | 'low';
+};
+
+const COLUMN_MAPPING_PROMPT = `
+Analyze these spreadsheet columns and sample data to identify which columns contain assessment question data.
+
+## Column Roles to Identify:
+- questionColumn: The main question text/prompt/stem (look for longest text, question marks, or columns named question/vraag/prompt/stem/text)
+- answerColumn: The correct answer(s) (look for columns named answer/antwoord/correct/key/solution or short letter values like "A", "B", "C")
+- optionColumns: Answer options/choices in separate columns (often columns A, B, C, D or named option/choice/answer a/answer b)
+- pointsColumn: Point values for questions (look for columns named points/punten/score/marks with numeric values)
+- stimulusColumn: Shared passage/context/source for questions (look for columns named stimulus/passage/context/bron/tekst)
+- identifierColumn: Question ID/number (look for columns named id/identifier/nummer/item with unique short values)
+
+## Rules:
+1. Only map columns that clearly match a role - leave undefined if uncertain
+2. optionColumns should be an array of column names (e.g., ["A", "B", "C", "D"])
+3. If columns are named with single letters A-F and contain answer text, those are optionColumns
+4. The questionColumn typically has the longest text content
+
+Return strict JSON only:
+{"questionColumn":"...", "answerColumn":"...", "optionColumns":["A","B","C","D"], "pointsColumn":"...", "stimulusColumn":"...", "identifierColumn":"...", "confidence":"high"|"medium"|"low"}
+`;
+
+const buildColumnMappingPrompt = (columns: string[], sampleRows: Record<string, string>[]): string => {
+  return [
+    COLUMN_MAPPING_PROMPT,
+    '',
+    '## Columns:',
+    JSON.stringify(columns),
+    '',
+    '## Sample Rows (first 5):',
+    JSON.stringify(sampleRows.slice(0, 5), null, 2)
+  ].join('\n');
+};
+
+const parseColumnMappingResponse = (rawResponse: string, availableColumns: Set<string>): ColumnMapping => {
+  const extractedJson = (() => {
+    const fencedMatch = rawResponse.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fencedMatch?.[1]) {
+      return fencedMatch[1].trim();
+    }
+    const start = rawResponse.indexOf('{');
+    const end = rawResponse.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      return rawResponse.slice(start, end + 1);
+    }
+    return rawResponse;
+  })();
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(extractedJson) as Record<string, unknown>;
+  } catch {
+    return { confidence: 'low' };
+  }
+
+  // Validate and clean the mapping - only keep columns that actually exist
+  const validateColumn = (value: unknown): string | undefined => {
+    if (typeof value === 'string' && availableColumns.has(value)) {
+      return value;
+    }
+    return undefined;
+  };
+
+  const validateColumns = (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    const validated = value.filter((v): v is string => typeof v === 'string' && availableColumns.has(v));
+    return validated.length > 0 ? validated : undefined;
+  };
+
+  const confidence = parsed.confidence === 'high' ? 'high' : parsed.confidence === 'medium' ? 'medium' : 'low';
+
+  return {
+    questionColumn: validateColumn(parsed.questionColumn),
+    answerColumn: validateColumn(parsed.answerColumn),
+    optionColumns: validateColumns(parsed.optionColumns),
+    pointsColumn: validateColumn(parsed.pointsColumn),
+    stimulusColumn: validateColumn(parsed.stimulusColumn),
+    identifierColumn: validateColumn(parsed.identifierColumn),
+    confidence
+  };
+};
+
+export const inferColumnMappingWithLlm = async (
+  engine: WebLlmLikeEngine,
+  spreadsheet: SpreadsheetData,
+  settings: WebLlmSettings = {}
+): Promise<ColumnMapping> => {
+  const sampleRows = spreadsheet.rows.slice(0, 5).map(row => {
+    const compact: Record<string, string> = {};
+    for (const column of spreadsheet.columns.slice(0, 20)) {
+      const value = String(row[column] || '').trim();
+      compact[column] = value.length > 100 ? value.slice(0, 100) + '...' : value;
+    }
+    return compact;
+  });
+
+  const response = await engine.chat.completions.create({
+    temperature: settings.temperature ?? 0,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You analyze spreadsheet structure to identify columns containing assessment question data. Return strict JSON only.'
+      },
+      {
+        role: 'user',
+        content: buildColumnMappingPrompt(spreadsheet.columns.slice(0, 20), sampleRows)
+      }
+    ]
+  });
+
+  const content = extractResponseContent(response.choices?.[0]?.message?.content);
+  if (!content) {
+    return { confidence: 'low' };
+  }
+
+  const availableColumns = new Set(spreadsheet.columns);
+  return parseColumnMappingResponse(content, availableColumns);
+};
+
+export const applyColumnMappingToSpreadsheet = (
+  spreadsheet: SpreadsheetData,
+  mapping: ColumnMapping
+): StructuredQuestion[] | null => {
+  if (!mapping.questionColumn || mapping.confidence === 'low') {
+    return null;
+  }
+
+  const questions: StructuredQuestion[] = [];
+
+  for (const [index, row] of spreadsheet.rows.entries()) {
+    const prompt = (row[mapping.questionColumn] || '').trim();
+    if (!prompt) {
+      continue;
+    }
+
+    const stimulus = mapping.stimulusColumn ? (row[mapping.stimulusColumn] || '').trim() || undefined : undefined;
+
+    const identifier = mapping.identifierColumn
+      ? (row[mapping.identifierColumn] || '').trim() || `item-${index + 1}`
+      : `item-${index + 1}`;
+
+    const pointsRaw = mapping.pointsColumn ? (row[mapping.pointsColumn] || '').trim() : undefined;
+    const points = pointsRaw ? Number(pointsRaw) : undefined;
+
+    const answerValue = mapping.answerColumn ? (row[mapping.answerColumn] || '').trim() : undefined;
+
+    // Build options if optionColumns are mapped
+    if (mapping.optionColumns && mapping.optionColumns.length >= 2) {
+      const options = mapping.optionColumns
+        .map((col, optIndex) => ({
+          id: String.fromCharCode(65 + optIndex),
+          text: (row[col] || '').trim()
+        }))
+        .filter(opt => opt.text);
+
+      if (options.length >= 2) {
+        // Determine which options are correct
+        const answerTokens = answerValue
+          ? answerValue
+              .toUpperCase()
+              .split(/[;,|/]+/)
+              .map(t => t.trim())
+              .filter(Boolean)
+          : [];
+
+        const optionsWithCorrect = options.map(opt => ({
+          ...opt,
+          isCorrectAnswer: answerTokens.includes(opt.id)
+        }));
+
+        questions.push({
+          type: 'multiple_choice',
+          identifier,
+          prompt,
+          stimulus,
+          options: optionsWithCorrect,
+          correctResponse: answerValue,
+          points: points && Number.isFinite(points) ? points : undefined,
+          selectionMode: answerTokens.length > 1 ? 'multiple' : 'single',
+          layout: stimulus ? 'auto' : 'single_column'
+        });
+        continue;
+      }
+    }
+
+    // No valid options - treat as extended text or try to infer from answer
+    questions.push({
+      type: 'extended_text',
+      identifier,
+      prompt,
+      stimulus,
+      correctResponse: answerValue,
+      points: points && Number.isFinite(points) ? points : undefined,
+      layout: stimulus ? 'auto' : 'single_column'
+    });
+  }
+
+  return questions.length > 0 ? questions : null;
 };

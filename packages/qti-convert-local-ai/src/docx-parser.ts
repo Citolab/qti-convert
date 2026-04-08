@@ -2,11 +2,14 @@ import JSZip from 'jszip';
 import { createWebLlmEngine, inferQuestionsFromRawResponse, type WebLlmLikeEngine } from './mapping';
 import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from './types';
 import { generateQtiPackageFromQuestions } from './qti-generator';
+import {
+  buildBatchedNormalizationPrompt,
+  buildSingleItemNormalizationPrompt,
+  buildSegmentationPrompt
+} from './shared-prompts';
 
 type DocxInput = File | Blob | ArrayBuffer | Uint8Array;
-type DocxBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; asset: StructuredMediaAsset };
+type DocxBlock = { type: 'text'; text: string } | { type: 'image'; asset: StructuredMediaAsset };
 type DocxSegmentation = {
   ignoredBlocks?: number[];
   items?: Array<{
@@ -38,6 +41,7 @@ export type DocxToQtiResult = {
 
 const EMPTY = '';
 const DOCX_SEGMENTATION_CHUNK_SIZE = 36;
+const DOCX_NORMALIZATION_BATCH_SIZE = 8; // Normalize multiple items per LLM call
 const DOCX_IMAGE_MIME_TYPES: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -211,10 +215,7 @@ const parseDocumentXml = (xml: string): string[] =>
     )
     .filter(Boolean);
 
-const parseDocumentBlocks = (
-  xml: string,
-  imageByRelationshipId: Map<string, StructuredMediaAsset>
-): DocxBlock[] =>
+const parseDocumentBlocks = (xml: string, imageByRelationshipId: Map<string, StructuredMediaAsset>): DocxBlock[] =>
   Array.from(xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)).flatMap(match => {
     const paragraphXml = match[0];
     const blocks: DocxBlock[] = [];
@@ -247,8 +248,7 @@ const isBareQuestionNumber = (value: string): boolean => /^\d{1,3}[.)]$/.test(va
 const isCombinedQuestionSubQuestionStart = (value: string): boolean => /^\d{1,3}[.)]\s+[a-h][.)]?\s+\S+/i.test(value);
 
 const isSubQuestionStart = (value: string): boolean =>
-  /^[a-h](?:[.)])?\s+\S+/.test(value) ||
-  /^\(?\d{1,3}[.)]?\s*[a-h](?:[.)])?\s+\S+/.test(value);
+  /^[a-h](?:[.)])?\s+\S+/.test(value) || /^\(?\d{1,3}[.)]?\s*[a-h](?:[.)])?\s+\S+/.test(value);
 
 const stripQuestionPrefix = (value: string): string =>
   value
@@ -290,7 +290,8 @@ const parseScore = (value: string): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const stripTrailingScore = (value: string): string => value.replace(/\s*\(?\d+(?:[.,]\d+)?\s*(?:p|pt|pts|punt(?:en)?)\)?$/i, '').trim();
+const stripTrailingScore = (value: string): string =>
+  value.replace(/\s*\(?\d+(?:[.,]\d+)?\s*(?:p|pt|pts|punt(?:en)?)\)?$/i, '').trim();
 
 const hasBlankPlaceholder = (value: string): boolean => blankPlaceholderDetector.test(value);
 
@@ -355,9 +356,10 @@ const finalizeQuestion = (question: WorkingQuestion): StructuredQuestion | null 
     type: containsBlankInteraction || question.options.length < 2 ? 'extended_text' : 'multiple_choice',
     identifier: question.identifier,
     prompt,
-    stimulus: (question.preserveStimulus || shouldKeepAsStimulus(question.stimulusParts))
-      ? normalizeWhitespace(stripBlankPlaceholders(question.stimulusParts.join('\n\n')))
-      : undefined,
+    stimulus:
+      question.preserveStimulus || shouldKeepAsStimulus(question.stimulusParts)
+        ? normalizeWhitespace(stripBlankPlaceholders(question.stimulusParts.join('\n\n')))
+        : undefined,
     stimulusImages: question.stimulusImages.length > 0 ? question.stimulusImages : undefined,
     options:
       !containsBlankInteraction && question.options.length >= 2
@@ -371,35 +373,21 @@ const finalizeQuestion = (question: WorkingQuestion): StructuredQuestion | null 
   };
 };
 
-const buildDocxSegmentationPrompt = (
-  blocks: Array<{ index: number; text: string }>
-): string =>
-  [
-    'Split these ordered document blocks into assessment items.',
-    'Return strict JSON only.',
-    'Use this shape: {"ignoredBlocks":[0,1],"items":[{"blockIndexes":[2,3,4]},{"blockIndexes":[5,6]}]}.',
-    'Ignore booklet metadata, page labels, and generic instructions when possible.',
-    'Keep option lines with the item they belong to.',
-    'If one parent question contains subquestions like a, b, c, split those into separate item groups.',
-    'If a parent question number like "5." is immediately followed by subquestions like "a" and "b", do not keep them as one item.',
-    'When needed, include nearby shared stimulus text with each item group it belongs to.',
-    'Preserve original order.',
-    JSON.stringify(blocks, null, 2)
-  ].join('\n\n');
+const buildDocxSegmentationPrompt = (blocks: Array<{ index: number; text: string }>): string =>
+  buildSegmentationPrompt('DOCX', blocks);
 
 const normalizeSegmentation = (rawValue: unknown, rangeStart: number, rangeEnd: number): number[][] => {
-  const items = typeof rawValue === 'object' && rawValue && Array.isArray((rawValue as DocxSegmentation).items)
-    ? (rawValue as DocxSegmentation).items || []
-    : [];
+  const items =
+    typeof rawValue === 'object' && rawValue && Array.isArray((rawValue as DocxSegmentation).items)
+      ? (rawValue as DocxSegmentation).items || []
+      : [];
 
   const normalized = items
     .map(item => {
       if (!Array.isArray(item.blockIndexes)) {
         return [];
       }
-      const rawIndexes = item.blockIndexes
-        .map(value => Number(value))
-        .filter(index => Number.isInteger(index));
+      const rawIndexes = item.blockIndexes.map(value => Number(value)).filter(index => Number.isInteger(index));
       const looksLocal = rawIndexes.every(index => index >= 0 && index < rangeEnd - rangeStart);
       const resolvedIndexes = looksLocal ? rawIndexes.map(index => index + rangeStart) : rawIndexes;
       return resolvedIndexes.filter(index => index >= rangeStart && index < rangeEnd);
@@ -464,7 +452,9 @@ const assignImageBlocksToSegmentedItems = (blocks: DocxBlock[], itemBlockIndexes
   const assigned = itemBlockIndexes.map(blockIndexes => [...blockIndexes].sort((a, b) => a - b));
   const imageIndexes = blocks
     .map((block, index) => ({ block, index }))
-    .filter((entry): entry is { block: Extract<DocxBlock, { type: 'image' }>; index: number } => entry.block.type === 'image')
+    .filter(
+      (entry): entry is { block: Extract<DocxBlock, { type: 'image' }>; index: number } => entry.block.type === 'image'
+    )
     .map(entry => entry.index);
 
   for (const imageIndex of imageIndexes) {
@@ -549,24 +539,11 @@ const assignImageBlocksToSegmentedItems = (blocks: DocxBlock[], itemBlockIndexes
 };
 
 const buildDocxNormalizationPrompt = (blocks: string[]): string =>
-  [
-    'Convert these ordered document blocks into normalized question JSON.',
-    'Return strict JSON only.',
-    'Return {"questions":[...]}',
-    'You may return more than one question if the blocks contain subquestions such as a, b, c.',
-    'Question shape: {"type":"multiple_choice"|"extended_text","stimulus":"...","prompt":"...","options":[{"id":"A","text":"...","isCorrectAnswer":false}],"points":1,"layout":"auto"}',
-    'Use multiple_choice only when the item truly contains answer options. Do not confuse subquestions with answer choices.',
-    'For open items or fill-in items, return type "extended_text".',
-    'Remove numbering like 5, 5a, a, b, c from the prompt.',
-    JSON.stringify(
-      blocks.map((text, index) => ({
-        index,
-        text
-      })),
-      null,
-      2
-    )
-  ].join('\n\n');
+  buildSingleItemNormalizationPrompt('DOCX', blocks);
+
+// Batched version that processes multiple items at once
+const buildBatchedDocxNormalizationPrompt = (itemGroups: Array<{ itemIndex: number; blocks: string[] }>): string =>
+  buildBatchedNormalizationPrompt('DOCX', itemGroups);
 
 const segmentDocxParagraphsWithLlm = async (
   engine: WebLlmLikeEngine,
@@ -592,7 +569,10 @@ const segmentDocxParagraphsWithLlm = async (
 
     const rawResponse = await requestLlmJson(
       engine,
-      buildDocxSystemPrompt('You segment DOCX document blocks into assessment items. Return strict JSON only.', options),
+      buildDocxSystemPrompt(
+        'You segment DOCX document blocks into assessment items. Return strict JSON only.',
+        options
+      ),
       buildDocxSegmentationPrompt(chunk),
       options
     );
@@ -633,6 +613,40 @@ const segmentDocxParagraphsWithLlm = async (
   return segmentedItems;
 };
 
+type DocxBatchedNormalizationResult = {
+  items: Array<{
+    itemIndex: number;
+    questions: StructuredQuestion[];
+  }>;
+};
+
+const parseDocxBatchedNormalizationResponse = (rawResponse: string): DocxBatchedNormalizationResult => {
+  const parsed = parseDocxJson(rawResponse);
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('LLM batch normalization response is not an object.');
+  }
+  const items = (parsed as Record<string, unknown>).items;
+  if (!Array.isArray(items)) {
+    // Fallback: try to treat as single item response
+    const questions = inferQuestionsFromRawResponse(rawResponse).questions;
+    return { items: [{ itemIndex: 0, questions }] };
+  }
+  return {
+    items: items.map((item: unknown, fallbackIndex: number) => {
+      if (typeof item !== 'object' || item === null) {
+        return { itemIndex: fallbackIndex, questions: [] };
+      }
+      const itemObj = item as Record<string, unknown>;
+      const itemIndex = typeof itemObj.itemIndex === 'number' ? itemObj.itemIndex : fallbackIndex;
+      let questions: StructuredQuestion[] = [];
+      if (Array.isArray(itemObj.questions)) {
+        questions = inferQuestionsFromRawResponse(JSON.stringify({ questions: itemObj.questions })).questions;
+      }
+      return { itemIndex, questions };
+    })
+  };
+};
+
 const normalizeDocxItemsWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: DocxBlock[],
@@ -649,83 +663,146 @@ const normalizeDocxItemsWithLlm = async (
       blocks: blockIndexes.map(blockIndex =>
         blocks[blockIndex]?.type === 'text'
           ? { index: blockIndex, type: 'text', text: (blocks[blockIndex] as Extract<DocxBlock, { type: 'text' }>).text }
-          : { index: blockIndex, type: 'image', fileName: (blocks[blockIndex] as Extract<DocxBlock, { type: 'image' }>).asset.fileName }
+          : {
+              index: blockIndex,
+              type: 'image',
+              fileName: (blocks[blockIndex] as Extract<DocxBlock, { type: 'image' }>).asset.fileName
+            }
       )
     }))
   );
   const questions: StructuredQuestion[] = [];
+  const totalItems = groupedBlockIndexes.length;
+  let batchIndex = 0;
 
-  for (const [index, blockIndexes] of groupedBlockIndexes.entries()) {
+  // Process items in batches
+  for (let startIdx = 0; startIdx < totalItems; startIdx += DOCX_NORMALIZATION_BATCH_SIZE) {
+    const endIdx = Math.min(startIdx + DOCX_NORMALIZATION_BATCH_SIZE, totalItems);
+    const batchItems = groupedBlockIndexes.slice(startIdx, endIdx);
+    batchIndex += 1;
+    const totalBatches = Math.ceil(totalItems / DOCX_NORMALIZATION_BATCH_SIZE);
+
     onProgress?.({
       stage: 'chunk_started',
-      message: `Normalizing DOCX item ${index + 1} of ${itemBlockIndexes.length}.`
+      message: `Normalizing DOCX items ${startIdx + 1}-${endIdx} of ${totalItems} (batch ${batchIndex}/${totalBatches}).`
     });
 
-    const itemBlocks = blockIndexes.map(blockIndex => blocks[blockIndex]).filter(Boolean);
-    const blockTexts = itemBlocks.map(block => (block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`));
-    const rawResponse = await requestLlmJson(
-      engine,
-      buildDocxSystemPrompt(
-        'You convert DOCX item blocks into structured assessment question JSON. Return strict JSON only.',
-        options
-      ),
-      buildDocxNormalizationPrompt(blockTexts),
-      options
-    );
-    logDocxDebug('DOCX item normalization raw response', {
-      itemIndex: index,
-      blockIndexes,
-      blockTexts,
-      rawResponse
+    // Prepare batch data: each item has its block texts
+    const itemGroups = batchItems.map((blockIndexes, localIdx) => {
+      const globalIdx = startIdx + localIdx;
+      const itemBlocks = blockIndexes.map(blockIndex => blocks[blockIndex]).filter(Boolean);
+      const blockTexts = itemBlocks.map(block =>
+        block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`
+      );
+      return { itemIndex: globalIdx, blocks: blockTexts, blockIndexes, itemBlocks };
     });
-    let normalized: StructuredQuestion[];
+
+    let batchQuestionCount = 0;
     try {
-      normalized = inferQuestionsFromRawResponse(rawResponse).questions;
+      const rawResponse = await requestLlmJson(
+        engine,
+        buildDocxSystemPrompt(
+          'You convert DOCX item blocks into structured assessment question JSON. Return strict JSON only.',
+          options
+        ),
+        buildBatchedDocxNormalizationPrompt(itemGroups.map(g => ({ itemIndex: g.itemIndex, blocks: g.blocks }))),
+        options
+      );
+      logDocxDebug('DOCX batch normalization raw response', {
+        batchIndex,
+        itemRange: [startIdx, endIdx],
+        itemGroups: itemGroups.map(g => ({ itemIndex: g.itemIndex, blockCount: g.blocks.length })),
+        rawResponse
+      });
+
+      let batchResult: DocxBatchedNormalizationResult;
+      try {
+        batchResult = parseDocxBatchedNormalizationResponse(rawResponse);
+      } catch (error) {
+        console.warn('[qti-convert-local-ai][docx] Failed to parse batch response, falling back to heuristic.', {
+          batchIndex,
+          error
+        });
+        // Fallback: heuristic extraction for each item in batch
+        for (const group of itemGroups) {
+          const fallbackQuestions = extractQuestionsFromParagraphs(group.blocks).map((question, questionIndex) => ({
+            ...question,
+            identifier: question.identifier || `item-${group.itemIndex + 1}-${questionIndex + 1}`
+          }));
+          questions.push(...fallbackQuestions);
+          batchQuestionCount += fallbackQuestions.length;
+        }
+        onProgress?.({
+          stage: 'chunk_completed',
+          message: `Normalized DOCX items ${startIdx + 1}-${endIdx} of ${totalItems}.`,
+          data: {
+            chunkIndex: batchIndex,
+            chunkCount: totalBatches,
+            questionCount: batchQuestionCount
+          }
+        });
+        continue;
+      }
+
+      // Process each item in the batch result
+      for (const itemResult of batchResult.items) {
+        const group = itemGroups.find(g => g.itemIndex === itemResult.itemIndex);
+        if (!group) continue;
+
+        const normalized = itemResult.questions;
+        const itemImages = group.itemBlocks
+          .filter((block): block is Extract<DocxBlock, { type: 'image' }> => block.type === 'image')
+          .map(block => block.asset);
+        const normalizedWithImages =
+          itemImages.length === 0
+            ? normalized
+            : normalized.map((question, questionIndex) =>
+                questionIndex === 0
+                  ? {
+                      ...question,
+                      stimulusImages: [...(question.stimulusImages || []), ...itemImages]
+                    }
+                  : question
+              );
+        logDocxDebug('Normalized DOCX item result', {
+          itemIndex: group.itemIndex,
+          blockIndexes: group.blockIndexes,
+          blockTexts: group.blocks,
+          imageFileNames: itemImages.map(image => image.fileName),
+          questionCount: normalizedWithImages.length,
+          questions: normalizedWithImages.map(question => ({
+            identifier: question.identifier,
+            prompt: question.prompt,
+            stimulusImageFileNames: (question.stimulusImages || []).map(image => image.fileName)
+          }))
+        });
+        questions.push(...normalizedWithImages);
+        batchQuestionCount += normalizedWithImages.length;
+      }
     } catch (error) {
-      console.warn('[qti-convert-local-ai][docx] Failed to normalize DOCX item response.', {
-        itemIndex: index,
-        blockIndexes,
-        blockTexts,
-        rawResponse,
+      console.warn('[qti-convert-local-ai][docx] Falling back to heuristic normalization for DOCX batch.', {
+        batchIndex,
+        itemRange: [startIdx, endIdx],
         error
       });
-      throw error;
+      // Fallback: heuristic extraction for each item in batch
+      for (const group of itemGroups) {
+        const fallbackQuestions = extractQuestionsFromParagraphs(group.blocks).map((question, questionIndex) => ({
+          ...question,
+          identifier: question.identifier || `item-${group.itemIndex + 1}-${questionIndex + 1}`
+        }));
+        questions.push(...fallbackQuestions);
+        batchQuestionCount += fallbackQuestions.length;
+      }
     }
-    const itemImages = itemBlocks
-      .filter((block): block is Extract<DocxBlock, { type: 'image' }> => block.type === 'image')
-      .map(block => block.asset);
-    const normalizedWithImages =
-      itemImages.length === 0
-        ? normalized
-        : normalized.map((question, questionIndex) =>
-            questionIndex === 0
-              ? {
-                  ...question,
-                  stimulusImages: [...(question.stimulusImages || []), ...itemImages]
-                }
-              : question
-          );
-    logDocxDebug('Normalized DOCX item result', {
-      itemIndex: index,
-      blockIndexes,
-      blockTexts,
-      imageFileNames: itemImages.map(image => image.fileName),
-      questionCount: normalizedWithImages.length,
-      questions: normalizedWithImages.map(question => ({
-        identifier: question.identifier,
-        prompt: question.prompt,
-        stimulusImageFileNames: (question.stimulusImages || []).map(image => image.fileName)
-      }))
-    });
-    questions.push(...normalizedWithImages);
 
     onProgress?.({
       stage: 'chunk_completed',
-      message: `Normalized DOCX item ${index + 1} of ${itemBlockIndexes.length}.`,
+      message: `Normalized DOCX items ${startIdx + 1}-${endIdx} of ${totalItems}.`,
       data: {
-        chunkIndex: index + 1,
-        chunkCount: itemBlockIndexes.length,
-        questionCount: normalized.length
+        chunkIndex: batchIndex,
+        chunkCount: totalBatches,
+        questionCount: batchQuestionCount
       }
     });
   }
@@ -737,9 +814,7 @@ const normalizeDocxItemsWithLlm = async (
 };
 
 export const extractQuestionsFromParagraphs = (paragraphs: string[]): StructuredQuestion[] => {
-  const normalizedParagraphs = paragraphs
-    .flatMap(value => splitEmbeddedQuestionMarkers(value))
-    .filter(Boolean);
+  const normalizedParagraphs = paragraphs.flatMap(value => splitEmbeddedQuestionMarkers(value)).filter(Boolean);
   const questions: StructuredQuestion[] = [];
   const pendingParagraphs: string[] = [];
   let current: WorkingQuestion | null = null;
@@ -798,8 +873,7 @@ export const extractQuestionsFromParagraphs = (paragraphs: string[]): Structured
         stimulusParts: shouldKeepAsStimulus(pendingParagraphs) ? [...pendingParagraphs] : [],
         stimulusImages: [],
         options: [],
-        points: parseScore(paragraph)
-        ,
+        points: parseScore(paragraph),
         kind: 'question',
         preserveStimulus: false
       };
@@ -813,9 +887,10 @@ export const extractQuestionsFromParagraphs = (paragraphs: string[]): Structured
         if (current.kind === 'subquestion') {
           flushCurrent();
         } else if (current.options.length === 0 && currentPromptAsStimulus) {
-          sharedStimulusParts = current.stimulusParts.length > 0
-            ? [...current.stimulusParts, currentPromptAsStimulus]
-            : [currentPromptAsStimulus];
+          sharedStimulusParts =
+            current.stimulusParts.length > 0
+              ? [...current.stimulusParts, currentPromptAsStimulus]
+              : [currentPromptAsStimulus];
         } else {
           flushCurrent();
         }
@@ -881,8 +956,7 @@ export const extractQuestionsFromParagraphs = (paragraphs: string[]): Structured
       ((unlabeledOptionCandidate(nextParagraph) && unlabeledOptionCandidate(nextNextParagraph)) ||
         (unlabeledOptionCandidate(nextParagraph) && unlabeledOptionCandidate(nextThreeParagraph)));
     const shouldTreatAsOption =
-      Boolean(option) &&
-      (!plainUppercaseOption || current.options.length > 0 || shouldStartPlainUppercaseOptionList);
+      Boolean(option) && (!plainUppercaseOption || current.options.length > 0 || shouldStartPlainUppercaseOptionList);
 
     if (shouldTreatAsOption) {
       const resolvedOption = option as RegExpMatchArray;
@@ -914,7 +988,8 @@ export const extractQuestionsFromParagraphs = (paragraphs: string[]): Structured
     }
 
     if (current.options.length > 0) {
-      current.options[current.options.length - 1].text = `${current.options[current.options.length - 1].text} ${stripTrailingScore(paragraph)}`.trim();
+      current.options[current.options.length - 1].text =
+        `${current.options[current.options.length - 1].text} ${stripTrailingScore(paragraph)}`.trim();
       continue;
     }
 
@@ -1033,9 +1108,10 @@ export const extractQuestionsFromBlocks = (blocks: DocxBlock[]): StructuredQuest
         if (current.kind === 'subquestion') {
           flushCurrent();
         } else if (current.options.length === 0 && currentPromptAsStimulus) {
-          sharedStimulusParts = current.stimulusParts.length > 0
-            ? [...current.stimulusParts, currentPromptAsStimulus]
-            : [currentPromptAsStimulus];
+          sharedStimulusParts =
+            current.stimulusParts.length > 0
+              ? [...current.stimulusParts, currentPromptAsStimulus]
+              : [currentPromptAsStimulus];
           sharedStimulusImages = [...current.stimulusImages];
         } else {
           flushCurrent();
@@ -1101,8 +1177,7 @@ export const extractQuestionsFromBlocks = (blocks: DocxBlock[]): StructuredQuest
       ((unlabeledOptionCandidate(nextParagraph) && unlabeledOptionCandidate(nextNextParagraph)) ||
         (unlabeledOptionCandidate(nextParagraph) && unlabeledOptionCandidate(nextThreeParagraph)));
     const shouldTreatAsOption =
-      Boolean(option) &&
-      (!plainUppercaseOption || current.options.length > 0 || shouldStartPlainUppercaseOptionList);
+      Boolean(option) && (!plainUppercaseOption || current.options.length > 0 || shouldStartPlainUppercaseOptionList);
 
     if (shouldTreatAsOption) {
       const resolvedOption = option as RegExpMatchArray;
@@ -1134,7 +1209,8 @@ export const extractQuestionsFromBlocks = (blocks: DocxBlock[]): StructuredQuest
     }
 
     if (current.options.length > 0) {
-      current.options[current.options.length - 1].text = `${current.options[current.options.length - 1].text} ${stripTrailingScore(paragraph)}`.trim();
+      current.options[current.options.length - 1].text =
+        `${current.options[current.options.length - 1].text} ${stripTrailingScore(paragraph)}`.trim();
       continue;
     }
 
@@ -1230,7 +1306,9 @@ export const convertDocxToQtiPackage = async (
     const engine = await createWebLlmEngine(options.llmSettings, event => {
       options.onProgress?.(event);
     });
-    const blockTexts = document.blocks.map(block => (block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`));
+    const blockTexts = document.blocks.map(block =>
+      block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`
+    );
     const segmentedItems = await segmentDocxParagraphsWithLlm(engine, blockTexts, options.onProgress, options);
     logDocxDebug('Raw DOCX segmentation indexes from LLM', segmentedItems);
     questions = await normalizeDocxItemsWithLlm(engine, document.blocks, segmentedItems, options.onProgress, options);

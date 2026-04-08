@@ -9,16 +9,17 @@ const createDocxBuffer = async (paragraphs: string[]): Promise<ArrayBuffer> => {
     <w:body>
       ${paragraphs
         .map(
-          paragraph => `<w:p>${paragraph
-            .split('\n')
-            .map(
-              (line, index) =>
-                `${index > 0 ? '<w:r><w:br/></w:r>' : ''}<w:r><w:t xml:space="preserve">${line
-                  .replaceAll('&', '&amp;')
-                  .replaceAll('<', '&lt;')
-                  .replaceAll('>', '&gt;')}</w:t></w:r>`
-            )
-            .join('')}</w:p>`
+          paragraph =>
+            `<w:p>${paragraph
+              .split('\n')
+              .map(
+                (line, index) =>
+                  `${index > 0 ? '<w:r><w:br/></w:r>' : ''}<w:r><w:t xml:space="preserve">${line
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')}</w:t></w:r>`
+              )
+              .join('')}</w:p>`
         )
         .join('')}
     </w:body>
@@ -110,19 +111,11 @@ describe('docx-parser', () => {
   });
 
   test('splits line breaks inside a single word paragraph into separate logical lines', async () => {
-    const buffer = await createDocxBuffer([
-      'Booklet 01\n1. What is 2+2?\nA. 3\nB. 4\n2. Explain your answer.'
-    ]);
+    const buffer = await createDocxBuffer(['Booklet 01\n1. What is 2+2?\nA. 3\nB. 4\n2. Explain your answer.']);
     const document = await parseDocx(buffer);
     const questions = extractQuestionsFromParagraphs(document.paragraphs);
 
-    expect(document.paragraphs).toEqual([
-      'Booklet 01',
-      '1. What is 2+2?',
-      'A. 3',
-      'B. 4',
-      '2. Explain your answer.'
-    ]);
+    expect(document.paragraphs).toEqual(['Booklet 01', '1. What is 2+2?', 'A. 3', 'B. 4', '2. Explain your answer.']);
     expect(questions).toHaveLength(2);
     expect(questions[0].prompt).toBe('What is 2+2?');
     expect(questions[1].prompt).toBe('Explain your answer.');
@@ -153,13 +146,7 @@ describe('docx-parser', () => {
   });
 
   test('prefers local llm segmentation and normalization for docx conversion', async () => {
-    const buffer = await createDocxBuffer([
-      'In welk jaar werd de VOC opgericht?',
-      '1568',
-      '1595',
-      '1602',
-      '1648'
-    ]);
+    const buffer = await createDocxBuffer(['In welk jaar werd de VOC opgericht?', '1568', '1595', '1602', '1648']);
 
     let requestCount = 0;
     const result = await convertDocxToQtiPackage(buffer, {
@@ -220,10 +207,7 @@ describe('docx-parser', () => {
   });
 
   test('attaches extracted docx images to the segmented item they belong to', async () => {
-    const buffer = await createDocxBufferWithImage(
-      ['1. First question?', '2. Second question with image?'],
-      1
-    );
+    const buffer = await createDocxBufferWithImage(['1. First question?', '2. Second question with image?'], 1);
 
     let requestCount = 0;
     const result = await convertDocxToQtiPackage(buffer, {
@@ -235,6 +219,7 @@ describe('docx-parser', () => {
               create: async () => {
                 requestCount += 1;
                 if (requestCount === 1) {
+                  // Segmentation request
                   return {
                     choices: [
                       {
@@ -248,15 +233,20 @@ describe('docx-parser', () => {
                   };
                 }
 
+                // Batch normalization request (all items in one call)
                 return {
                   choices: [
                     {
                       message: {
                         content: JSON.stringify({
-                          questions: [
+                          items: [
                             {
-                              type: 'extended_text',
-                              prompt: requestCount === 2 ? 'First question?' : 'Second question with image?'
+                              itemIndex: 0,
+                              questions: [{ type: 'extended_text', prompt: 'First question?' }]
+                            },
+                            {
+                              itemIndex: 1,
+                              questions: [{ type: 'extended_text', prompt: 'Second question with image?' }]
                             }
                           ]
                         })
@@ -278,10 +268,7 @@ describe('docx-parser', () => {
   });
 
   test('assigns image blocks to the nearest segmented item even if the llm omits image indexes', async () => {
-    const buffer = await createDocxBufferWithImage(
-      ['1. First question?', '2. Second question with image?'],
-      1
-    );
+    const buffer = await createDocxBufferWithImage(['1. First question?', '2. Second question with image?'], 1);
 
     let requestCount = 0;
     const result = await convertDocxToQtiPackage(buffer, {
@@ -293,6 +280,7 @@ describe('docx-parser', () => {
               create: async () => {
                 requestCount += 1;
                 if (requestCount === 1) {
+                  // Segmentation request (image index omitted)
                   return {
                     choices: [
                       {
@@ -306,15 +294,20 @@ describe('docx-parser', () => {
                   };
                 }
 
+                // Batch normalization request (all items in one call)
                 return {
                   choices: [
                     {
                       message: {
                         content: JSON.stringify({
-                          questions: [
+                          items: [
                             {
-                              type: 'extended_text',
-                              prompt: requestCount === 2 ? 'First question?' : 'Second question with image?'
+                              itemIndex: 0,
+                              questions: [{ type: 'extended_text', prompt: 'First question?' }]
+                            },
+                            {
+                              itemIndex: 1,
+                              questions: [{ type: 'extended_text', prompt: 'Second question with image?' }]
                             }
                           ]
                         })
@@ -385,9 +378,7 @@ describe('docx-parser', () => {
   });
 
   test('converts underline placeholders into extended text prompts', () => {
-    const questions = extractQuestionsFromParagraphs([
-      '1. Write the missing word: ________ 1p'
-    ]);
+    const questions = extractQuestionsFromParagraphs(['1. Write the missing word: ________ 1p']);
 
     expect(questions).toHaveLength(1);
     expect(questions[0]).toEqual({

@@ -8,3 +8,6 @@ export * from './pdf-parser';
 export * from './google-form';
 export * from './microsoft-form';
 export * from './remote-source';
+export * from './converter-interface';
+export * from './converters';
+export * from './shared-prompts';
