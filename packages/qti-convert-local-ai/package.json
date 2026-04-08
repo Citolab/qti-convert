@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-convert-local-ai",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "Browser-side spreadsheet to QTI package conversion helpers",
   "type": "module",
   "license": "Apache-2.0",
