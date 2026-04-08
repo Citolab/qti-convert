@@ -1,4 +1,3 @@
-import Papa from 'papaparse';
 import { Buffer as BrowserBuffer } from 'buffer';
 import ExcelJS from 'exceljs';
 import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from './types';
@@ -116,24 +115,50 @@ const normalizeRows = (rawRows: Record<string, unknown>[], columns?: string[]): 
     .filter(row => Object.values(row).some(value => value !== EMPTY_CELL));
 };
 
-const parseCsv = (csvText: string): SpreadsheetData => {
-  const parsed = Papa.parse<Record<string, string>>(csvText, {
-    header: true,
-    skipEmptyLines: 'greedy',
-    transformHeader: value => value.trim()
-  });
+const countDelimiterMatches = (line: string, delimiter: string): number => {
+  let count = 0;
+  let inQuotes = false;
 
-  if (parsed.errors.length > 0) {
-    throw new Error(parsed.errors.map(error => error.message).join('; '));
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (!inQuotes && char === delimiter) {
+      count += 1;
+    }
   }
 
-  const rows = normalizeRows(parsed.data);
-  const columns = normalizeColumns(rows);
-  return {
-    columns,
-    rows: normalizeRows(rows, columns),
-    format: 'csv'
-  };
+  return count;
+};
+
+const detectCsvDelimiter = (csvText: string): string => {
+  const candidates = [',', ';', '\t'];
+  const lines = csvText
+    .split(/\r\n|\n|\r/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+
+  if (lines.length === 0) {
+    return ',';
+  }
+
+  const scores = candidates.map(delimiter => ({
+    delimiter,
+    score: lines.reduce((total, line) => total + countDelimiterMatches(line, delimiter), 0)
+  }));
+
+  scores.sort((left, right) => right.score - left.score);
+  return scores[0]?.score ? scores[0].delimiter : ',';
 };
 
 const ensureBufferCompatibility = (): void => {
@@ -155,9 +180,54 @@ const ensureBufferCompatibility = (): void => {
   }
 };
 
+ensureBufferCompatibility();
+
+const loadCsvParse = async () => {
+  const { parse } = await import('csv-parse/sync');
+  return parse;
+};
+
+const parseCsv = async (csvText: string): Promise<SpreadsheetData> => {
+  const parseCsvSync = await loadCsvParse();
+  const delimiter = detectCsvDelimiter(csvText);
+  const rawRows = parseCsvSync(csvText, {
+    bom: true,
+    columns: header => header.map(value => value.trim()),
+    delimiter,
+    relax_column_count: true,
+    skip_empty_lines: true,
+    trim: true
+  }) as Record<string, unknown>[];
+
+  if (rawRows.length === 0) {
+    const [headerOnlyRow = []] = parseCsvSync(csvText, {
+      bom: true,
+      delimiter,
+      relax_column_count: true,
+      skip_empty_lines: true,
+      to_line: 1,
+      trim: true
+    }) as string[][];
+
+    return {
+      columns: headerOnlyRow.map(value => value.trim()).filter(Boolean),
+      rows: [],
+      format: 'csv'
+    };
+  }
+
+  const rows = normalizeRows(rawRows);
+  const columns = normalizeColumns(rows);
+  return {
+    columns,
+    rows: normalizeRows(rows, columns),
+    format: 'csv'
+  };
+};
+
 const parseWorkbook = async (buffer: ArrayBuffer, sheetName?: string): Promise<SpreadsheetData> => {
-  const workbook = new ExcelJS.Workbook();
   ensureBufferCompatibility();
+  const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(BrowserBuffer.from(buffer) as never);
 
   const worksheet = sheetName ? workbook.getWorksheet(sheetName) : workbook.worksheets[0];
@@ -460,7 +530,7 @@ export const parseSpreadsheet = async (
     const buffer = await toArrayBuffer(input);
     const text = new TextDecoder().decode(buffer);
     return {
-      ...parseCsv(text),
+      ...await parseCsv(text),
       fileName
     };
   }

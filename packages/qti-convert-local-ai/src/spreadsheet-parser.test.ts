@@ -19,7 +19,7 @@ Capital of France?,Paris,Berlin,A,2
     });
   });
 
-  test('parses csv files when papaparse is resolved through default export interop', async () => {
+  test('parses csv files from File input', async () => {
     const file = new File(
       [`Question,Answer A,Answer B,Correct\nLargest mammal?,Elephant,Blue whale,B`],
       'questions.csv',
@@ -34,6 +34,33 @@ Capital of France?,Paris,Berlin,A,2
       'Answer A': 'Elephant',
       'Answer B': 'Blue whale',
       Correct: 'B'
+    });
+  });
+
+  test('sniffs semicolon-separated csv content', async () => {
+    const spreadsheet = await parseSpreadsheet(
+      'Vraag;Antwoord A;Antwoord B;Correct\nHoofdstad van Frankrijk?;Parijs;Berlijn;A'
+    );
+
+    expect(spreadsheet.format).toBe('csv');
+    expect(spreadsheet.columns).toEqual(['Vraag', 'Antwoord A', 'Antwoord B', 'Correct']);
+    expect(spreadsheet.rows[0]).toEqual({
+      Vraag: 'Hoofdstad van Frankrijk?',
+      'Antwoord A': 'Parijs',
+      'Antwoord B': 'Berlijn',
+      Correct: 'A'
+    });
+  });
+
+  test('parses quoted csv cells with commas and line breaks', async () => {
+    const spreadsheet = await parseSpreadsheet(
+      'Question,Answer A,Correct\n"What, exactly?\nExplain","A, with comma",A'
+    );
+
+    expect(spreadsheet.rows[0]).toEqual({
+      Question: 'What, exactly?\nExplain',
+      'Answer A': 'A, with comma',
+      Correct: 'A'
     });
   });
 
