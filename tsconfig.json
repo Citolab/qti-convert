@@ -12,6 +12,7 @@
     "esModuleInterop": true,
     "declaration": true,
     "emitDeclarationOnly": true,
+    "rootDir": "./packages",
     "outDir": "./types",
     "strict": false,
     "noUnusedLocals": false,
@@ -19,16 +20,15 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "forceConsistentCasingInFileNames": true,
     "useDefineForClassFields": false,
     "skipLibCheck": true,
-    "baseUrl": "./",
     "paths": {
-      "@citolab/qti-components/qti-convert": ["src/lib/qti-converter"]
+      "@citolab/qti-components/qti-convert": ["./src/lib/qti-converter"]
     }
   }
 }

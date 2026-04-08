@@ -2,6 +2,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: [
+    'src/qti-json-schema/index.ts',
     'src/qti-converter/index.ts',
     'src/qti-converter-node/index.ts',
     'src/qti-transformer/index.ts',

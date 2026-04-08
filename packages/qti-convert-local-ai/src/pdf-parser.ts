@@ -65,7 +65,7 @@ const PDF_RENDER_SCALE = 2;
 
 try {
   if (!GlobalWorkerOptions.workerSrc) {
-    GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
+    GlobalWorkerOptions.workerSrc = new URL('../../../pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
   }
 } catch {
   // Ignore worker URL setup issues here; getDocument will raise a clearer runtime error if loading fails.
