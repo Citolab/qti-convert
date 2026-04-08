@@ -249,8 +249,7 @@ const salvagePdfQuestionsFromRawResponse = (rawResponse: string, blockTexts: str
 const buildPdfSegmentationPrompt = (blocks: Array<{ index: number; text: string }>): string =>
   buildSegmentationPrompt('PDF', blocks);
 
-const buildPdfNormalizationPrompt = (blocks: string[]): string =>
-  buildSingleItemNormalizationPrompt('PDF', blocks);
+const buildPdfNormalizationPrompt = (blocks: string[]): string => buildSingleItemNormalizationPrompt('PDF', blocks);
 
 // Batched version that processes multiple items at once
 const buildBatchedPdfNormalizationPrompt = (itemGroups: Array<{ itemIndex: number; blocks: string[] }>): string =>

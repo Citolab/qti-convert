@@ -538,8 +538,7 @@ const assignImageBlocksToSegmentedItems = (blocks: DocxBlock[], itemBlockIndexes
   return assigned;
 };
 
-const buildDocxNormalizationPrompt = (blocks: string[]): string =>
-  buildSingleItemNormalizationPrompt('DOCX', blocks);
+const buildDocxNormalizationPrompt = (blocks: string[]): string => buildSingleItemNormalizationPrompt('DOCX', blocks);
 
 // Batched version that processes multiple items at once
 const buildBatchedDocxNormalizationPrompt = (itemGroups: Array<{ itemIndex: number; blocks: string[] }>): string =>

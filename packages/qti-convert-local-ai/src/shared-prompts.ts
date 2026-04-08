@@ -65,10 +65,7 @@ export interface ItemGroup {
  * @param documentType - "PDF" or "DOCX" for context
  * @param itemGroups - Array of item groups with their block texts
  */
-export const buildBatchedNormalizationPrompt = (
-  documentType: 'PDF' | 'DOCX',
-  itemGroups: ItemGroup[]
-): string =>
+export const buildBatchedNormalizationPrompt = (documentType: 'PDF' | 'DOCX', itemGroups: ItemGroup[]): string =>
   [
     `Convert these ${documentType} assessment items into normalized question JSON.`,
     'Return strict JSON only.',
