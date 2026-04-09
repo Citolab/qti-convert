@@ -6,7 +6,8 @@ import { generateQtiPackageFromQuestions } from './qti-generator';
 import {
   buildBatchedNormalizationPrompt,
   buildSingleItemNormalizationPrompt,
-  buildSegmentationPrompt
+  buildBoundaryDetectionPrompt,
+  buildBoundaryDetectionPromptWithContext
 } from './shared-prompts';
 
 type PdfInput = File | Blob | ArrayBuffer | Uint8Array;
@@ -22,13 +23,6 @@ type PdfImageAsset = StructuredMediaAsset & {
   pageNumber: number;
   top: number;
   bottom: number;
-};
-
-type PdfSegmentation = {
-  ignoredBlocks?: number[];
-  items?: Array<{
-    blockIndexes?: number[];
-  }>;
 };
 
 type PdfTextItem = {
@@ -64,10 +58,23 @@ export type PdfToQtiResult = {
   summary: Awaited<ReturnType<typeof generateQtiPackageFromQuestions>>['summary'];
 };
 
-const PDF_SEGMENTATION_CHUNK_SIZE = 36;
-const PDF_NORMALIZATION_BATCH_SIZE = 8; // Normalize multiple items per LLM call
+// Keep chunk sizes small to fit in Qwen2.5-7B context window (~4k tokens usable after prompts)
+const PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS = 100; // Fits with examples in context window
+const PDF_BOUNDARY_DETECTION_CHUNK_SIZE = 80; // Process in smaller chunks
+const PDF_NORMALIZATION_BATCH_SIZE = 3; // Smaller batches to avoid overflow on items with many blocks
+const PDF_CONTEXT_CARRYOVER = 10; // Blocks from previous chunk to include as context
 const PDF_Y_TOLERANCE = 3;
 const PDF_RENDER_SCALE = 2;
+
+// ---------------------------------------------------------------------------
+// Boundary Detection Types
+// ---------------------------------------------------------------------------
+
+type BoundaryDetectionResult = {
+  itemStartIndexes: number[];
+  contextIndexes: number[];
+  ignoredIndexes: number[];
+};
 
 try {
   if (!GlobalWorkerOptions.workerSrc) {
@@ -246,38 +253,218 @@ const salvagePdfQuestionsFromRawResponse = (rawResponse: string, blockTexts: str
     .filter(question => question.prompt);
 };
 
-const buildPdfSegmentationPrompt = (blocks: Array<{ index: number; text: string }>): string =>
-  buildSegmentationPrompt('PDF', blocks);
-
 const buildPdfNormalizationPrompt = (blocks: string[]): string => buildSingleItemNormalizationPrompt('PDF', blocks);
 
 // Batched version that processes multiple items at once
 const buildBatchedPdfNormalizationPrompt = (itemGroups: Array<{ itemIndex: number; blocks: string[] }>): string =>
   buildBatchedNormalizationPrompt('PDF', itemGroups);
 
-const normalizeSegmentation = (rawValue: unknown, rangeStart: number, rangeEnd: number): number[][] => {
-  const items =
-    typeof rawValue === 'object' && rawValue && Array.isArray((rawValue as PdfSegmentation).items)
-      ? (rawValue as PdfSegmentation).items || []
-      : [];
+// ---------------------------------------------------------------------------
+// LLM-based Boundary Detection (Phase 1)
+// ---------------------------------------------------------------------------
 
-  const normalized = items
-    .map(item => {
-      if (!Array.isArray(item.blockIndexes)) {
-        return [];
-      }
-      const rawIndexes = item.blockIndexes.map(value => Number(value)).filter(index => Number.isInteger(index));
-      const looksLocal = rawIndexes.every(index => index >= 0 && index < rangeEnd - rangeStart);
-      const resolvedIndexes = looksLocal ? rawIndexes.map(index => index + rangeStart) : rawIndexes;
-      return resolvedIndexes.filter(index => index >= rangeStart && index < rangeEnd);
-    })
-    .filter(blockIndexes => blockIndexes.length > 0);
+/**
+ * Parse the LLM's boundary detection response.
+ */
+const parseBoundaryDetectionResponse = (rawResponse: string, rangeStart: number, rangeEnd: number): BoundaryDetectionResult => {
+  const jsonStr = extractJsonString(rawResponse);
+  const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
-  if (normalized.length === 0) {
-    throw new Error('LLM PDF segmentation did not produce any item groups.');
+  const parseIndexArray = (key: string): number[] => {
+    const arr = parsed[key];
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map(v => Number(v))
+      .filter(n => Number.isInteger(n))
+      .map(n => {
+        // Handle local vs global indexes
+        if (n >= 0 && n < rangeEnd - rangeStart) {
+          return n + rangeStart; // Convert local to global
+        }
+        return n; // Already global
+      })
+      .filter(n => n >= rangeStart && n < rangeEnd);
+  };
+
+  return {
+    itemStartIndexes: parseIndexArray('itemStartIndexes'),
+    contextIndexes: parseIndexArray('contextIndexes'),
+    ignoredIndexes: parseIndexArray('ignoredIndexes')
+  };
+};
+
+/**
+ * Convert boundary detection results into item block groups.
+ * Each item includes blocks from its start until the next item starts,
+ * with context blocks prepended to the first item that follows them.
+ */
+const boundariesToItemGroups = (
+  boundaries: BoundaryDetectionResult,
+  totalBlocks: number
+): number[][] => {
+  const { itemStartIndexes, contextIndexes, ignoredIndexes } = boundaries;
+
+  if (itemStartIndexes.length === 0) {
+    throw new Error('LLM boundary detection did not find any item starts.');
   }
 
-  return normalized;
+  // Sort item starts
+  const sortedStarts = [...itemStartIndexes].sort((a, b) => a - b);
+  const itemGroups: number[][] = [];
+
+  // Track which context blocks haven't been assigned yet
+  const unassignedContext = new Set(contextIndexes);
+
+  for (let i = 0; i < sortedStarts.length; i++) {
+    const startIdx = sortedStarts[i];
+    const endIdx = sortedStarts[i + 1] ?? totalBlocks;
+    const itemBlocks: number[] = [];
+
+    // Find context blocks that should attach to this item
+    // (context that appears before this item's start but after previous item's start)
+    const prevStart = i > 0 ? sortedStarts[i - 1] : -1;
+    for (const ctxIdx of unassignedContext) {
+      if (ctxIdx > prevStart && ctxIdx < startIdx) {
+        itemBlocks.push(ctxIdx);
+        unassignedContext.delete(ctxIdx);
+      }
+    }
+
+    // Add all blocks from start to next item (excluding ignored)
+    for (let j = startIdx; j < endIdx; j++) {
+      if (!ignoredIndexes.includes(j) && !itemBlocks.includes(j)) {
+        itemBlocks.push(j);
+      }
+    }
+
+    // Sort blocks within item
+    itemBlocks.sort((a, b) => a - b);
+    if (itemBlocks.length > 0) {
+      itemGroups.push(itemBlocks);
+    }
+  }
+
+  return itemGroups;
+};
+
+/**
+ * Detect item boundaries using LLM (Phase 1).
+ * Tries to process whole document first; only chunks if document is very large.
+ */
+const detectBoundariesWithLlm = async (
+  engine: WebLlmLikeEngine,
+  blocks: string[],
+  onProgress?: GenerateQtiPackageOptions['onProgress'],
+  options: GenerateQtiPackageOptions = {}
+): Promise<number[][]> => {
+  const allBoundaries: BoundaryDetectionResult = {
+    itemStartIndexes: [],
+    contextIndexes: [],
+    ignoredIndexes: []
+  };
+
+  // Try whole document first if it's small enough
+  const useChunking = blocks.length > PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS;
+  const chunkSize = useChunking ? PDF_BOUNDARY_DETECTION_CHUNK_SIZE : blocks.length;
+
+  let startIndex = 0;
+  let chunkIndex = 0;
+  let previousContext: Array<{ index: number; text: string }> = [];
+
+  if (!useChunking) {
+    onProgress?.({
+      stage: 'chunk_started',
+      message: `Analyzing all ${blocks.length} blocks for item boundaries (single pass).`
+    });
+  }
+
+  while (startIndex < blocks.length) {
+    const endIndex = Math.min(blocks.length, startIndex + chunkSize);
+    const chunk = blocks.slice(startIndex, endIndex).map((text, localIndex) => ({
+      index: startIndex + localIndex,
+      text
+    }));
+
+    if (useChunking) {
+      onProgress?.({
+        stage: 'chunk_started',
+        message: `Detecting item boundaries in blocks ${startIndex + 1}-${endIndex} of ${blocks.length}${previousContext.length > 0 ? ` (with ${previousContext.length} context blocks)` : ''}.`
+      });
+    }
+
+    const prompt = previousContext.length > 0
+      ? buildBoundaryDetectionPromptWithContext('PDF', chunk, previousContext)
+      : buildBoundaryDetectionPrompt('PDF', chunk);
+
+    try {
+      const rawResponse = await requestLlmJson(
+        engine,
+        buildPdfSystemPrompt('You analyze document structure to identify where assessment items begin. Return strict JSON only.', options),
+        prompt,
+        options
+      );
+
+      const chunkBoundaries = parseBoundaryDetectionResponse(rawResponse, startIndex, endIndex);
+
+      logPdfDebug('PDF boundary detection chunk result', {
+        chunkIndex,
+        startIndex,
+        endIndex,
+        itemStartsFound: chunkBoundaries.itemStartIndexes.length,
+        contextFound: chunkBoundaries.contextIndexes.length,
+        ignoredFound: chunkBoundaries.ignoredIndexes.length
+      });
+
+      // Merge into overall results
+      allBoundaries.itemStartIndexes.push(...chunkBoundaries.itemStartIndexes);
+      allBoundaries.contextIndexes.push(...chunkBoundaries.contextIndexes);
+      allBoundaries.ignoredIndexes.push(...chunkBoundaries.ignoredIndexes);
+    } catch (error) {
+      console.warn('[qti-convert-local-ai][pdf] Failed to parse boundary detection response for chunk', {
+        chunkIndex,
+        startIndex,
+        endIndex,
+        error
+      });
+      // Continue with next chunk - partial results are better than none
+    }
+
+    onProgress?.({
+      stage: 'chunk_completed',
+      message: useChunking
+        ? `Detected boundaries in blocks ${startIndex + 1}-${endIndex}.`
+        : `Boundary detection complete (${allBoundaries.itemStartIndexes.length} items found).`,
+      data: {
+        chunkIndex: chunkIndex + 1,
+        chunkCount: Math.ceil(blocks.length / chunkSize),
+        itemStartsFound: allBoundaries.itemStartIndexes.length
+      }
+    });
+
+    // Save trailing blocks as context for next chunk (only needed if chunking)
+    if (useChunking) {
+      const trailingStart = Math.max(startIndex, endIndex - PDF_CONTEXT_CARRYOVER);
+      previousContext = blocks.slice(trailingStart, endIndex).map((text, i) => ({
+        index: trailingStart + i,
+        text
+      }));
+    }
+
+    startIndex = endIndex;
+    chunkIndex += 1;
+  }
+
+  // Convert boundaries to item groups
+  const itemGroups = boundariesToItemGroups(allBoundaries, blocks.length);
+
+  logPdfDebug('PDF boundary detection complete', {
+    totalItemStarts: allBoundaries.itemStartIndexes.length,
+    totalContextBlocks: allBoundaries.contextIndexes.length,
+    totalIgnoredBlocks: allBoundaries.ignoredIndexes.length,
+    finalItemCount: itemGroups.length
+  });
+
+  return itemGroups;
 };
 
 const groupPageItemsIntoLines = (items: PdfTextItem[]): string[] => {
@@ -586,65 +773,6 @@ export const buildPdfPreview = (document: PdfDocumentData, sampleSize = 8): PdfP
   fileName: document.fileName
 });
 
-const segmentPdfBlocksWithLlm = async (
-  engine: WebLlmLikeEngine,
-  blocks: string[],
-  onProgress?: GenerateQtiPackageOptions['onProgress'],
-  options: GenerateQtiPackageOptions = {}
-): Promise<number[][]> => {
-  const segmentedItems: number[][] = [];
-  let startIndex = 0;
-  let chunkIndex = 0;
-
-  while (startIndex < blocks.length) {
-    const endIndex = Math.min(blocks.length, startIndex + PDF_SEGMENTATION_CHUNK_SIZE);
-    const chunk = blocks.slice(startIndex, endIndex).map((text, localIndex) => ({
-      index: startIndex + localIndex,
-      text
-    }));
-
-    onProgress?.({
-      stage: 'chunk_started',
-      message: `Segmenting PDF blocks ${startIndex + 1}-${endIndex} of ${blocks.length}.`
-    });
-
-    const rawResponse = await requestLlmJson(
-      engine,
-      buildPdfSystemPrompt('You segment PDF document blocks into assessment items. Return strict JSON only.', options),
-      buildPdfSegmentationPrompt(chunk),
-      options
-    );
-    const parsed = parsePdfJson(rawResponse);
-    const chunkItems = normalizeSegmentation(parsed, startIndex, endIndex);
-    logPdfDebug('PDF segmentation chunk result', {
-      chunkIndex,
-      startIndex,
-      endIndex,
-      chunk,
-      chunkItems
-    });
-    segmentedItems.push(...chunkItems);
-
-    onProgress?.({
-      stage: 'chunk_completed',
-      message: `Segmented PDF blocks ${startIndex + 1}-${endIndex} of ${blocks.length}.`,
-      data: {
-        chunkIndex: chunkIndex + 1,
-        chunkCount: Math.ceil(blocks.length / PDF_SEGMENTATION_CHUNK_SIZE)
-      }
-    });
-
-    startIndex = endIndex;
-    chunkIndex += 1;
-  }
-
-  if (segmentedItems.length === 0) {
-    throw new Error('LLM PDF segmentation did not produce any item groups.');
-  }
-
-  return segmentedItems;
-};
-
 type BatchedNormalizationResult = {
   items: Array<{
     itemIndex: number;
@@ -858,9 +986,22 @@ export const convertPdfToQtiPackage = async (
     const engine = await createWebLlmEngine(options.llmSettings, event => {
       options.onProgress?.(event);
     });
+
+    // Phase 1: LLM-based boundary detection (identifies where items start)
+    options.onProgress?.({
+      stage: 'chunk_started',
+      message: 'Detecting item boundaries using LLM...'
+    });
+
     const blockTexts = document.blocks.map(block => block.text);
-    const segmentedItems = await segmentPdfBlocksWithLlm(engine, blockTexts, options.onProgress, options);
-    logPdfDebug('Raw PDF segmentation indexes from LLM', segmentedItems);
+    const segmentedItems = await detectBoundariesWithLlm(engine, blockTexts, options.onProgress, options);
+
+    logPdfDebug('PDF boundary detection complete', {
+      itemCount: segmentedItems.length,
+      sampleItems: segmentedItems.slice(0, 3)
+    });
+
+    // Phase 2: Normalize items using LLM (convert to structured questions)
     questions = await normalizePdfItemsWithLlm(
       engine,
       document.blocks,

@@ -35,10 +35,10 @@ export const QUESTION_TYPE_INSTRUCTIONS = [
  * Instructions for extracting metadata from question text.
  */
 export const METADATA_EXTRACTION_INSTRUCTIONS = [
-  '- Points: Extract from patterns like "2p", "3p", "(3 points)", "2 punten" → points:2',
-  '- Dutch exam format: "2p   1   Leg uit..." means question 1 worth 2 points',
-  '- Selection mode: "meerdere antwoorden", "select all", "kies alle" → selectionMode:"multiple"',
-  '- Remove question numbering like "1.", "5a.", "a)", "Vraag 3" from the prompt text'
+  '- Points: Extract from patterns like "2p", "3 points", "(5 marks)", "2 punti", "3 pts" → points:N',
+  '- Score prefix format: "[Xp] [N] Question..." means question N worth X points (common in standardized exams)',
+  '- Selection mode: "select all", "multiple answers", "choose all that apply" → selectionMode:"multiple"',
+  '- Remove question numbering like "1.", "Q1", "5a.", "a)", "Question 3", "Vraag 3", "Domanda 1" from the prompt text'
 ].join('\n');
 
 /**
@@ -55,39 +55,46 @@ export const SUBQUESTION_INSTRUCTIONS = [
 // ---------------------------------------------------------------------------
 
 /**
- * Few-shot examples showing how to normalize Dutch exam questions.
+ * Few-shot examples showing how to normalize exam questions from various formats.
+ * Examples include different languages to demonstrate pattern-based extraction.
  */
 export const NORMALIZATION_EXAMPLES = `
-EXAMPLE 1: Dutch exam with points prefix
+IMPORTANT: Questions can be in ANY language. Focus on STRUCTURAL patterns:
+- Points/scores: "2p", "3 points", "(5 marks)", "2 punti"
+- Question numbers: "1.", "Q1", "Question 1", etc. (remove from prompt)
+- Section headers become stimulus (shared context)
+- Determine type by structure, not language keywords
+
+EXAMPLE 1: Points-prefixed format (e.g., Dutch/European standardized exams)
 
 Input:
-{"blocks": [{"blockIndex": 0, "text": "Opgave 1 Analyse minimumuurloon"}, {"blockIndex": 1, "text": "Nederland heeft een wettelijk minimumuurloon..."}, {"blockIndex": 2, "text": "2p   1   Leg de uitspraak van econoom 1 uit."}]}
+{"blocks": [{"blockIndex": 0, "text": "Opgave 1 Analysis"}, {"blockIndex": 1, "text": "Country X has a minimum wage policy..."}, {"blockIndex": 2, "text": "2p   1   Explain the economist's statement."}]}
 
 Output:
-{"questions": [{"type": "extended_text", "stimulus": "Opgave 1 Analyse minimumuurloon\\n\\nNederland heeft een wettelijk minimumuurloon...", "prompt": "Leg de uitspraak van econoom 1 uit.", "points": 2}]}
+{"questions": [{"type": "extended_text", "stimulus": "Opgave 1 Analysis\\n\\nCountry X has a minimum wage policy...", "prompt": "Explain the economist's statement.", "points": 2}]}
 
-EXAMPLE 2: Calculation question
+EXAMPLE 2: Standard numbered with stimulus
 
 Input:
-{"blocks": [{"blockIndex": 0, "text": "Gebruik bron 1."}, {"blockIndex": 1, "text": "1p   4   Bereken hoeveel procent het minimumuurloon van een 20-jarige hoger is dan dat van een 16-jarige."}]}
+{"blocks": [{"blockIndex": 0, "text": "Use source 1."}, {"blockIndex": 1, "text": "1p   4   Calculate the percentage difference between the two values."}]}
 
 Output:
-{"questions": [{"type": "extended_text", "stimulus": "Gebruik bron 1.", "prompt": "Bereken hoeveel procent het minimumuurloon van een 20-jarige hoger is dan dat van een 16-jarige.", "points": 1}]}
+{"questions": [{"type": "extended_text", "stimulus": "Use source 1.", "prompt": "Calculate the percentage difference between the two values.", "points": 1}]}
 
 EXAMPLE 3: Multiple choice with options
 
 Input:
-{"blocks": [{"blockIndex": 0, "text": "2p   8   Maak van onderstaande tekst een economisch juiste redenering."}, {"blockIndex": 1, "text": "De markt kan worden gezien als ...(1)..."}, {"blockIndex": 2, "text": "Kies uit:"}, {"blockIndex": 3, "text": "bij (1) volkomen concurrentie / monopolistische concurrentie / oligopolie"}]}
+{"blocks": [{"blockIndex": 0, "text": "2p   8   Complete the text with the correct economic term."}, {"blockIndex": 1, "text": "The market can be seen as ...(1)..."}, {"blockIndex": 2, "text": "Choose from:"}, {"blockIndex": 3, "text": "(1) perfect competition / monopolistic competition / oligopoly"}]}
 
 Output:
-{"questions": [{"type": "multiple_choice", "prompt": "Maak van onderstaande tekst een economisch juiste redenering.\\n\\nDe markt kan worden gezien als ...(1)...", "options": [{"id": "A", "text": "volkomen concurrentie"}, {"id": "B", "text": "monopolistische concurrentie"}, {"id": "C", "text": "oligopolie"}], "points": 2}]}
+{"questions": [{"type": "multiple_choice", "prompt": "Complete the text with the correct economic term.\\n\\nThe market can be seen as ...(1)...", "options": [{"id": "A", "text": "perfect competition"}, {"id": "B", "text": "monopolistic competition"}, {"id": "C", "text": "oligopoly"}], "points": 2}]}
 
-Key patterns:
-- "Xp   N   " prefix: X is points, N is question number (remove from prompt)
-- "Opgave" text becomes stimulus (shared context)
-- "Gebruik bron X" is part of stimulus
-- "Leg uit", "Bereken", "Noem" → extended_text
-- "Kies uit" with options → multiple_choice
+Key patterns to recognize:
+- "[Xp] [N]" or "(X points)" prefix → extract points, remove from prompt
+- Section headers ("Opgave", "Exercice", "Part") → become stimulus
+- "Use source X", "See figure Y" → include in stimulus
+- Questions asking to explain, calculate, analyze → extended_text
+- Questions with A/B/C/D options or "choose from" → multiple_choice
 `;
 
 // ---------------------------------------------------------------------------
@@ -216,6 +223,110 @@ Key patterns:
 - Each "Xp   N   " line is a separate item
 - "Gebruik bron X" before a question belongs to that question
 `;
+
+// ---------------------------------------------------------------------------
+// Boundary Detection Prompt (Phase 1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Concise examples for boundary detection. Keep short to fit in context window.
+ */
+export const BOUNDARY_DETECTION_EXAMPLES = `
+PATTERNS (any language): "1.", "1)", "Q1", "2p 1", "3 points", "(a)", "Question 1"
+
+EX1: Points-prefix format (European exams)
+[{"index":0,"text":"Exam 2025"},{"index":1,"text":"Economics"},{"index":2,"text":"Section 1"},{"index":3,"text":"Context about topic..."},{"index":4,"text":"2p 1 Explain X."},{"index":5,"text":"2p 2 Explain Y."},{"index":6,"text":"Use source 1."},{"index":7,"text":"1p 3 Calculate Z."}]
+Output: {"itemStartIndexes":[4,5,7],"contextIndexes":[2,3,6],"ignoredIndexes":[0,1]}
+Note: "Xp N" pattern marks questions. Section headers and "Use source" are context.
+
+EX2: Standard numbered
+[{"index":0,"text":"Math Test"},{"index":1,"text":"1. What is 2+2?"},{"index":2,"text":"A) 3 B) 4"},{"index":3,"text":"2. Solve x=10"}]
+Output: {"itemStartIndexes":[1,3],"contextIndexes":[],"ignoredIndexes":[0]}
+Note: "N." pattern marks questions. Options stay with their question.
+
+EX3: Exercise sections
+[{"index":0,"text":"Problem 1"},{"index":1,"text":"Given f(x)=..."},{"index":2,"text":"a) Calculate f(0)."},{"index":3,"text":"b) Prove increasing."},{"index":4,"text":"Problem 2"},{"index":5,"text":"a) Solve."}]
+Output: {"itemStartIndexes":[2,3,5],"contextIndexes":[0,1,4],"ignoredIndexes":[]}
+Note: "(a)", "(b)" or "a)", "b)" mark questions. Problem headers are context.
+
+KEY: Find the repeating pattern that marks EACH question start. Ignore titles/dates/instructions.
+`;
+
+/**
+ * Build a prompt for Phase 1: detecting item boundaries.
+ * This is a lighter task than full segmentation - just identify WHERE items start.
+ *
+ * @param documentType - "PDF" or "DOCX" for context
+ * @param blocks - Array of text blocks with their indexes
+ */
+export const buildBoundaryDetectionPrompt = (
+  documentType: 'PDF' | 'DOCX',
+  blocks: Array<{ index: number; text: string }>
+): string =>
+  [
+    `Analyze these ${documentType} text blocks and identify where assessment items START.`,
+    'Return strict JSON only.',
+    '',
+    'IMPORTANT: The document may be in ANY language (English, Dutch, French, Italian, Spanish,',
+    'German, Japanese, etc.). Focus on STRUCTURAL patterns, not specific words:',
+    '- Numbering: "1.", "1)", "(1)", "Q1", "Question 1", etc.',
+    '- Score prefixes: "2p", "3 points", "(5 marks)", etc.',
+    '- Section markers: "Part A", "Exercise 1", etc.',
+    '',
+    'Your task:',
+    '1. First, identify the STRUCTURAL PATTERN used to mark question starts',
+    '2. Return the block indexes where each assessment item BEGINS',
+    '3. Identify context blocks (shared passages, section headers) that should attach to following questions',
+    '4. Identify ignored blocks (page headers, footers, exam titles)',
+    '',
+    'Output shape:',
+    '{"itemStartIndexes": [3, 5, 8], "contextIndexes": [1, 2], "ignoredIndexes": [0]}',
+    '',
+    'Rules:',
+    '- itemStartIndexes: blocks where a NEW question begins (the actual question text)',
+    '- contextIndexes: shared passages or section headers that provide context for questions',
+    '- ignoredIndexes: document chrome (titles, page numbers, instructions)',
+    '- Each item includes all blocks from its start until the next item starts',
+    '- Context blocks will be attached to the first item that follows them',
+    '',
+    BOUNDARY_DETECTION_EXAMPLES,
+    '',
+    'Now analyze these blocks and identify item boundaries:',
+    JSON.stringify(blocks, null, 2)
+  ].join('\n');
+
+/**
+ * Build a prompt for Phase 1 with context from previous chunk.
+ */
+export const buildBoundaryDetectionPromptWithContext = (
+  documentType: 'PDF' | 'DOCX',
+  blocks: Array<{ index: number; text: string }>,
+  previousContext: Array<{ index: number; text: string }>
+): string => {
+  let prompt = buildBoundaryDetectionPrompt(documentType, blocks);
+
+  if (previousContext.length > 0) {
+    const contextNote = [
+      '',
+      '--- CONTEXT FROM PREVIOUS CHUNK ---',
+      'These blocks are from the end of the previous chunk. They help you understand',
+      'if the first blocks in the current chunk need context or are continuations.',
+      'Do NOT include these indexes in your output - only analyze them for context.',
+      '',
+      JSON.stringify(previousContext, null, 2),
+      '',
+      '--- END CONTEXT ---',
+      ''
+    ].join('\n');
+
+    prompt = prompt.replace(
+      'Now analyze these blocks and identify item boundaries:',
+      contextNote + 'Now analyze these blocks and identify item boundaries:'
+    );
+  }
+
+  return prompt;
+};
 
 // ---------------------------------------------------------------------------
 // Segmentation Prompt Builder

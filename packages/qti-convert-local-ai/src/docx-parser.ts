@@ -5,17 +5,12 @@ import { generateQtiPackageFromQuestions } from './qti-generator';
 import {
   buildBatchedNormalizationPrompt,
   buildSingleItemNormalizationPrompt,
-  buildSegmentationPrompt
+  buildBoundaryDetectionPrompt,
+  buildBoundaryDetectionPromptWithContext
 } from './shared-prompts';
 
 type DocxInput = File | Blob | ArrayBuffer | Uint8Array;
 type DocxBlock = { type: 'text'; text: string } | { type: 'image'; asset: StructuredMediaAsset };
-type DocxSegmentation = {
-  ignoredBlocks?: number[];
-  items?: Array<{
-    blockIndexes?: number[];
-  }>;
-};
 
 export type DocxDocumentData = {
   paragraphs: string[];
@@ -40,8 +35,11 @@ export type DocxToQtiResult = {
 };
 
 const EMPTY = '';
-const DOCX_SEGMENTATION_CHUNK_SIZE = 36;
-const DOCX_NORMALIZATION_BATCH_SIZE = 8; // Normalize multiple items per LLM call
+// Keep chunk sizes small to fit in Qwen2.5-7B context window (~4k tokens usable after prompts)
+const DOCX_BOUNDARY_DETECTION_MAX_SINGLE_PASS = 100; // Fits with examples in context window
+const DOCX_BOUNDARY_DETECTION_CHUNK_SIZE = 80; // Process in smaller chunks
+const DOCX_NORMALIZATION_BATCH_SIZE = 3; // Smaller batches to avoid overflow on items with many blocks
+const DOCX_CONTEXT_CARRYOVER = 10; // Blocks from previous chunk to include as context
 const DOCX_IMAGE_MIME_TYPES: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -241,7 +239,9 @@ const isQuestionStart = (value: string): boolean =>
   /^((question|vraag)\s*)?\d{1,3}[.)]\s+\S+/i.test(value) ||
   /^\(\d{1,3}\)\s+\S+/i.test(value) ||
   /^((question|vraag)\s*)?\d{1,3}\s*[:.-]\s+\S+/i.test(value) ||
-  /^(question|vraag)\s+\d{1,3}\b[:.)-]?\s*/i.test(value);
+  /^(question|vraag)\s+\d{1,3}\b[:.)-]?\s*/i.test(value) ||
+  // Dutch exam format: "2p 1 Leg..." or "2p   1   Leg..."
+  /^\d{1,2}p\s+\d{1,3}\s+\S+/i.test(value);
 
 const isBareQuestionNumber = (value: string): boolean => /^\d{1,3}[.)]$/.test(value);
 
@@ -256,6 +256,8 @@ const stripQuestionPrefix = (value: string): string =>
     .replace(/^\(\d{1,3}\)\s*/i, '')
     .replace(/^((question|vraag)\s*)?\d{1,3}\s*[:.-]\s*/i, '')
     .replace(/^(question|vraag)\s+\d{1,3}\b[:.)-]?\s*/i, '')
+    // Dutch exam format: "2p 1 Leg..." or "2p   1   Leg..."
+    .replace(/^\d{1,2}p\s+\d{1,3}\s+/i, '')
     .trim();
 
 const stripSubQuestionPrefix = (value: string): string =>
@@ -280,8 +282,19 @@ const unlabeledOptionCandidate = (value: string): boolean =>
 const blankPlaceholderPattern = /_{3,}/g;
 const blankPlaceholderDetector = /_{3,}/;
 const scorePattern = /(?:^|\s|\()(\d+(?:[.,]\d+)?)\s*(?:p|pt|pts|punt(?:en)?)\)?$/i;
+// Dutch exam format: "2p 1 ..." - score at the BEGINNING
+const prefixScorePattern = /^(\d{1,2})p\s+\d{1,3}\s+/i;
 
 const parseScore = (value: string): number | undefined => {
+  // First check for prefix score (Dutch exam format: "2p 1 Leg...")
+  const prefixMatch = value.match(prefixScorePattern);
+  if (prefixMatch?.[1]) {
+    const parsed = Number(prefixMatch[1]);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  // Then check for suffix score
   const match = value.match(scorePattern);
   if (!match?.[1]) {
     return undefined;
@@ -373,54 +386,212 @@ const finalizeQuestion = (question: WorkingQuestion): StructuredQuestion | null 
   };
 };
 
-const buildDocxSegmentationPrompt = (blocks: Array<{ index: number; text: string }>): string =>
-  buildSegmentationPrompt('DOCX', blocks);
+// ---------------------------------------------------------------------------
+// LLM-based Boundary Detection Types
+// ---------------------------------------------------------------------------
 
-const normalizeSegmentation = (rawValue: unknown, rangeStart: number, rangeEnd: number): number[][] => {
-  const items =
-    typeof rawValue === 'object' && rawValue && Array.isArray((rawValue as DocxSegmentation).items)
-      ? (rawValue as DocxSegmentation).items || []
-      : [];
-
-  const normalized = items
-    .map(item => {
-      if (!Array.isArray(item.blockIndexes)) {
-        return [];
-      }
-      const rawIndexes = item.blockIndexes.map(value => Number(value)).filter(index => Number.isInteger(index));
-      const looksLocal = rawIndexes.every(index => index >= 0 && index < rangeEnd - rangeStart);
-      const resolvedIndexes = looksLocal ? rawIndexes.map(index => index + rangeStart) : rawIndexes;
-      return resolvedIndexes.filter(index => index >= rangeStart && index < rangeEnd);
-    })
-    .filter(blockIndexes => blockIndexes.length > 0);
-
-  if (normalized.length === 0) {
-    throw new Error('LLM DOCX segmentation did not produce any item groups.');
-  }
-
-  return normalized;
+type DocxBoundaryDetectionResult = {
+  itemStartIndexes: number[];
+  contextIndexes: number[];
+  ignoredIndexes: number[];
 };
 
-const isSegmentationBoundary = (value: string): boolean =>
-  isBareQuestionNumber(value) ||
-  isQuestionStart(value) ||
-  isCombinedQuestionSubQuestionStart(value) ||
-  isSubQuestionStart(value);
+/**
+ * Parse the LLM's boundary detection response.
+ */
+const parseBoundaryDetectionResponse = (
+  rawResponse: string,
+  rangeStart: number,
+  rangeEnd: number
+): DocxBoundaryDetectionResult => {
+  const jsonStr = extractJsonString(rawResponse);
+  const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
-const findSegmentationChunkEnd = (blocks: string[], startIndex: number, chunkSize: number): number => {
-  const maxEnd = Math.min(blocks.length, startIndex + chunkSize);
-  if (maxEnd >= blocks.length) {
-    return blocks.length;
+  const parseIndexArray = (key: string): number[] => {
+    const arr = parsed[key];
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map(v => Number(v))
+      .filter(n => Number.isInteger(n))
+      .map(n => {
+        // Handle local vs global indexes
+        if (n >= 0 && n < rangeEnd - rangeStart) {
+          return n + rangeStart; // Convert local to global
+        }
+        return n; // Already global
+      })
+      .filter(n => n >= rangeStart && n < rangeEnd);
+  };
+
+  return {
+    itemStartIndexes: parseIndexArray('itemStartIndexes'),
+    contextIndexes: parseIndexArray('contextIndexes'),
+    ignoredIndexes: parseIndexArray('ignoredIndexes')
+  };
+};
+
+/**
+ * Convert boundary detection results into item block groups.
+ */
+const boundariesToItemGroups = (
+  boundaries: DocxBoundaryDetectionResult,
+  totalBlocks: number
+): number[][] => {
+  const { itemStartIndexes, contextIndexes, ignoredIndexes } = boundaries;
+
+  if (itemStartIndexes.length === 0) {
+    throw new Error('LLM boundary detection did not find any item starts.');
   }
 
-  const minimumEnd = Math.min(blocks.length, startIndex + Math.max(8, Math.floor(chunkSize / 2)));
-  for (let index = maxEnd; index > minimumEnd; index -= 1) {
-    if (isSegmentationBoundary(blocks[index] || '')) {
-      return index;
+  const sortedStarts = [...itemStartIndexes].sort((a, b) => a - b);
+  const itemGroups: number[][] = [];
+  const unassignedContext = new Set(contextIndexes);
+
+  for (let i = 0; i < sortedStarts.length; i++) {
+    const startIdx = sortedStarts[i];
+    const endIdx = sortedStarts[i + 1] ?? totalBlocks;
+    const itemBlocks: number[] = [];
+
+    // Find context blocks that should attach to this item
+    const prevStart = i > 0 ? sortedStarts[i - 1] : -1;
+    for (const ctxIdx of unassignedContext) {
+      if (ctxIdx > prevStart && ctxIdx < startIdx) {
+        itemBlocks.push(ctxIdx);
+        unassignedContext.delete(ctxIdx);
+      }
+    }
+
+    // Add all blocks from start to next item (excluding ignored)
+    for (let j = startIdx; j < endIdx; j++) {
+      if (!ignoredIndexes.includes(j) && !itemBlocks.includes(j)) {
+        itemBlocks.push(j);
+      }
+    }
+
+    itemBlocks.sort((a, b) => a - b);
+    if (itemBlocks.length > 0) {
+      itemGroups.push(itemBlocks);
     }
   }
 
-  return maxEnd;
+  return itemGroups;
+};
+
+/**
+ * Detect item boundaries using LLM (Phase 1).
+ * Tries to process whole document first; only chunks if document is very large.
+ */
+const detectDocxBoundariesWithLlm = async (
+  engine: WebLlmLikeEngine,
+  blocks: string[],
+  onProgress?: GenerateQtiPackageOptions['onProgress'],
+  options: GenerateQtiPackageOptions = {}
+): Promise<number[][]> => {
+  const allBoundaries: DocxBoundaryDetectionResult = {
+    itemStartIndexes: [],
+    contextIndexes: [],
+    ignoredIndexes: []
+  };
+
+  // Try whole document first if it's small enough
+  const useChunking = blocks.length > DOCX_BOUNDARY_DETECTION_MAX_SINGLE_PASS;
+  const chunkSize = useChunking ? DOCX_BOUNDARY_DETECTION_CHUNK_SIZE : blocks.length;
+
+  let startIndex = 0;
+  let chunkIndex = 0;
+  let previousContext: Array<{ index: number; text: string }> = [];
+
+  if (!useChunking) {
+    onProgress?.({
+      stage: 'chunk_started',
+      message: `Analyzing all ${blocks.length} blocks for item boundaries (single pass).`
+    });
+  }
+
+  while (startIndex < blocks.length) {
+    const endIndex = Math.min(blocks.length, startIndex + chunkSize);
+    const chunk = blocks.slice(startIndex, endIndex).map((text, localIndex) => ({
+      index: startIndex + localIndex,
+      text
+    }));
+
+    if (useChunking) {
+      onProgress?.({
+        stage: 'chunk_started',
+        message: `Detecting item boundaries in blocks ${startIndex + 1}-${endIndex} of ${blocks.length}${previousContext.length > 0 ? ` (with ${previousContext.length} context blocks)` : ''}.`
+      });
+    }
+
+    const prompt = previousContext.length > 0
+      ? buildBoundaryDetectionPromptWithContext('DOCX', chunk, previousContext)
+      : buildBoundaryDetectionPrompt('DOCX', chunk);
+
+    try {
+      const rawResponse = await requestLlmJson(
+        engine,
+        buildDocxSystemPrompt('You analyze document structure to identify where assessment items begin. Return strict JSON only.', options),
+        prompt,
+        options
+      );
+
+      const chunkBoundaries = parseBoundaryDetectionResponse(rawResponse, startIndex, endIndex);
+
+      logDocxDebug('DOCX boundary detection chunk result', {
+        chunkIndex,
+        startIndex,
+        endIndex,
+        itemStartsFound: chunkBoundaries.itemStartIndexes.length,
+        contextFound: chunkBoundaries.contextIndexes.length,
+        ignoredFound: chunkBoundaries.ignoredIndexes.length
+      });
+
+      allBoundaries.itemStartIndexes.push(...chunkBoundaries.itemStartIndexes);
+      allBoundaries.contextIndexes.push(...chunkBoundaries.contextIndexes);
+      allBoundaries.ignoredIndexes.push(...chunkBoundaries.ignoredIndexes);
+    } catch (error) {
+      console.warn('[qti-convert-local-ai][docx] Failed to parse boundary detection response for chunk', {
+        chunkIndex,
+        startIndex,
+        endIndex,
+        error
+      });
+    }
+
+    onProgress?.({
+      stage: 'chunk_completed',
+      message: useChunking
+        ? `Detected boundaries in blocks ${startIndex + 1}-${endIndex}.`
+        : `Boundary detection complete (${allBoundaries.itemStartIndexes.length} items found).`,
+      data: {
+        chunkIndex: chunkIndex + 1,
+        chunkCount: Math.ceil(blocks.length / chunkSize),
+        itemStartsFound: allBoundaries.itemStartIndexes.length
+      }
+    });
+
+    // Save trailing blocks as context for next chunk (only needed if chunking)
+    if (useChunking) {
+      const trailingStart = Math.max(startIndex, endIndex - DOCX_CONTEXT_CARRYOVER);
+      previousContext = blocks.slice(trailingStart, endIndex).map((text, i) => ({
+        index: trailingStart + i,
+        text
+      }));
+    }
+
+    startIndex = endIndex;
+    chunkIndex += 1;
+  }
+
+  const itemGroups = boundariesToItemGroups(allBoundaries, blocks.length);
+
+  logDocxDebug('DOCX boundary detection complete', {
+    totalItemStarts: allBoundaries.itemStartIndexes.length,
+    totalContextBlocks: allBoundaries.contextIndexes.length,
+    totalIgnoredBlocks: allBoundaries.ignoredIndexes.length,
+    finalItemCount: itemGroups.length
+  });
+
+  return itemGroups;
 };
 
 const findPreviousTextBlockIndex = (blocks: DocxBlock[], imageIndex: number): number | undefined => {
@@ -543,74 +714,6 @@ const buildDocxNormalizationPrompt = (blocks: string[]): string => buildSingleIt
 // Batched version that processes multiple items at once
 const buildBatchedDocxNormalizationPrompt = (itemGroups: Array<{ itemIndex: number; blocks: string[] }>): string =>
   buildBatchedNormalizationPrompt('DOCX', itemGroups);
-
-const segmentDocxParagraphsWithLlm = async (
-  engine: WebLlmLikeEngine,
-  paragraphs: string[],
-  onProgress?: GenerateQtiPackageOptions['onProgress'],
-  options: GenerateQtiPackageOptions = {}
-): Promise<number[][]> => {
-  const segmentedItems: number[][] = [];
-  let startIndex = 0;
-  let chunkIndex = 0;
-
-  while (startIndex < paragraphs.length) {
-    const endIndex = findSegmentationChunkEnd(paragraphs, startIndex, DOCX_SEGMENTATION_CHUNK_SIZE);
-    const chunk = paragraphs.slice(startIndex, endIndex).map((text, localIndex) => ({
-      index: startIndex + localIndex,
-      text
-    }));
-
-    onProgress?.({
-      stage: 'chunk_started',
-      message: `Segmenting DOCX blocks ${startIndex + 1}-${endIndex} of ${paragraphs.length}.`
-    });
-
-    const rawResponse = await requestLlmJson(
-      engine,
-      buildDocxSystemPrompt(
-        'You segment DOCX document blocks into assessment items. Return strict JSON only.',
-        options
-      ),
-      buildDocxSegmentationPrompt(chunk),
-      options
-    );
-    const parsed = parseDocxJson(rawResponse);
-    const chunkItems = normalizeSegmentation(parsed, startIndex, endIndex);
-    logDocxDebug('DOCX segmentation chunk result', {
-      chunkIndex,
-      startIndex,
-      endIndex,
-      chunk,
-      chunkItems
-    });
-    segmentedItems.push(...chunkItems);
-
-    onProgress?.({
-      stage: 'chunk_completed',
-      message: `Segmented DOCX blocks ${startIndex + 1}-${endIndex} of ${paragraphs.length}.`,
-      data: {
-        chunkIndex: chunkIndex + 1,
-        rangeStart: startIndex,
-        rangeEnd: endIndex,
-        itemCount: chunkItems.length
-      }
-    });
-
-    startIndex = endIndex;
-    chunkIndex += 1;
-  }
-
-  if (segmentedItems.length === 0) {
-    throw new Error('LLM DOCX segmentation did not produce any item groups.');
-  }
-
-  onProgress?.({
-    stage: 'mapping_started',
-    message: 'Segmented DOCX blocks into candidate items with the local LLM.'
-  });
-  return segmentedItems;
-};
 
 type DocxBatchedNormalizationResult = {
   items: Array<{
@@ -1305,11 +1408,24 @@ export const convertDocxToQtiPackage = async (
     const engine = await createWebLlmEngine(options.llmSettings, event => {
       options.onProgress?.(event);
     });
+
+    // Phase 1: LLM-based boundary detection
+    options.onProgress?.({
+      stage: 'chunk_started',
+      message: 'Detecting item boundaries using LLM...'
+    });
+
     const blockTexts = document.blocks.map(block =>
       block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`
     );
-    const segmentedItems = await segmentDocxParagraphsWithLlm(engine, blockTexts, options.onProgress, options);
-    logDocxDebug('Raw DOCX segmentation indexes from LLM', segmentedItems);
+    const segmentedItems = await detectDocxBoundariesWithLlm(engine, blockTexts, options.onProgress, options);
+
+    logDocxDebug('DOCX boundary detection complete', {
+      itemCount: segmentedItems.length,
+      sampleItems: segmentedItems.slice(0, 3)
+    });
+
+    // Phase 2: Normalize items using LLM
     questions = await normalizeDocxItemsWithLlm(engine, document.blocks, segmentedItems, options.onProgress, options);
   } catch (error) {
     console.warn('DOCX LLM parsing failed. Falling back to heuristic extraction.', {
