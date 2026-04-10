@@ -192,6 +192,173 @@ Output: {"itemStartIndexes": [...], "contextIndexes": [...], "ignoredIndexes": [
 
 **Do NOT add hardcoded regex patterns** — teach the LLM through examples instead.
 
+## PDF Image Extraction & Association
+
+PDF images are processed **separately from text** and attached to items via Y-position overlap — the LLM never sees images.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  PDF Input                                                  │
+└─────────────────────────────────────────────────────────────┘
+                    │
+    ┌───────────────┴───────────────┐
+    │                               │
+    ▼                               ▼
+┌───────────────────┐       ┌───────────────────────────────┐
+│  Extract Text     │       │  Extract Images               │
+│  - blocks[]       │       │  - Render page to canvas      │
+│  - pageNumber     │       │  - Find image bounding boxes  │
+│  - Y position     │       │  - Crop each image region     │
+└───────────────────┘       │  - Store with Y coordinates   │
+    │                       └───────────────────────────────┘
+    │                               │
+    ▼                               │
+┌───────────────────┐               │
+│  LLM Boundary     │               │
+│  Detection        │               │
+│  (text only)      │               │
+└───────────────────┘               │
+    │                               │
+    ▼                               │
+┌───────────────────┐               │
+│  LLM Normalization│               │
+│  (text only)      │               │
+└───────────────────┘               │
+    │                               │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Image-to-Item Association (Y-position matching)           │
+│                                                             │
+│  For each item:                                             │
+│  1. Get Y range from item's text blocks                     │
+│  2. Filter images where:                                    │
+│     - image.page ∈ item.pages                              │
+│     - image.bottom <= itemTop + topTolerance (default 60)  │
+│     - image.top >= itemBottom - bottomTolerance (def 220)  │
+│  3. Attach matching images to item.stimulusImages           │
+└─────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  QTI Package with embedded images                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Details (`pdf-parser.ts`)
+
+**Image Extraction (`extractPdfPageImages`):**
+1. Parse PDF operator list for `paintImageXObject`, `paintInlineImageXObject`, `paintImageMaskXObject`
+2. Track transform matrix to compute bounding boxes
+3. Render full page to canvas at 2x scale (`PDF_RENDER_SCALE = 2`)
+4. Crop each image region and convert to PNG bytes
+5. Store with `pageNumber`, `top` (PDF Y), `bottom` (PDF Y)
+
+**Image Association (in `normalizePdfItemsWithLlm`):**
+```typescript
+// Now configurable via options.imageAssociation
+const topTolerance = options.imageAssociation?.topTolerance ?? 60;
+const bottomTolerance = options.imageAssociation?.bottomTolerance ?? 220;
+
+const itemImages = images.filter(image => {
+  if (!itemPages.includes(image.pageNumber)) return false;
+  return image.bottom <= itemTop + topTolerance && image.top >= itemBottom - bottomTolerance;
+});
+```
+
+### Why This Approach?
+
+| Benefit | Explanation |
+|---------|-------------|
+| **LLM-efficient** | Images don't waste context tokens; small models can't interpret images anyway |
+| **Deterministic** | Y-position matching is reliable and fast |
+| **Privacy** | Images never leave the browser |
+| **Simple fallback** | If Y-matching fails, images just go to first item on that page |
+
+## Known Limitations & Future Improvements
+
+### Current Limitations
+
+| Issue | Impact | Mitigation |
+|-------|--------|------------|
+| **Small context window (~4K)** | Can't see full document structure at once | Adaptive chunking with natural breaks |
+| **No multi-column awareness** | Y-position matching assumes single column | Would need column detection |
+| **Batch failures lose structure** | If normalization batch fails, creates flat text items | Could retry with smaller batches |
+
+### Recently Implemented ✅
+
+1. **✅ Adaptive chunking** — Detects natural section breaks (page boundaries, large Y gaps) instead of fixed 80-block chunks. Configure via `options.pdfChunking`.
+
+2. **✅ Configurable Y tolerances** — Adjust image-to-text association thresholds via `options.imageAssociation`.
+
+3. **✅ Table detection** — Identifies tabular regions (3+ rows, 2+ columns at similar Y positions) and prevents chunk breaks inside tables.
+
+### Remaining Improvements
+
+1. **Multi-pass boundary refinement** — First pass finds major sections, second pass finds items within sections
+
+2. **Streaming progress** — Report progress per chunk to improve UX on large documents
+
+3. **Larger model support** — Allow using bigger WebLLM models (14B+) on capable devices for better accuracy
+
+4. **Hybrid cloud fallback** — Optional cloud API fallback when local LLM fails repeatedly
+
+## Configuration Options
+
+### PdfChunkingOptions
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `adaptiveChunking` | boolean | `true` | Use natural breaks (page, Y-gap) instead of fixed chunks |
+| `minYGapForBreak` | number | `50` | Min Y-gap (PDF units) to consider as section break |
+| `maxChunkSize` | number | `80` | Hard limit on blocks per chunk |
+| `minChunkSize` | number | `20` | Minimum blocks per chunk |
+
+### ImageAssociationOptions
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `topTolerance` | number | `60` | Y-tolerance above item top (PDF units) |
+| `bottomTolerance` | number | `220` | Y-tolerance below item bottom (PDF units) |
+
+### Usage Example
+
+```typescript
+import { convertPdfToQtiPackage } from '@citolab/qti-convert-local-ai';
+
+const result = await convertPdfToQtiPackage(pdfFile, {
+  // Adaptive chunking options
+  pdfChunking: {
+    adaptiveChunking: true,
+    minYGapForBreak: 50,
+    maxChunkSize: 100
+  },
+  // Image association options
+  imageAssociation: {
+    topTolerance: 80,
+    bottomTolerance: 250
+  }
+});
+```
+
+## Constants (`pdf-parser.ts`)
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS` | 100 | Max blocks for single LLM call |
+| `PDF_MAX_CHUNK_SIZE` | 80 | Default max blocks per chunk |
+| `PDF_MIN_CHUNK_SIZE` | 20 | Default min blocks per chunk |
+| `PDF_MIN_Y_GAP_FOR_BREAK` | 50 | Default Y-gap threshold for section break |
+| `PDF_NORMALIZATION_BATCH_SIZE` | 3 | Items per normalization batch |
+| `PDF_CONTEXT_CARRYOVER` | 10 | Blocks from previous chunk |
+| `PDF_Y_TOLERANCE` | 3 | Line grouping tolerance |
+| `PDF_RENDER_SCALE` | 2 | Canvas render scale for images |
+| `PDF_IMAGE_TOP_TOLERANCE` | 60 | Default image association top tolerance |
+| `PDF_IMAGE_BOTTOM_TOLERANCE` | 220 | Default image association bottom tolerance |
+
 ## Testing
 
 Run tests with:

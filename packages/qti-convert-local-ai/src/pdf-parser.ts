@@ -1,6 +1,5 @@
 import { GlobalWorkerOptions, OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createWebLlmEngine, inferQuestionsFromRawResponse, type WebLlmLikeEngine } from './mapping';
-import { extractQuestionsFromParagraphs } from './docx-parser';
 import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from './types';
 import { generateQtiPackageFromQuestions } from './qti-generator';
 import {
@@ -66,6 +65,16 @@ const PDF_CONTEXT_CARRYOVER = 10; // Blocks from previous chunk to include as co
 const PDF_Y_TOLERANCE = 3;
 const PDF_RENDER_SCALE = 2;
 
+// Adaptive chunking defaults
+const PDF_ADAPTIVE_CHUNKING_DEFAULT = true;
+const PDF_MIN_Y_GAP_FOR_BREAK = 50; // PDF units
+const PDF_MIN_CHUNK_SIZE = 20;
+const PDF_MAX_CHUNK_SIZE = 80;
+
+// Image association defaults
+const PDF_IMAGE_TOP_TOLERANCE = 60;
+const PDF_IMAGE_BOTTOM_TOLERANCE = 220;
+
 // ---------------------------------------------------------------------------
 // Boundary Detection Types
 // ---------------------------------------------------------------------------
@@ -74,6 +83,306 @@ type BoundaryDetectionResult = {
   itemStartIndexes: number[];
   contextIndexes: number[];
   ignoredIndexes: number[];
+};
+
+// ---------------------------------------------------------------------------
+// Adaptive Chunking - Find Natural Break Points
+// ---------------------------------------------------------------------------
+
+type ChunkBreakPoint = {
+  index: number;
+  reason: 'page_break' | 'y_gap' | 'max_size';
+  score: number; // Higher = better break point
+};
+
+/**
+ * Find natural break points in the document based on:
+ * 1. Page boundaries (strongest signal)
+ * 2. Large Y-gaps (section breaks within a page)
+ * 3. Maximum chunk size limits
+ * 4. Table boundaries (never break inside a table)
+ */
+const findAdaptiveChunkBreaks = (
+  blocks: PdfTextBlock[],
+  options: {
+    minYGap?: number;
+    maxChunkSize?: number;
+    minChunkSize?: number;
+    detectTables?: boolean;
+  } = {}
+): number[] => {
+  const minYGap = options.minYGap ?? PDF_MIN_Y_GAP_FOR_BREAK;
+  const maxChunkSize = options.maxChunkSize ?? PDF_MAX_CHUNK_SIZE;
+  const minChunkSize = options.minChunkSize ?? PDF_MIN_CHUNK_SIZE;
+  const detectTables = options.detectTables ?? true;
+
+  if (blocks.length <= maxChunkSize) {
+    return []; // No breaks needed, process as single chunk
+  }
+
+  // Detect table regions to avoid breaking inside them
+  const tables = detectTables ? detectTableRegions(blocks) : [];
+
+  const breakPoints: ChunkBreakPoint[] = [];
+
+  // Find all potential break points
+  for (let i = 1; i < blocks.length; i++) {
+    const prev = blocks[i - 1];
+    const curr = blocks[i];
+
+    // Skip if this would break inside a table
+    if (wouldSplitTable(i, tables)) {
+      continue;
+    }
+
+    // Page break (strongest signal)
+    if (curr.pageNumber !== prev.pageNumber) {
+      breakPoints.push({
+        index: i,
+        reason: 'page_break',
+        score: 100
+      });
+      continue;
+    }
+
+    // Large Y-gap within same page (section break)
+    // Note: PDF Y increases upward, so a new section below has a SMALLER Y
+    const yGap = prev.y - curr.y;
+    if (yGap > minYGap) {
+      breakPoints.push({
+        index: i,
+        reason: 'y_gap',
+        score: Math.min(yGap, 80) // Cap score at 80 (less than page break)
+      });
+    }
+  }
+
+  // Now select breaks to create chunks within size limits
+  const selectedBreaks: number[] = [];
+  let lastBreak = 0;
+
+  // Sort by index to process in order
+  breakPoints.sort((a, b) => a.index - b.index);
+
+  for (const bp of breakPoints) {
+    const chunkSize = bp.index - lastBreak;
+
+    // Skip if chunk would be too small
+    if (chunkSize < minChunkSize && selectedBreaks.length > 0) {
+      continue;
+    }
+
+    // Select this break if chunk is reasonable size
+    if (chunkSize >= minChunkSize) {
+      // But don't let chunks get too big - if we're past max, find best break
+      if (chunkSize > maxChunkSize) {
+        // We need to break earlier - find the best break point in range
+        const rangeStart = lastBreak + minChunkSize;
+        const rangeEnd = lastBreak + maxChunkSize;
+        const inRangeBreaks = breakPoints.filter(
+          b => b.index > rangeStart && b.index <= rangeEnd && b.index < bp.index
+        );
+
+        if (inRangeBreaks.length > 0) {
+          // Pick highest scoring break in range
+          inRangeBreaks.sort((a, b) => b.score - a.score);
+          selectedBreaks.push(inRangeBreaks[0].index);
+          lastBreak = inRangeBreaks[0].index;
+        } else {
+          // No good break in range, force break at max size
+          selectedBreaks.push(lastBreak + maxChunkSize);
+          lastBreak = lastBreak + maxChunkSize;
+        }
+      }
+
+      // Now add this break if still valid
+      const currentChunkSize = bp.index - lastBreak;
+      if (currentChunkSize >= minChunkSize && currentChunkSize <= maxChunkSize) {
+        selectedBreaks.push(bp.index);
+        lastBreak = bp.index;
+      }
+    }
+  }
+
+  // Handle remaining blocks if they'd create a valid chunk
+  const remaining = blocks.length - lastBreak;
+  if (remaining > maxChunkSize) {
+    // Need more breaks
+    while (blocks.length - lastBreak > maxChunkSize) {
+      const nextBreak = lastBreak + maxChunkSize;
+      selectedBreaks.push(nextBreak);
+      lastBreak = nextBreak;
+    }
+  }
+
+  logPdfDebug('Adaptive chunking breaks', {
+    totalBlocks: blocks.length,
+    potentialBreaks: breakPoints.length,
+    selectedBreaks: selectedBreaks.length,
+    breaks: selectedBreaks.map(idx => ({
+      index: idx,
+      reason: breakPoints.find(bp => bp.index === idx)?.reason || 'max_size'
+    }))
+  });
+
+  return selectedBreaks;
+};
+
+// ---------------------------------------------------------------------------
+// Table Detection - Identify tabular regions
+// ---------------------------------------------------------------------------
+
+type TableRegion = {
+  startIndex: number;
+  endIndex: number;
+  rowCount: number;
+  colCount: number;
+};
+
+/**
+ * Detect table-like regions in the document.
+ * Tables are identified by clusters of blocks at similar Y positions (rows)
+ * appearing consecutively, with multiple blocks per row (columns).
+ *
+ * @returns Array of table regions with start/end block indexes
+ */
+const detectTableRegions = (
+  blocks: PdfTextBlock[],
+  options: {
+    minRows?: number;
+    minCols?: number;
+    yTolerance?: number;
+  } = {}
+): TableRegion[] => {
+  const minRows = options.minRows ?? 3; // At least 3 rows to be considered a table
+  const minCols = options.minCols ?? 2; // At least 2 columns
+  const yTolerance = options.yTolerance ?? PDF_Y_TOLERANCE;
+
+  const tables: TableRegion[] = [];
+
+  // Group consecutive blocks by Y position (same row)
+  type RowGroup = { y: number; startIdx: number; endIdx: number; count: number };
+  const rows: RowGroup[] = [];
+
+  let currentRow: RowGroup | null = null;
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+
+    // Check if this block continues the current row
+    if (currentRow && Math.abs(block.y - currentRow.y) <= yTolerance && block.pageNumber === blocks[currentRow.startIdx].pageNumber) {
+      currentRow.endIdx = i;
+      currentRow.count += 1;
+    } else {
+      // Start a new row
+      if (currentRow) {
+        rows.push(currentRow);
+      }
+      currentRow = {
+        y: block.y,
+        startIdx: i,
+        endIdx: i,
+        count: 1
+      };
+    }
+  }
+
+  if (currentRow) {
+    rows.push(currentRow);
+  }
+
+  // Find consecutive multi-column rows (table candidates)
+  let tableStart: number | null = null;
+  let tableRowCount = 0;
+  let minColsInTable = Infinity;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+
+    // Check if this row has multiple columns and continues a table
+    if (row.count >= minCols) {
+      if (tableStart === null) {
+        tableStart = row.startIdx;
+        tableRowCount = 1;
+        minColsInTable = row.count;
+      } else {
+        // Check if rows are consecutive (no big gap)
+        const prevRow = rows[i - 1];
+        const yGap = prevRow.y - row.y;
+        const samePageAsPrev = blocks[row.startIdx].pageNumber === blocks[prevRow.startIdx].pageNumber;
+
+        if (samePageAsPrev && yGap < 50) {
+          tableRowCount += 1;
+          minColsInTable = Math.min(minColsInTable, row.count);
+        } else {
+          // End current table, start new one
+          if (tableRowCount >= minRows) {
+            tables.push({
+              startIndex: tableStart,
+              endIndex: prevRow.endIdx,
+              rowCount: tableRowCount,
+              colCount: minColsInTable
+            });
+          }
+          tableStart = row.startIdx;
+          tableRowCount = 1;
+          minColsInTable = row.count;
+        }
+      }
+    } else {
+      // Single-column row - end any current table
+      if (tableStart !== null && tableRowCount >= minRows) {
+        const prevRow = rows[i - 1];
+        tables.push({
+          startIndex: tableStart,
+          endIndex: prevRow.endIdx,
+          rowCount: tableRowCount,
+          colCount: minColsInTable
+        });
+      }
+      tableStart = null;
+      tableRowCount = 0;
+      minColsInTable = Infinity;
+    }
+  }
+
+  // Handle table at end of document
+  if (tableStart !== null && tableRowCount >= minRows) {
+    const lastRow = rows[rows.length - 1];
+    tables.push({
+      startIndex: tableStart,
+      endIndex: lastRow.endIdx,
+      rowCount: tableRowCount,
+      colCount: minColsInTable
+    });
+  }
+
+  if (tables.length > 0) {
+    logPdfDebug('Table regions detected', {
+      count: tables.length,
+      tables: tables.map(t => ({
+        blocks: `${t.startIndex}-${t.endIndex}`,
+        rows: t.rowCount,
+        cols: t.colCount
+      }))
+    });
+  }
+
+  return tables;
+};
+
+/**
+ * Check if a block index falls within any table region.
+ */
+const isInTable = (blockIndex: number, tables: TableRegion[]): boolean => {
+  return tables.some(t => blockIndex >= t.startIndex && blockIndex <= t.endIndex);
+};
+
+/**
+ * Check if a potential break point would split a table.
+ */
+const wouldSplitTable = (breakIndex: number, tables: TableRegion[]): boolean => {
+  return tables.some(t => breakIndex > t.startIndex && breakIndex <= t.endIndex);
 };
 
 try {
@@ -266,7 +575,11 @@ const buildBatchedPdfNormalizationPrompt = (itemGroups: Array<{ itemIndex: numbe
 /**
  * Parse the LLM's boundary detection response.
  */
-const parseBoundaryDetectionResponse = (rawResponse: string, rangeStart: number, rangeEnd: number): BoundaryDetectionResult => {
+const parseBoundaryDetectionResponse = (
+  rawResponse: string,
+  rangeStart: number,
+  rangeEnd: number
+): BoundaryDetectionResult => {
   const jsonStr = extractJsonString(rawResponse);
   const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
@@ -298,10 +611,7 @@ const parseBoundaryDetectionResponse = (rawResponse: string, rangeStart: number,
  * Each item includes blocks from its start until the next item starts,
  * with context blocks prepended to the first item that follows them.
  */
-const boundariesToItemGroups = (
-  boundaries: BoundaryDetectionResult,
-  totalBlocks: number
-): number[][] => {
+const boundariesToItemGroups = (boundaries: BoundaryDetectionResult, totalBlocks: number): number[][] => {
   const { itemStartIndexes, contextIndexes, ignoredIndexes } = boundaries;
 
   if (itemStartIndexes.length === 0) {
@@ -349,11 +659,11 @@ const boundariesToItemGroups = (
 
 /**
  * Detect item boundaries using LLM (Phase 1).
- * Tries to process whole document first; only chunks if document is very large.
+ * Uses adaptive chunking based on page breaks and Y-gaps when enabled.
  */
 const detectBoundariesWithLlm = async (
   engine: WebLlmLikeEngine,
-  blocks: string[],
+  blocks: PdfTextBlock[],
   onProgress?: GenerateQtiPackageOptions['onProgress'],
   options: GenerateQtiPackageOptions = {}
 ): Promise<number[][]> => {
@@ -363,43 +673,84 @@ const detectBoundariesWithLlm = async (
     ignoredIndexes: []
   };
 
-  // Try whole document first if it's small enough
-  const useChunking = blocks.length > PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS;
-  const chunkSize = useChunking ? PDF_BOUNDARY_DETECTION_CHUNK_SIZE : blocks.length;
+  // Extract chunking options with defaults
+  const chunkingOptions = options.pdfChunking ?? {};
+  const useAdaptive = chunkingOptions.adaptiveChunking ?? PDF_ADAPTIVE_CHUNKING_DEFAULT;
+  const maxChunkSize = chunkingOptions.maxChunkSize ?? PDF_MAX_CHUNK_SIZE;
+  const minChunkSize = chunkingOptions.minChunkSize ?? PDF_MIN_CHUNK_SIZE;
+  const minYGap = chunkingOptions.minYGapForBreak ?? PDF_MIN_Y_GAP_FOR_BREAK;
 
-  let startIndex = 0;
-  let chunkIndex = 0;
-  let previousContext: Array<{ index: number; text: string }> = [];
+  // Determine chunk boundaries
+  let chunkBreaks: number[];
+  if (blocks.length <= PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS) {
+    // Small document - process in single pass
+    chunkBreaks = [];
+  } else if (useAdaptive) {
+    // Use adaptive chunking based on natural breaks
+    chunkBreaks = findAdaptiveChunkBreaks(blocks, {
+      minYGap,
+      maxChunkSize,
+      minChunkSize
+    });
+  } else {
+    // Fixed-size chunking (legacy behavior)
+    chunkBreaks = [];
+    for (let i = maxChunkSize; i < blocks.length; i += maxChunkSize) {
+      chunkBreaks.push(i);
+    }
+  }
 
-  if (!useChunking) {
+  // Build chunk ranges from breaks
+  const chunkRanges: Array<{ start: number; end: number }> = [];
+  let prevEnd = 0;
+  for (const breakIdx of chunkBreaks) {
+    chunkRanges.push({ start: prevEnd, end: breakIdx });
+    prevEnd = breakIdx;
+  }
+  chunkRanges.push({ start: prevEnd, end: blocks.length });
+
+  logPdfDebug('Chunking strategy', {
+    totalBlocks: blocks.length,
+    useAdaptive,
+    chunkCount: chunkRanges.length,
+    chunkSizes: chunkRanges.map(r => r.end - r.start)
+  });
+
+  if (chunkRanges.length === 1) {
     onProgress?.({
       stage: 'chunk_started',
       message: `Analyzing all ${blocks.length} blocks for item boundaries (single pass).`
     });
   }
 
-  while (startIndex < blocks.length) {
-    const endIndex = Math.min(blocks.length, startIndex + chunkSize);
-    const chunk = blocks.slice(startIndex, endIndex).map((text, localIndex) => ({
+  let previousContext: Array<{ index: number; text: string }> = [];
+
+  for (let chunkIndex = 0; chunkIndex < chunkRanges.length; chunkIndex++) {
+    const { start: startIndex, end: endIndex } = chunkRanges[chunkIndex];
+    const chunk = blocks.slice(startIndex, endIndex).map((block, localIndex) => ({
       index: startIndex + localIndex,
-      text
+      text: block.text
     }));
 
-    if (useChunking) {
+    if (chunkRanges.length > 1) {
       onProgress?.({
         stage: 'chunk_started',
         message: `Detecting item boundaries in blocks ${startIndex + 1}-${endIndex} of ${blocks.length}${previousContext.length > 0 ? ` (with ${previousContext.length} context blocks)` : ''}.`
       });
     }
 
-    const prompt = previousContext.length > 0
-      ? buildBoundaryDetectionPromptWithContext('PDF', chunk, previousContext)
-      : buildBoundaryDetectionPrompt('PDF', chunk);
+    const prompt =
+      previousContext.length > 0
+        ? buildBoundaryDetectionPromptWithContext('PDF', chunk, previousContext)
+        : buildBoundaryDetectionPrompt('PDF', chunk);
 
     try {
       const rawResponse = await requestLlmJson(
         engine,
-        buildPdfSystemPrompt('You analyze document structure to identify where assessment items begin. Return strict JSON only.', options),
+        buildPdfSystemPrompt(
+          'You analyze document structure to identify where assessment items begin. Return strict JSON only.',
+          options
+        ),
         prompt,
         options
       );
@@ -431,27 +782,24 @@ const detectBoundariesWithLlm = async (
 
     onProgress?.({
       stage: 'chunk_completed',
-      message: useChunking
+      message: chunkRanges.length > 1
         ? `Detected boundaries in blocks ${startIndex + 1}-${endIndex}.`
         : `Boundary detection complete (${allBoundaries.itemStartIndexes.length} items found).`,
       data: {
         chunkIndex: chunkIndex + 1,
-        chunkCount: Math.ceil(blocks.length / chunkSize),
+        chunkCount: chunkRanges.length,
         itemStartsFound: allBoundaries.itemStartIndexes.length
       }
     });
 
-    // Save trailing blocks as context for next chunk (only needed if chunking)
-    if (useChunking) {
+    // Save trailing blocks as context for next chunk
+    if (chunkIndex < chunkRanges.length - 1) {
       const trailingStart = Math.max(startIndex, endIndex - PDF_CONTEXT_CARRYOVER);
-      previousContext = blocks.slice(trailingStart, endIndex).map((text, i) => ({
+      previousContext = blocks.slice(trailingStart, endIndex).map((block, i) => ({
         index: trailingStart + i,
-        text
+        text: block.text
       }));
     }
-
-    startIndex = endIndex;
-    chunkIndex += 1;
   }
 
   // Convert boundaries to item groups
@@ -900,6 +1248,11 @@ const normalizePdfItemsWithLlm = async (
           .filter((value): value is number => Number.isFinite(value));
         const itemTop = itemYValues.length > 0 ? Math.max(...itemYValues) : Number.NEGATIVE_INFINITY;
         const itemBottom = itemYValues.length > 0 ? Math.min(...itemYValues) : Number.POSITIVE_INFINITY;
+
+        // Image association with configurable tolerances
+        const topTolerance = options.imageAssociation?.topTolerance ?? PDF_IMAGE_TOP_TOLERANCE;
+        const bottomTolerance = options.imageAssociation?.bottomTolerance ?? PDF_IMAGE_BOTTOM_TOLERANCE;
+
         const itemImages = images.filter(image => {
           if (!itemPages.includes(image.pageNumber)) {
             return false;
@@ -907,7 +1260,7 @@ const normalizePdfItemsWithLlm = async (
           if (!Number.isFinite(itemTop) || !Number.isFinite(itemBottom)) {
             return true;
           }
-          return image.bottom <= itemTop + 60 && image.top >= itemBottom - 220;
+          return image.bottom <= itemTop + topTolerance && image.top >= itemBottom - bottomTolerance;
         });
         const normalizedQuestions = normalized.map((question, questionIndex) => ({
           ...question,
@@ -921,24 +1274,28 @@ const normalizePdfItemsWithLlm = async (
         batchQuestionCount += normalizedQuestions.length;
       }
     } catch (error) {
-      console.warn('[qti-convert-local-ai][pdf] Falling back to heuristic normalization for PDF batch.', {
+      console.warn('[qti-convert-local-ai][pdf] LLM normalization failed for PDF batch, creating simple items.', {
         batchIndex,
         itemRange: [startIdx, endIdx],
         error
       });
-      // Fallback: heuristic extraction for each item in batch
+      // Fallback: create simple items from blocks (no pattern matching)
       for (let localIdx = 0; localIdx < batchItems.length; localIdx++) {
         const globalIdx = startIdx + localIdx;
         const blockIndexes = batchItems[localIdx];
         const blockTexts = blockIndexes
           .map(blockIndex => blocks[blockIndex]?.text)
           .filter((value): value is string => Boolean(value));
-        const fallbackQuestions = extractQuestionsFromParagraphs(blockTexts).map((question, questionIndex) => ({
-          ...question,
-          identifier: question.identifier || `item-${globalIdx + 1}-${questionIndex + 1}`
-        }));
-        questions.push(...fallbackQuestions);
-        batchQuestionCount += fallbackQuestions.length;
+        // Create one extended_text item per block group without regex pattern matching
+        if (blockTexts.length > 0) {
+          questions.push({
+            type: 'extended_text',
+            identifier: `item-${globalIdx + 1}`,
+            prompt: blockTexts.join('\n\n'),
+            points: 1
+          });
+          batchQuestionCount += 1;
+        }
       }
     }
 
@@ -993,8 +1350,7 @@ export const convertPdfToQtiPackage = async (
       message: 'Detecting item boundaries using LLM...'
     });
 
-    const blockTexts = document.blocks.map(block => block.text);
-    const segmentedItems = await detectBoundariesWithLlm(engine, blockTexts, options.onProgress, options);
+    const segmentedItems = await detectBoundariesWithLlm(engine, document.blocks, options.onProgress, options);
 
     logPdfDebug('PDF boundary detection complete', {
       itemCount: segmentedItems.length,
@@ -1011,20 +1367,21 @@ export const convertPdfToQtiPackage = async (
       options
     );
   } catch (error) {
-    console.warn('PDF LLM parsing failed. Falling back to heuristic extraction.', {
+    console.warn('PDF LLM parsing failed. Creating simple items from all blocks.', {
       error,
-      blockCount: document.blocks.length,
-      blocks: document.blocks.map((block, index) => ({
-        index,
-        pageNumber: block.pageNumber,
-        text: block.text
-      }))
+      blockCount: document.blocks.length
     });
     options.onProgress?.({
       stage: 'mapping_started',
-      message: 'Falling back to heuristic PDF extraction because the local LLM failed.'
+      message: 'LLM parsing failed. Creating simple items from document blocks.'
     });
-    questions = extractQuestionsFromParagraphs(document.blocks.map(block => block.text));
+    // Create one item per block without pattern matching
+    questions = document.blocks.map((block, index) => ({
+      type: 'extended_text' as const,
+      identifier: `item-${index + 1}`,
+      prompt: block.text,
+      points: 1
+    }));
   }
 
   options.onProgress?.({

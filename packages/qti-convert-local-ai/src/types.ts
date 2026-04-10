@@ -133,6 +133,43 @@ export type QuestionInferenceFunction = (
   }
 ) => Promise<StructuredQuestion[]>;
 
+export type PdfChunkingOptions = {
+  /**
+   * Use adaptive chunking based on page breaks and Y-gaps instead of fixed chunk size.
+   * @default true
+   */
+  adaptiveChunking?: boolean;
+  /**
+   * Minimum Y-gap (in PDF units) to consider as a natural section break.
+   * Larger values = fewer breaks. Typical range: 30-100.
+   * @default 50
+   */
+  minYGapForBreak?: number;
+  /**
+   * Maximum blocks per chunk (hard limit even with adaptive chunking).
+   * @default 80
+   */
+  maxChunkSize?: number;
+  /**
+   * Minimum blocks per chunk (prevents tiny chunks).
+   * @default 20
+   */
+  minChunkSize?: number;
+};
+
+export type ImageAssociationOptions = {
+  /**
+   * Y-tolerance above item top for image association (PDF units).
+   * @default 60
+   */
+  topTolerance?: number;
+  /**
+   * Y-tolerance below item bottom for image association (PDF units).
+   * @default 220
+   */
+  bottomTolerance?: number;
+};
+
 export type GenerateQtiPackageOptions = {
   packageIdentifier?: string;
   testIdentifier?: string;
@@ -143,6 +180,14 @@ export type GenerateQtiPackageOptions = {
   pointsDefault?: number;
   onProgress?: ProgressCallback;
   llmSettings?: WebLlmSettings;
+  /**
+   * PDF-specific chunking options for boundary detection.
+   */
+  pdfChunking?: PdfChunkingOptions;
+  /**
+   * Image-to-item association options (PDF only).
+   */
+  imageAssociation?: ImageAssociationOptions;
 };
 
 export type SpreadsheetToQtiResult = {

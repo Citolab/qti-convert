@@ -26,9 +26,15 @@ export const QUESTION_JSON_SHAPE = `{
  * Instructions for determining question type.
  */
 export const QUESTION_TYPE_INSTRUCTIONS = [
-  '- Multiple choice: has answer options labeled A, B, C, D etc.',
+  '- Multiple choice: has answer options labeled A, B, C, D etc. EXPLICITLY in the text',
   '- Extended text: open questions, fill-in-the-blank, or essay questions without predefined options',
-  '- Do NOT confuse subquestions (a, b, c) with answer choices (A, B, C, D)'
+  '- Do NOT confuse subquestions (a, b, c) with answer choices (A, B, C, D)',
+  '',
+  'CRITICAL - NEVER ADD CONTENT:',
+  '- ONLY use "multiple_choice" if options A/B/C/D are EXPLICITLY written in the source text',
+  '- NEVER generate or invent options that do not exist in the source',
+  '- If unsure, use "extended_text" - it is always safe',
+  '- Questions asking to "explain", "calculate", "describe", "motivate" are ALWAYS extended_text'
 ].join('\n');
 
 /**
@@ -37,6 +43,7 @@ export const QUESTION_TYPE_INSTRUCTIONS = [
 export const METADATA_EXTRACTION_INSTRUCTIONS = [
   '- Points: Extract from patterns like "2p", "3 points", "(5 marks)", "2 punti", "3 pts" → points:N',
   '- Score prefix format: "[Xp] [N] Question..." means question N worth X points (common in standardized exams)',
+  '- REMOVE the score prefix from the prompt text! "2p 1 Leg uit..." → prompt: "Leg uit..." (NOT "2p 1 Leg uit...")',
   '- Selection mode: "select all", "multiple answers", "choose all that apply" → selectionMode:"multiple"',
   '- Remove question numbering like "1.", "Q1", "5a.", "a)", "Question 3", "Vraag 3", "Domanda 1" from the prompt text'
 ].join('\n');
@@ -65,6 +72,12 @@ IMPORTANT: Questions can be in ANY language. Focus on STRUCTURAL patterns:
 - Section headers become stimulus (shared context)
 - Determine type by structure, not language keywords
 
+CRITICAL - PRESERVE TEXT EXACTLY:
+- NEVER invent, add, or generate content that is not in the source
+- ONLY use multiple_choice if options A/B/C/D are EXPLICITLY written in the source
+- If there are NO options in the text, use extended_text
+- Copy text verbatim - do not paraphrase or summarize
+
 EXAMPLE 1: Points-prefixed format (e.g., Dutch/European standardized exams)
 
 Input:
@@ -72,6 +85,8 @@ Input:
 
 Output:
 {"questions": [{"type": "extended_text", "stimulus": "Opgave 1 Analysis\\n\\nCountry X has a minimum wage policy...", "prompt": "Explain the economist's statement.", "points": 2}]}
+
+Note: "2p 1" was REMOVED from prompt. Extract points:2, remove the prefix entirely.
 
 EXAMPLE 2: Standard numbered with stimulus
 
@@ -230,26 +245,48 @@ Key patterns:
 
 /**
  * Concise examples for boundary detection. Keep short to fit in context window.
+ * Uses SEMANTIC detection: identify blocks that contain IMPERATIVE VERBS commanding the student.
+ * Also recognizes score markers (Xp N) as strong hints.
  */
 export const BOUNDARY_DETECTION_EXAMPLES = `
-PATTERNS (any language): "1.", "1)", "Q1", "2p 1", "3 points", "(a)", "Question 1"
+A QUESTION block contains an IMPERATIVE VERB (command to student) - can be in ANY language:
+- Dutch: "Leg uit", "Bereken", "Toon aan", "Motiveer", "Geef", "Beschrijf", "Noem", "Vergelijk"
+- English: "Explain", "Calculate", "Show", "Prove", "Describe", "List", "Compare", "Analyze", "Define"
+- German: "Erkläre", "Berechne", "Beschreibe", "Nenne", "Vergleiche"
+- French: "Expliquez", "Calculez", "Décrivez", "Comparez"
+- Spanish: "Explica", "Calcula", "Describe", "Compara"
+- Other languages: Look for command verbs addressed to the student
 
-EX1: Points-prefix format (European exams)
-[{"index":0,"text":"Exam 2025"},{"index":1,"text":"Economics"},{"index":2,"text":"Section 1"},{"index":3,"text":"Context about topic..."},{"index":4,"text":"2p 1 Explain X."},{"index":5,"text":"2p 2 Explain Y."},{"index":6,"text":"Use source 1."},{"index":7,"text":"1p 3 Calculate Z."}]
-Output: {"itemStartIndexes":[4,5,7],"contextIndexes":[2,3,6],"ignoredIndexes":[0,1]}
-Note: "Xp N" pattern marks questions. Section headers and "Use source" are context.
+STRONG HINT: "Xp N" pattern (e.g., "2p 16", "1p 21") almost always marks a question start.
 
-EX2: Standard numbered
-[{"index":0,"text":"Math Test"},{"index":1,"text":"1. What is 2+2?"},{"index":2,"text":"A) 3 B) 4"},{"index":3,"text":"2. Solve x=10"}]
-Output: {"itemStartIndexes":[1,3],"contextIndexes":[],"ignoredIndexes":[0]}
-Note: "N." pattern marks questions. Options stay with their question.
+CRITICAL - ANSWER OPTIONS ARE NOT QUESTIONS:
+- Lines starting with "A ", "B ", "C ", "D ", "E ", "F " followed by text are ANSWER OPTIONS
+- Answer options belong to the PREVIOUS question - they are NOT new item starts
+- Bullet lists (•, -, *) followed by text are also answer options, not new items
+- DO NOT put answer option lines in itemStartIndexes!
 
-EX3: Exercise sections
-[{"index":0,"text":"Problem 1"},{"index":1,"text":"Given f(x)=..."},{"index":2,"text":"a) Calculate f(0)."},{"index":3,"text":"b) Prove increasing."},{"index":4,"text":"Problem 2"},{"index":5,"text":"a) Solve."}]
-Output: {"itemStartIndexes":[2,3,5],"contextIndexes":[0,1,4],"ignoredIndexes":[]}
-Note: "(a)", "(b)" or "a)", "b)" mark questions. Problem headers are context.
+NOT a question (CONTEXT):
+- Quotes: "Een econoom zegt: ..." 
+- Facts: "De overheid verhoogde..."
+- Scenarios without imperative: "Stel dat..."
+- Answer options: "A De markt...", "B Het aanbod...", etc.
 
-KEY: Find the repeating pattern that marks EACH question start. Ignore titles/dates/instructions.
+EX1: Multiple choice with answer options
+[{"index":0,"text":"2p 1 Wat zijn drie voorbeelden van materiële cultuurelementen?"},{"index":1,"text":"A De Nachtwacht is het beroemdste schilderij."},{"index":2,"text":"B In de winter wordt er stamppot gegeten."},{"index":3,"text":"C In Drenthe spreekt 55% een dialect."},{"index":4,"text":"D Nederland kleurt oranje bij voetbal."},{"index":5,"text":"2p 2 Leg uit wat immateriële cultuur is."}]
+Output: {"itemStartIndexes":[0,5],"contextIndexes":[],"ignoredIndexes":[]}
+Why: Block 0 and 5 are questions (have "Xp N" + imperative). Blocks 1-4 are ANSWER OPTIONS (start with A/B/C/D) - they belong to question at block 0, NOT separate items.
+
+EX2: Regular questions without options
+[{"index":0,"text":"Exam 2025"},{"index":1,"text":"Een econoom zegt: 'De markt faalt.'"},{"index":2,"text":"2p 16 Leg uit waarom de markt faalt."},{"index":3,"text":"De overheid besluit in te grijpen."},{"index":4,"text":"2p 17 Leg uit welk effect dit heeft."},{"index":5,"text":"1p 18 Bereken het percentage."}]
+Output: {"itemStartIndexes":[2,4,5],"contextIndexes":[1,3],"ignoredIndexes":[0]}
+Why: Blocks 2,4,5 have "Xp N" AND imperatives. Blocks 1,3 are descriptive context.
+
+EX3: Question with bullet options
+[{"index":0,"text":"2p 5 Welke stelling is juist?"},{"index":1,"text":"• Stelling 1: De prijs stijgt"},{"index":2,"text":"• Stelling 2: Het aanbod daalt"},{"index":3,"text":"1p 6 Bereken de elasticiteit."}]
+Output: {"itemStartIndexes":[0,3],"contextIndexes":[],"ignoredIndexes":[]}
+Why: Block 0 is a question. Blocks 1-2 are bullet options (belong to question 0). Block 3 is next question.
+
+Rule: If a block starts with A/B/C/D/E/F + space + text, OR • / - / * → it's an ANSWER OPTION, not a question.
 `;
 
 /**
@@ -264,34 +301,27 @@ export const buildBoundaryDetectionPrompt = (
   blocks: Array<{ index: number; text: string }>
 ): string =>
   [
-    `Analyze these ${documentType} text blocks and identify where assessment items START.`,
-    'Return strict JSON only.',
+    `Identify assessment QUESTIONS in these ${documentType} text blocks. Return strict JSON.`,
     '',
-    'IMPORTANT: The document may be in ANY language (English, Dutch, French, Italian, Spanish,',
-    'German, Japanese, etc.). Focus on STRUCTURAL patterns, not specific words:',
-    '- Numbering: "1.", "1)", "(1)", "Q1", "Question 1", etc.',
-    '- Score prefixes: "2p", "3 points", "(5 marks)", etc.',
-    '- Section markers: "Part A", "Exercise 1", etc.',
+    'A QUESTION block has BOTH:',
+    '1. Score marker like "2p 16", "1p 21" (X points, question N)',
+    '2. Imperative verb (command to the student) - can be in ANY language:',
+    '   - Dutch: Leg uit, Bereken, Toon aan, Motiveer, Geef, Beschrijf, Noem, Vergelijk',
+    '   - English: Explain, Calculate, Show, Prove, Describe, List, Compare, Analyze, Define',
     '',
-    'Your task:',
-    '1. First, identify the STRUCTURAL PATTERN used to mark question starts',
-    '2. Return the block indexes where each assessment item BEGINS',
-    '3. Identify context blocks (shared passages, section headers) that should attach to following questions',
-    '4. Identify ignored blocks (page headers, footers, exam titles)',
+    'CRITICAL: ANSWER OPTIONS ARE NOT QUESTIONS!',
+    '- Lines starting with A/B/C/D/E/F + space + text are ANSWER OPTIONS',
+    '- Bullet points (•, -, *) followed by text are ANSWER OPTIONS',
+    '- Answer options belong to the PREVIOUS question, NOT separate items',
     '',
-    'Output shape:',
-    '{"itemStartIndexes": [3, 5, 8], "contextIndexes": [1, 2], "ignoredIndexes": [0]}',
+    'CONTEXT blocks are descriptive (no imperative): quotes, facts, scenarios',
+    'IGNORED blocks: titles, page numbers, dates',
     '',
-    'Rules:',
-    '- itemStartIndexes: blocks where a NEW question begins (the actual question text)',
-    '- contextIndexes: shared passages or section headers that provide context for questions',
-    '- ignoredIndexes: document chrome (titles, page numbers, instructions)',
-    '- Each item includes all blocks from its start until the next item starts',
-    '- Context blocks will be attached to the first item that follows them',
+    'Output: {"itemStartIndexes":[...], "contextIndexes":[...], "ignoredIndexes":[...]}',
     '',
     BOUNDARY_DETECTION_EXAMPLES,
     '',
-    'Now analyze these blocks and identify item boundaries:',
+    'Blocks to analyze:',
     JSON.stringify(blocks, null, 2)
   ].join('\n');
 

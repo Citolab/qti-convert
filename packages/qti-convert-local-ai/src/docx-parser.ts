@@ -239,9 +239,7 @@ const isQuestionStart = (value: string): boolean =>
   /^((question|vraag)\s*)?\d{1,3}[.)]\s+\S+/i.test(value) ||
   /^\(\d{1,3}\)\s+\S+/i.test(value) ||
   /^((question|vraag)\s*)?\d{1,3}\s*[:.-]\s+\S+/i.test(value) ||
-  /^(question|vraag)\s+\d{1,3}\b[:.)-]?\s*/i.test(value) ||
-  // Dutch exam format: "2p 1 Leg..." or "2p   1   Leg..."
-  /^\d{1,2}p\s+\d{1,3}\s+\S+/i.test(value);
+  /^(question|vraag)\s+\d{1,3}\b[:.)-]?\s*/i.test(value);
 
 const isBareQuestionNumber = (value: string): boolean => /^\d{1,3}[.)]$/.test(value);
 
@@ -256,8 +254,6 @@ const stripQuestionPrefix = (value: string): string =>
     .replace(/^\(\d{1,3}\)\s*/i, '')
     .replace(/^((question|vraag)\s*)?\d{1,3}\s*[:.-]\s*/i, '')
     .replace(/^(question|vraag)\s+\d{1,3}\b[:.)-]?\s*/i, '')
-    // Dutch exam format: "2p 1 Leg..." or "2p   1   Leg..."
-    .replace(/^\d{1,2}p\s+\d{1,3}\s+/i, '')
     .trim();
 
 const stripSubQuestionPrefix = (value: string): string =>
@@ -282,19 +278,8 @@ const unlabeledOptionCandidate = (value: string): boolean =>
 const blankPlaceholderPattern = /_{3,}/g;
 const blankPlaceholderDetector = /_{3,}/;
 const scorePattern = /(?:^|\s|\()(\d+(?:[.,]\d+)?)\s*(?:p|pt|pts|punt(?:en)?)\)?$/i;
-// Dutch exam format: "2p 1 ..." - score at the BEGINNING
-const prefixScorePattern = /^(\d{1,2})p\s+\d{1,3}\s+/i;
 
 const parseScore = (value: string): number | undefined => {
-  // First check for prefix score (Dutch exam format: "2p 1 Leg...")
-  const prefixMatch = value.match(prefixScorePattern);
-  if (prefixMatch?.[1]) {
-    const parsed = Number(prefixMatch[1]);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  // Then check for suffix score
   const match = value.match(scorePattern);
   if (!match?.[1]) {
     return undefined;
@@ -433,10 +418,7 @@ const parseBoundaryDetectionResponse = (
 /**
  * Convert boundary detection results into item block groups.
  */
-const boundariesToItemGroups = (
-  boundaries: DocxBoundaryDetectionResult,
-  totalBlocks: number
-): number[][] => {
+const boundariesToItemGroups = (boundaries: DocxBoundaryDetectionResult, totalBlocks: number): number[][] => {
   const { itemStartIndexes, contextIndexes, ignoredIndexes } = boundaries;
 
   if (itemStartIndexes.length === 0) {
@@ -522,14 +504,18 @@ const detectDocxBoundariesWithLlm = async (
       });
     }
 
-    const prompt = previousContext.length > 0
-      ? buildBoundaryDetectionPromptWithContext('DOCX', chunk, previousContext)
-      : buildBoundaryDetectionPrompt('DOCX', chunk);
+    const prompt =
+      previousContext.length > 0
+        ? buildBoundaryDetectionPromptWithContext('DOCX', chunk, previousContext)
+        : buildBoundaryDetectionPrompt('DOCX', chunk);
 
     try {
       const rawResponse = await requestLlmJson(
         engine,
-        buildDocxSystemPrompt('You analyze document structure to identify where assessment items begin. Return strict JSON only.', options),
+        buildDocxSystemPrompt(
+          'You analyze document structure to identify where assessment items begin. Return strict JSON only.',
+          options
+        ),
         prompt,
         options
       );
@@ -821,18 +807,21 @@ const normalizeDocxItemsWithLlm = async (
       try {
         batchResult = parseDocxBatchedNormalizationResponse(rawResponse);
       } catch (error) {
-        console.warn('[qti-convert-local-ai][docx] Failed to parse batch response, falling back to heuristic.', {
+        console.warn('[qti-convert-local-ai][docx] Failed to parse batch response, creating simple items.', {
           batchIndex,
           error
         });
-        // Fallback: heuristic extraction for each item in batch
+        // Fallback: create simple items without pattern matching
         for (const group of itemGroups) {
-          const fallbackQuestions = extractQuestionsFromParagraphs(group.blocks).map((question, questionIndex) => ({
-            ...question,
-            identifier: question.identifier || `item-${group.itemIndex + 1}-${questionIndex + 1}`
-          }));
-          questions.push(...fallbackQuestions);
-          batchQuestionCount += fallbackQuestions.length;
+          if (group.blocks.length > 0) {
+            questions.push({
+              type: 'extended_text',
+              identifier: `item-${group.itemIndex + 1}`,
+              prompt: group.blocks.join('\n\n'),
+              points: 1
+            });
+            batchQuestionCount += 1;
+          }
         }
         onProgress?.({
           stage: 'chunk_completed',
@@ -882,19 +871,22 @@ const normalizeDocxItemsWithLlm = async (
         batchQuestionCount += normalizedWithImages.length;
       }
     } catch (error) {
-      console.warn('[qti-convert-local-ai][docx] Falling back to heuristic normalization for DOCX batch.', {
+      console.warn('[qti-convert-local-ai][docx] LLM normalization failed, creating simple items.', {
         batchIndex,
         itemRange: [startIdx, endIdx],
         error
       });
-      // Fallback: heuristic extraction for each item in batch
+      // Fallback: create simple items without pattern matching
       for (const group of itemGroups) {
-        const fallbackQuestions = extractQuestionsFromParagraphs(group.blocks).map((question, questionIndex) => ({
-          ...question,
-          identifier: question.identifier || `item-${group.itemIndex + 1}-${questionIndex + 1}`
-        }));
-        questions.push(...fallbackQuestions);
-        batchQuestionCount += fallbackQuestions.length;
+        if (group.blocks.length > 0) {
+          questions.push({
+            type: 'extended_text',
+            identifier: `item-${group.itemIndex + 1}`,
+            prompt: group.blocks.join('\n\n'),
+            points: 1
+          });
+          batchQuestionCount += 1;
+        }
       }
     }
 
@@ -1428,20 +1420,23 @@ export const convertDocxToQtiPackage = async (
     // Phase 2: Normalize items using LLM
     questions = await normalizeDocxItemsWithLlm(engine, document.blocks, segmentedItems, options.onProgress, options);
   } catch (error) {
-    console.warn('DOCX LLM parsing failed. Falling back to heuristic extraction.', {
+    console.warn('DOCX LLM parsing failed. Creating simple items from blocks.', {
       error,
-      blockCount: document.blocks.length,
-      blocks: document.blocks.map((block, index) =>
-        block.type === 'text'
-          ? { index, type: 'text', text: block.text }
-          : { index, type: 'image', fileName: block.asset.fileName }
-      )
+      blockCount: document.blocks.length
     });
     options.onProgress?.({
       stage: 'mapping_started',
-      message: 'Falling back to heuristic DOCX extraction because the local LLM failed.'
+      message: 'LLM parsing failed. Creating simple items from document blocks.'
     });
-    questions = extractQuestionsFromBlocks(document.blocks);
+    // Create one item per text block without pattern matching
+    questions = document.blocks
+      .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+      .map((block, index) => ({
+        type: 'extended_text' as const,
+        identifier: `item-${index + 1}`,
+        prompt: block.text,
+        points: 1
+      }));
   }
 
   options.onProgress?.({

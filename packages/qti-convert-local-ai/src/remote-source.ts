@@ -32,6 +32,14 @@ export type RemoteSourceToQtiResult = Pick<
   fileName: string;
 };
 
+/**
+ * Default CORS proxy URL. Uses {url} placeholder for the target URL.
+ *
+ * To use your own Cloudflare Worker proxy, see the cloudflare-cors-proxy
+ * directory in this package for a ready-to-deploy worker.
+ *
+ * Usage: proxyUrl: 'https://your-worker.workers.dev?url={url}'
+ */
 export const DEFAULT_REMOTE_SOURCE_PROXY_URL = 'https://corsproxy.io/?url={url}';
 
 const tryParseUrl = (rawUrl: string): URL | null => {
