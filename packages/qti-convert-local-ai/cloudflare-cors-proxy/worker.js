@@ -1,15 +1,15 @@
 /**
  * Cloudflare Worker CORS Proxy for qti-convert-local-ai
- * 
+ *
  * Deploy this worker to enable fetching Google Forms, Microsoft Forms,
  * and other remote sources from the browser.
- * 
+ *
  * Usage:
  * 1. Create a Cloudflare account (free tier works)
  * 2. Go to Workers & Pages → Create Worker
  * 3. Paste this code and deploy
  * 4. Use your worker URL:
- *    
+ *
  *    convertRemoteSourceToQtiPackage(url, {
  *      proxyUrl: 'https://your-worker.your-subdomain.workers.dev?url={url}'
  *    });
@@ -24,7 +24,7 @@ export default {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, OPTIONS',
           'Access-Control-Allow-Headers': '*',
-          'Access-Control-Max-Age': '86400',
+          'Access-Control-Max-Age': '86400'
         }
       });
     }
@@ -61,13 +61,14 @@ export default {
       const response = await fetch(targetUrl, {
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
           'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-cache'
         },
-        redirect: 'follow',
+        redirect: 'follow'
       });
 
       // Get response body as ArrayBuffer to handle binary content
@@ -80,7 +81,7 @@ export default {
       const responseHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Expose-Headers': 'Content-Type, Content-Disposition, Content-Length',
-        'Content-Type': contentType,
+        'Content-Type': contentType
       };
 
       if (contentDisposition) {
@@ -90,7 +91,7 @@ export default {
       return new Response(body, {
         status: response.status,
         statusText: response.statusText,
-        headers: responseHeaders,
+        headers: responseHeaders
       });
     } catch (error) {
       return new Response(`Proxy error: ${error.message}`, { status: 502 });

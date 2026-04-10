@@ -270,7 +270,11 @@ const detectTableRegions = (
     const block = blocks[i];
 
     // Check if this block continues the current row
-    if (currentRow && Math.abs(block.y - currentRow.y) <= yTolerance && block.pageNumber === blocks[currentRow.startIdx].pageNumber) {
+    if (
+      currentRow &&
+      Math.abs(block.y - currentRow.y) <= yTolerance &&
+      block.pageNumber === blocks[currentRow.startIdx].pageNumber
+    ) {
       currentRow.endIdx = i;
       currentRow.count += 1;
     } else {
@@ -782,9 +786,10 @@ const detectBoundariesWithLlm = async (
 
     onProgress?.({
       stage: 'chunk_completed',
-      message: chunkRanges.length > 1
-        ? `Detected boundaries in blocks ${startIndex + 1}-${endIndex}.`
-        : `Boundary detection complete (${allBoundaries.itemStartIndexes.length} items found).`,
+      message:
+        chunkRanges.length > 1
+          ? `Detected boundaries in blocks ${startIndex + 1}-${endIndex}.`
+          : `Boundary detection complete (${allBoundaries.itemStartIndexes.length} items found).`,
       data: {
         chunkIndex: chunkIndex + 1,
         chunkCount: chunkRanges.length,

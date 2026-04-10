@@ -59,7 +59,10 @@ const getFileBaseName = (fileName: string): string => fileName.replace(/\.[^.]+$
 
 const normalizeHtmlToText = (html: string): string => {
   if (typeof DOMParser === 'undefined') {
-    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return html
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   const document = new DOMParser().parseFromString(html, 'text/html');
@@ -303,7 +306,9 @@ const convertFetchedSource = async (
     const result = await convertGoogleFormToQtiPackage(route.fetchUrl, {
       ...options,
       fetchFormHtml: async (url: string) => {
-        const htmlResponse = await (options.fetchRemote || defaultFetchRemote)(buildProxyRequestUrl(url, options.proxyUrl));
+        const htmlResponse = await (options.fetchRemote || defaultFetchRemote)(
+          buildProxyRequestUrl(url, options.proxyUrl)
+        );
         if (!htmlResponse.ok) {
           throw new Error(`Failed to fetch Google Form (${htmlResponse.status}).`);
         }
@@ -323,7 +328,10 @@ const convertFetchedSource = async (
     const result = await convertMicrosoftFormToQtiPackage(html, {
       ...options,
       fetchRuntimeForm: async (url: string, init?: RequestInit) => {
-        const runtimeResponse = await (options.fetchRemote || defaultFetchRemote)(buildProxyRequestUrl(url, options.proxyUrl), init);
+        const runtimeResponse = await (options.fetchRemote || defaultFetchRemote)(
+          buildProxyRequestUrl(url, options.proxyUrl),
+          init
+        );
         if (!runtimeResponse.ok) {
           throw new Error(`Failed to fetch Microsoft Form definition (${runtimeResponse.status}).`);
         }
@@ -397,7 +405,9 @@ const convertFetchedSource = async (
 
   const inferredMode = await chooseAmbiguousMode(route.fetchUrl, contentType, normalizedText, options);
   if (inferredMode && inferredMode !== 'html-text') {
-    throw new Error(`Remote source was classified as "${inferredMode}", but only HTML/text processing is available for this response.`);
+    throw new Error(
+      `Remote source was classified as "${inferredMode}", but only HTML/text processing is available for this response.`
+    );
   }
 
   const workbookFile = await createWorkbookFileFromText(normalizedText, responseFileName || route.fileName);
@@ -441,7 +451,9 @@ export const convertRemoteSourceToQtiPackage = async (
     };
   }
 
-  const response = await (options.fetchRemote || defaultFetchRemote)(buildProxyRequestUrl(route.fetchUrl, options.proxyUrl));
+  const response = await (options.fetchRemote || defaultFetchRemote)(
+    buildProxyRequestUrl(route.fetchUrl, options.proxyUrl)
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch remote source (${response.status}).`);
   }

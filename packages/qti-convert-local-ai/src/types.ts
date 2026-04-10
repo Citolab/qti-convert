@@ -87,12 +87,7 @@ export type MappingInference = {
 
 export type ProgressEvent =
   | {
-      stage:
-        | 'parse_started'
-        | 'llm_loading_started'
-        | 'mapping_started'
-        | 'generation_started'
-        | 'chunk_started';
+      stage: 'parse_started' | 'llm_loading_started' | 'mapping_started' | 'generation_started' | 'chunk_started';
       message: string;
     }
   | {
