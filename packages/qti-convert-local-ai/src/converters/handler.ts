@@ -6,7 +6,7 @@
  * has a corresponding converter that implements the DocumentConverter interface.
  */
 
-import type { GenerateQtiPackageOptions, StructuredQuestion, ConversionSummary, ProgressCallback } from './types';
+import type { GenerateQtiPackageOptions, StructuredQuestion, ConversionSummary, ProgressCallback } from '../types';
 
 // ---------------------------------------------------------------------------
 // Core Converter Types

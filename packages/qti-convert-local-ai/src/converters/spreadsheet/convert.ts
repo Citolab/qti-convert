@@ -1,12 +1,12 @@
-import { buildDatasetPreview, parseSpreadsheet, ParseSpreadsheetOptions } from './spreadsheet-parser';
+import { buildDatasetPreview, parseSpreadsheet, ParseSpreadsheetOptions } from './parser';
 import {
   createWebLlmQuestionInfererFromSettings,
   createWebLlmEngine,
   inferColumnMappingWithLlm,
   applyColumnMappingToSpreadsheet,
   type ColumnMapping
-} from './mapping';
-import { generateQtiPackageFromQuestions } from './qti-generator';
+} from '../../mapping';
+import { generateQtiPackageFromQuestions } from '../../qti-generator';
 import {
   GenerateQtiPackageOptions,
   QuestionInferenceFunction,
@@ -14,7 +14,7 @@ import {
   SpreadsheetRow,
   SpreadsheetToQtiResult,
   StructuredQuestion
-} from './types';
+} from '../../types';
 
 export type ConvertSpreadsheetToQtiOptions = ParseSpreadsheetOptions & GenerateQtiPackageOptions;
 

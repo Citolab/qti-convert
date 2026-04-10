@@ -1,194 +1,25 @@
 import ExcelJS from 'exceljs';
-import { createWebLlmEngine } from './mapping';
-import { convertSpreadsheetToQtiPackage } from './convert-spreadsheet';
-import { convertDocxToQtiPackage } from './docx-parser';
-import { convertPdfToQtiPackage } from './pdf-parser';
-import { convertGoogleFormToQtiPackage } from './google-form';
-import { convertMicrosoftFormToQtiPackage } from './microsoft-form';
-import { GenerateQtiPackageOptions, SpreadsheetToQtiResult } from './types';
-
-export type RemoteSourceMode = 'xlsx' | 'docx' | 'pdf' | 'csv' | 'html-text' | 'google-form' | 'microsoft-form';
-
-export type RemoteSourceRoute = {
-  fetchUrl: string;
-  mode: RemoteSourceMode;
-  fileName: string;
-  originalUrl: string;
-};
-
-export type RemoteSourceFetcher = (url: string, init?: RequestInit) => Promise<Response>;
-
-export type ConvertRemoteSourceToQtiOptions = GenerateQtiPackageOptions & {
-  fetchRemote?: RemoteSourceFetcher;
-  proxyUrl?: string;
-};
-
-export type RemoteSourceToQtiResult = Pick<
-  SpreadsheetToQtiResult,
-  'questions' | 'packageBlob' | 'packageName' | 'summary'
-> & {
-  sourceMode: RemoteSourceMode;
-  resolvedUrl: string;
-  fileName: string;
-};
-
-/**
- * Default CORS proxy URL. Uses {url} placeholder for the target URL.
- *
- * To use your own Cloudflare Worker proxy, see the cloudflare-cors-proxy
- * directory in this package for a ready-to-deploy worker.
- *
- * Usage: proxyUrl: 'https://your-worker.workers.dev?url={url}'
- */
-export const DEFAULT_REMOTE_SOURCE_PROXY_URL = 'https://corsproxy.io/?url={url}';
-
-const tryParseUrl = (rawUrl: string): URL | null => {
-  try {
-    return new URL(rawUrl);
-  } catch {
-    return null;
-  }
-};
-
-const getFileExtension = (fileName: string): string => {
-  const match = fileName.toLowerCase().match(/\.[^.]+$/);
-  return match?.[0] || '';
-};
-
-const getFileBaseName = (fileName: string): string => fileName.replace(/\.[^.]+$/i, '');
-
-const normalizeHtmlToText = (html: string): string => {
-  if (typeof DOMParser === 'undefined') {
-    return html
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  return document.body.textContent?.replace(/\s+/g, ' ').trim() || '';
-};
-
-const buildGoogleExportRoute = (url: URL): RemoteSourceRoute | null => {
-  const spreadsheetMatch = url.pathname.match(/^\/spreadsheets\/d\/([^/]+)/);
-  if (spreadsheetMatch) {
-    const id = spreadsheetMatch[1];
-    return {
-      fetchUrl: `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`,
-      mode: 'xlsx',
-      fileName: `${id}.xlsx`,
-      originalUrl: url.toString()
-    };
-  }
-
-  const documentMatch = url.pathname.match(/^\/document\/d\/([^/]+)/);
-  if (documentMatch) {
-    const id = documentMatch[1];
-    return {
-      fetchUrl: `https://docs.google.com/document/d/${id}/export?format=docx`,
-      mode: 'docx',
-      fileName: `${id}.docx`,
-      originalUrl: url.toString()
-    };
-  }
-
-  if (url.pathname.includes('/forms/')) {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'google-form',
-      fileName: 'google-form',
-      originalUrl: url.toString()
-    };
-  }
-
-  return null;
-};
-
-export const inferRemoteSourceRoute = (rawUrl: string): RemoteSourceRoute | null => {
-  const url = tryParseUrl(rawUrl.trim());
-  if (!url) {
-    return null;
-  }
-
-  if (url.hostname === 'docs.google.com') {
-    return buildGoogleExportRoute(url);
-  }
-
-  if (url.hostname === 'forms.gle' || (url.hostname.endsWith('.google.com') && url.pathname.includes('/forms/'))) {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'google-form',
-      fileName: 'google-form',
-      originalUrl: url.toString()
-    };
-  }
-
-  if (url.hostname === 'forms.office.com' || url.hostname.endsWith('.forms.office.com')) {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'microsoft-form',
-      fileName: 'microsoft-form',
-      originalUrl: url.toString()
-    };
-  }
-
-  const extension = getFileExtension(url.pathname);
-  if (extension === '.xlsx' || extension === '.xls') {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'xlsx',
-      fileName: decodeURIComponent(url.pathname.split('/').pop() || 'remote.xlsx'),
-      originalUrl: url.toString()
-    };
-  }
-  if (extension === '.docx') {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'docx',
-      fileName: decodeURIComponent(url.pathname.split('/').pop() || 'remote.docx'),
-      originalUrl: url.toString()
-    };
-  }
-  if (extension === '.pdf') {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'pdf',
-      fileName: decodeURIComponent(url.pathname.split('/').pop() || 'remote.pdf'),
-      originalUrl: url.toString()
-    };
-  }
-  if (extension === '.csv') {
-    return {
-      fetchUrl: url.toString(),
-      mode: 'csv',
-      fileName: decodeURIComponent(url.pathname.split('/').pop() || 'remote.csv'),
-      originalUrl: url.toString()
-    };
-  }
-
-  return {
-    fetchUrl: url.toString(),
-    mode: 'html-text',
-    fileName: decodeURIComponent(url.pathname.split('/').pop() || 'remote-source.txt'),
-    originalUrl: url.toString()
-  };
-};
-
-const buildProxyRequestUrl = (targetUrl: string, proxyUrl?: string): string => {
-  const effectiveProxyUrl = proxyUrl === undefined ? DEFAULT_REMOTE_SOURCE_PROXY_URL : proxyUrl;
-  const trimmedProxy = effectiveProxyUrl.trim();
-  if (!trimmedProxy) {
-    return targetUrl;
-  }
-
-  if (trimmedProxy.includes('{url}')) {
-    return trimmedProxy.replace('{url}', encodeURIComponent(targetUrl));
-  }
-
-  const url = new URL(trimmedProxy);
-  url.searchParams.set('url', targetUrl);
-  return url.toString();
-};
+import { createWebLlmEngine } from '../../mapping';
+import { convertSpreadsheetToQtiPackage } from '../spreadsheet';
+import { convertDocxToQtiPackage } from '../docx';
+import { convertPdfToQtiPackage } from '../pdf';
+import { convertGoogleFormToQtiPackage } from '../google-form';
+import { convertMicrosoftFormToQtiPackage } from '../microsoft-form';
+import type {
+  ConvertRemoteSourceToQtiOptions,
+  RemoteSourceFetcher,
+  RemoteSourceMode,
+  RemoteSourceRoute,
+  RemoteSourceToQtiResult
+} from './types';
+import {
+  buildProxyRequestUrl,
+  getFileBaseName,
+  getFileExtension,
+  inferRemoteSourceRoute,
+  inferResponseMode,
+  normalizeHtmlToText
+} from './routing';
 
 const getResponseFileName = (response: Response, fallback: string): string => {
   const contentDisposition = response.headers.get('content-disposition') || '';
@@ -206,39 +37,6 @@ const defaultFetchRemote: RemoteSourceFetcher = (url, init) =>
 
 const responseContentToString = async (response: Response): Promise<string> => await response.text();
 
-const inferResponseMode = (contentType: string, fileName: string): RemoteSourceMode | null => {
-  const extension = getFileExtension(fileName);
-  if (extension === '.xlsx' || extension === '.xls') {
-    return 'xlsx';
-  }
-  if (extension === '.docx') {
-    return 'docx';
-  }
-  if (extension === '.pdf') {
-    return 'pdf';
-  }
-  if (extension === '.csv') {
-    return 'csv';
-  }
-
-  if (contentType.includes('spreadsheet') || contentType.includes('excel')) {
-    return 'xlsx';
-  }
-  if (contentType.includes('wordprocessingml') || contentType.includes('msword')) {
-    return 'docx';
-  }
-  if (contentType.includes('pdf')) {
-    return 'pdf';
-  }
-  if (contentType.includes('csv')) {
-    return 'csv';
-  }
-  if (contentType.includes('html') || contentType.startsWith('text/')) {
-    return 'html-text';
-  }
-
-  return null;
-};
 
 const chooseAmbiguousMode = async (
   url: string,

@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { describe, expect, test } from 'vitest';
-import { convertDocxToQtiPackage, extractQuestionsFromParagraphs, parseDocx } from './docx-parser';
+import { convertDocxToQtiPackage, extractQuestionsFromParagraphs, parseDocx } from '../src/converters';
 
 const createDocxBuffer = async (paragraphs: string[]): Promise<ArrayBuffer> => {
   const zip = new JSZip();

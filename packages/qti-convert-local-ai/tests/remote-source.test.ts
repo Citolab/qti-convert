@@ -1,7 +1,11 @@
 /* @vitest-environment jsdom */
 
 import { describe, expect, test } from 'vitest';
-import { DEFAULT_REMOTE_SOURCE_PROXY_URL, convertRemoteSourceToQtiPackage, inferRemoteSourceRoute } from './remote-source';
+import {
+  DEFAULT_REMOTE_SOURCE_PROXY_URL,
+  convertRemoteSourceToQtiPackage,
+  inferRemoteSourceRoute
+} from '../src/converters';
 
 const GOOGLE_FORM_HTML = `<!DOCTYPE html>
 <html>

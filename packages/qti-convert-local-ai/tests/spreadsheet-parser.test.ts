@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { describe, expect, test } from 'vitest';
-import { buildDatasetPreview, parseSpreadsheet } from './spreadsheet-parser';
+import { buildDatasetPreview, parseSpreadsheet } from '../src/converters';
 
 describe('parseSpreadsheet', () => {
   test('parses csv input into ordered columns and rows', async () => {

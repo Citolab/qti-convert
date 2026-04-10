@@ -1,10 +1,9 @@
 import { Buffer as BrowserBuffer } from 'buffer';
 import ExcelJS from 'exceljs';
-import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from './types';
+import { DatasetPreview, SpreadsheetData, SpreadsheetFormat, SpreadsheetRow } from '../../types';
+import { getInputFileName, toArrayBuffer, type SpreadsheetInput } from '../../utils/file-input';
 
 const EMPTY_CELL = '';
-
-type SpreadsheetInput = File | Blob | ArrayBuffer | Uint8Array | string;
 
 export type ParseSpreadsheetOptions = {
   format?: SpreadsheetFormat;
@@ -23,29 +22,6 @@ const QUESTESTINTEROP_COLUMNS = [
   'optionsJson',
   'expectedLength'
 ] as const;
-
-const toArrayBuffer = async (input: SpreadsheetInput): Promise<ArrayBuffer> => {
-  if (typeof input === 'string') {
-    return new Uint8Array(new TextEncoder().encode(input)).buffer.slice(0) as ArrayBuffer;
-  }
-  if (input instanceof ArrayBuffer) {
-    return input;
-  }
-  if (input instanceof Uint8Array) {
-    return new Uint8Array(input).buffer.slice(0) as ArrayBuffer;
-  }
-  return (await input.arrayBuffer()) as ArrayBuffer;
-};
-
-const getInputFileName = (input: SpreadsheetInput, fallback?: string): string | undefined => {
-  if (fallback) {
-    return fallback;
-  }
-  if (typeof File !== 'undefined' && input instanceof File) {
-    return input.name;
-  }
-  return undefined;
-};
 
 const detectFormat = (input: SpreadsheetInput, explicitFormat?: SpreadsheetFormat): SpreadsheetFormat => {
   if (explicitFormat) {

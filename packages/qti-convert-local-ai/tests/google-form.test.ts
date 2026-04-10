@@ -2,7 +2,7 @@
 
 import JSZip from 'jszip';
 import { describe, expect, test } from 'vitest';
-import { convertGoogleFormToQtiPackage, parseGoogleForm } from './google-form';
+import { convertGoogleFormToQtiPackage, parseGoogleForm } from '../src/converters';
 
 const GOOGLE_FORM_HTML = `<!DOCTYPE html>
 <html>

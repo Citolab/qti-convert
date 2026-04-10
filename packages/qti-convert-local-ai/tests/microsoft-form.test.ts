@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest';
 import {
   convertMicrosoftFormToQtiPackage,
   extractMicrosoftFormPrefetchRequest
-} from './microsoft-form';
+} from '../src/converters';
 
 const MICROSOFT_FORM_HTML = `<!DOCTYPE html>
 <html>

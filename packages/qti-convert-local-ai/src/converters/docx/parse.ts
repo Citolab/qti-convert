@@ -1,38 +1,14 @@
 import JSZip from 'jszip';
-import { createWebLlmEngine, inferQuestionsFromRawResponse, type WebLlmLikeEngine } from './mapping';
-import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from './types';
-import { generateQtiPackageFromQuestions } from './qti-generator';
+import { inferQuestionsFromRawResponse, type WebLlmLikeEngine } from '../../mapping';
+import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from '../../types';
 import {
   buildBatchedNormalizationPrompt,
   buildSingleItemNormalizationPrompt,
   buildBoundaryDetectionPrompt,
   buildBoundaryDetectionPromptWithContext
-} from './shared-prompts';
-
-type DocxInput = File | Blob | ArrayBuffer | Uint8Array;
-type DocxBlock = { type: 'text'; text: string } | { type: 'image'; asset: StructuredMediaAsset };
-
-export type DocxDocumentData = {
-  paragraphs: string[];
-  blocks: DocxBlock[];
-  images: StructuredMediaAsset[];
-  fileName?: string;
-};
-
-export type DocxPreview = {
-  paragraphCount: number;
-  sampleParagraphs: string[];
-  fileName?: string;
-};
-
-export type DocxToQtiResult = {
-  document: DocxDocumentData;
-  preview: DocxPreview;
-  questions: StructuredQuestion[];
-  packageBlob: Blob;
-  packageName: string;
-  summary: Awaited<ReturnType<typeof generateQtiPackageFromQuestions>>['summary'];
-};
+} from '../../shared-prompts';
+import { getInputFileName, toArrayBuffer } from '../../utils/file-input';
+import type { DocxBlock, DocxDocumentData, DocxInput, DocxPreview } from './types';
 
 const EMPTY = '';
 // Keep chunk sizes small to fit in Qwen2.5-7B context window (~4k tokens usable after prompts)
@@ -50,7 +26,7 @@ const DOCX_IMAGE_MIME_TYPES: Record<string, string> = {
   svg: 'image/svg+xml'
 };
 
-const logDocxDebug = (label: string, data: unknown): void => {
+export const logDocxDebug = (label: string, data: unknown): void => {
   console.log(`[qti-convert-local-ai][docx] ${label}`, data);
 };
 
@@ -63,23 +39,6 @@ const decodeXmlEntities = (value: string): string =>
     .replaceAll('&apos;', "'")
     .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
     .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCharCode(Number.parseInt(code, 16)));
-
-const getInputFileName = (input: DocxInput): string | undefined => {
-  if (typeof File !== 'undefined' && input instanceof File) {
-    return input.name;
-  }
-  return undefined;
-};
-
-const toArrayBuffer = async (input: DocxInput): Promise<ArrayBuffer> => {
-  if (input instanceof ArrayBuffer) {
-    return input;
-  }
-  if (input instanceof Uint8Array) {
-    return new Uint8Array(input).buffer.slice(0) as ArrayBuffer;
-  }
-  return input.arrayBuffer();
-};
 
 const normalizeWhitespace = (value: string): string =>
   value
@@ -379,6 +338,7 @@ type DocxBoundaryDetectionResult = {
   itemStartIndexes: number[];
   contextIndexes: number[];
   ignoredIndexes: number[];
+  itemGroups?: number[][];
 };
 
 /**
@@ -408,7 +368,33 @@ const parseBoundaryDetectionResponse = (
       .filter(n => n >= rangeStart && n < rangeEnd);
   };
 
+  const parseBlockIndexGroup = (rawGroup: unknown): number[] => {
+    if (typeof rawGroup !== 'object' || rawGroup === null) {
+      return [];
+    }
+    const blockIndexes = (rawGroup as Record<string, unknown>).blockIndexes;
+    if (!Array.isArray(blockIndexes)) {
+      return [];
+    }
+    return blockIndexes
+      .map(v => Number(v))
+      .filter(n => Number.isInteger(n))
+      .map(n => {
+        if (n >= 0 && n < rangeEnd - rangeStart) {
+          return n + rangeStart;
+        }
+        return n;
+      })
+      .filter(n => n >= rangeStart && n < rangeEnd)
+      .sort((a, b) => a - b);
+  };
+
+  const explicitItemGroups = Array.isArray(parsed.items)
+    ? parsed.items.map(parseBlockIndexGroup).filter(group => group.length > 0)
+    : [];
+
   return {
+    itemGroups: explicitItemGroups.length > 0 ? explicitItemGroups : undefined,
     itemStartIndexes: parseIndexArray('itemStartIndexes'),
     contextIndexes: parseIndexArray('contextIndexes'),
     ignoredIndexes: parseIndexArray('ignoredIndexes')
@@ -419,7 +405,11 @@ const parseBoundaryDetectionResponse = (
  * Convert boundary detection results into item block groups.
  */
 const boundariesToItemGroups = (boundaries: DocxBoundaryDetectionResult, totalBlocks: number): number[][] => {
-  const { itemStartIndexes, contextIndexes, ignoredIndexes } = boundaries;
+  const { itemStartIndexes, contextIndexes, ignoredIndexes, itemGroups: explicitItemGroups } = boundaries;
+
+  if (explicitItemGroups && explicitItemGroups.length > 0) {
+    return explicitItemGroups.map(group => [...group].sort((a, b) => a - b));
+  }
 
   if (itemStartIndexes.length === 0) {
     throw new Error('LLM boundary detection did not find any item starts.');
@@ -463,13 +453,14 @@ const boundariesToItemGroups = (boundaries: DocxBoundaryDetectionResult, totalBl
  * Detect item boundaries using LLM (Phase 1).
  * Tries to process whole document first; only chunks if document is very large.
  */
-const detectDocxBoundariesWithLlm = async (
+export const detectDocxBoundariesWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: string[],
   onProgress?: GenerateQtiPackageOptions['onProgress'],
   options: GenerateQtiPackageOptions = {}
 ): Promise<number[][]> => {
   const allBoundaries: DocxBoundaryDetectionResult = {
+    itemGroups: [],
     itemStartIndexes: [],
     contextIndexes: [],
     ignoredIndexes: []
@@ -526,11 +517,14 @@ const detectDocxBoundariesWithLlm = async (
         chunkIndex,
         startIndex,
         endIndex,
-        itemStartsFound: chunkBoundaries.itemStartIndexes.length,
+        itemStartsFound: chunkBoundaries.itemGroups?.length || chunkBoundaries.itemStartIndexes.length,
         contextFound: chunkBoundaries.contextIndexes.length,
         ignoredFound: chunkBoundaries.ignoredIndexes.length
       });
 
+      if (chunkBoundaries.itemGroups?.length) {
+        allBoundaries.itemGroups?.push(...chunkBoundaries.itemGroups);
+      }
       allBoundaries.itemStartIndexes.push(...chunkBoundaries.itemStartIndexes);
       allBoundaries.contextIndexes.push(...chunkBoundaries.contextIndexes);
       allBoundaries.ignoredIndexes.push(...chunkBoundaries.ignoredIndexes);
@@ -547,11 +541,11 @@ const detectDocxBoundariesWithLlm = async (
       stage: 'chunk_completed',
       message: useChunking
         ? `Detected boundaries in blocks ${startIndex + 1}-${endIndex}.`
-        : `Boundary detection complete (${allBoundaries.itemStartIndexes.length} items found).`,
+        : `Boundary detection complete (${allBoundaries.itemGroups?.length || allBoundaries.itemStartIndexes.length} items found).`,
       data: {
         chunkIndex: chunkIndex + 1,
         chunkCount: Math.ceil(blocks.length / chunkSize),
-        itemStartsFound: allBoundaries.itemStartIndexes.length
+        itemStartsFound: allBoundaries.itemGroups?.length || allBoundaries.itemStartIndexes.length
       }
     });
 
@@ -571,7 +565,7 @@ const detectDocxBoundariesWithLlm = async (
   const itemGroups = boundariesToItemGroups(allBoundaries, blocks.length);
 
   logDocxDebug('DOCX boundary detection complete', {
-    totalItemStarts: allBoundaries.itemStartIndexes.length,
+    totalItemStarts: allBoundaries.itemGroups?.length || allBoundaries.itemStartIndexes.length,
     totalContextBlocks: allBoundaries.contextIndexes.length,
     totalIgnoredBlocks: allBoundaries.ignoredIndexes.length,
     finalItemCount: itemGroups.length
@@ -735,7 +729,7 @@ const parseDocxBatchedNormalizationResponse = (rawResponse: string): DocxBatched
   };
 };
 
-const normalizeDocxItemsWithLlm = async (
+export const normalizeDocxItemsWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: DocxBlock[],
   itemBlockIndexes: number[][],
@@ -1370,98 +1364,3 @@ export const buildDocxPreview = (document: DocxDocumentData, sampleSize = 8): Do
   sampleParagraphs: document.paragraphs.slice(0, Math.max(sampleSize, 0)),
   fileName: document.fileName
 });
-
-export const convertDocxToQtiPackage = async (
-  input: DocxInput,
-  options: GenerateQtiPackageOptions = {}
-): Promise<DocxToQtiResult> => {
-  options.onProgress?.({
-    stage: 'parse_started',
-    message: 'Parsing DOCX input.'
-  });
-
-  const document = await parseDocx(input);
-
-  options.onProgress?.({
-    stage: 'parse_completed',
-    message: `Parsed ${document.paragraphs.length} paragraph${document.paragraphs.length === 1 ? '' : 's'}.`,
-    data: {
-      paragraphCount: document.paragraphs.length
-    }
-  });
-
-  options.onProgress?.({
-    stage: 'mapping_started',
-    message: 'Extracting likely assessment items from DOCX paragraphs.'
-  });
-
-  let questions: StructuredQuestion[];
-  try {
-    const engine = await createWebLlmEngine(options.llmSettings, event => {
-      options.onProgress?.(event);
-    });
-
-    // Phase 1: LLM-based boundary detection
-    options.onProgress?.({
-      stage: 'chunk_started',
-      message: 'Detecting item boundaries using LLM...'
-    });
-
-    const blockTexts = document.blocks.map(block =>
-      block.type === 'text' ? block.text : `[Image: ${block.asset.fileName}]`
-    );
-    const segmentedItems = await detectDocxBoundariesWithLlm(engine, blockTexts, options.onProgress, options);
-
-    logDocxDebug('DOCX boundary detection complete', {
-      itemCount: segmentedItems.length,
-      sampleItems: segmentedItems.slice(0, 3)
-    });
-
-    // Phase 2: Normalize items using LLM
-    questions = await normalizeDocxItemsWithLlm(engine, document.blocks, segmentedItems, options.onProgress, options);
-  } catch (error) {
-    console.warn('DOCX LLM parsing failed. Creating simple items from blocks.', {
-      error,
-      blockCount: document.blocks.length
-    });
-    options.onProgress?.({
-      stage: 'mapping_started',
-      message: 'LLM parsing failed. Creating simple items from document blocks.'
-    });
-    // Create one item per text block without pattern matching
-    questions = document.blocks
-      .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
-      .map((block, index) => ({
-        type: 'extended_text' as const,
-        identifier: `item-${index + 1}`,
-        prompt: block.text,
-        points: 1
-      }));
-  }
-
-  options.onProgress?.({
-    stage: 'mapping_completed',
-    message: `Extracted ${questions.length} likely question${questions.length === 1 ? '' : 's'}.`,
-    data: questions
-  });
-  logDocxDebug(
-    'Final DOCX question image mapping',
-    questions.map((question, index) => ({
-      questionIndex: index,
-      identifier: question.identifier,
-      prompt: question.prompt,
-      stimulusImageFileNames: (question.stimulusImages || []).map(image => image.fileName)
-    }))
-  );
-
-  const { blob, packageName, summary } = await generateQtiPackageFromQuestions(questions, options);
-
-  return {
-    document,
-    preview: buildDocxPreview(document),
-    questions,
-    packageBlob: blob,
-    packageName,
-    summary
-  };
-};

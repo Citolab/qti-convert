@@ -1,61 +1,14 @@
 import { GlobalWorkerOptions, OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { createWebLlmEngine, inferQuestionsFromRawResponse, type WebLlmLikeEngine } from './mapping';
-import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from './types';
-import { generateQtiPackageFromQuestions } from './qti-generator';
+import { inferQuestionsFromRawResponse, type WebLlmLikeEngine } from '../../mapping';
+import { GenerateQtiPackageOptions, StructuredMediaAsset, StructuredQuestion } from '../../types';
 import {
   buildBatchedNormalizationPrompt,
   buildSingleItemNormalizationPrompt,
   buildBoundaryDetectionPrompt,
   buildBoundaryDetectionPromptWithContext
-} from './shared-prompts';
-
-type PdfInput = File | Blob | ArrayBuffer | Uint8Array;
-
-type PdfTextBlock = {
-  type: 'text';
-  text: string;
-  pageNumber: number;
-  y: number;
-};
-
-type PdfImageAsset = StructuredMediaAsset & {
-  pageNumber: number;
-  top: number;
-  bottom: number;
-};
-
-type PdfTextItem = {
-  str?: string;
-  transform?: number[];
-  width?: number;
-  hasEOL?: boolean;
-};
-
-export type PdfDocumentData = {
-  blocks: PdfTextBlock[];
-  images: PdfImageAsset[];
-  pages: Array<{
-    pageNumber: number;
-    lines: string[];
-  }>;
-  fileName?: string;
-};
-
-export type PdfPreview = {
-  pageCount: number;
-  blockCount: number;
-  sampleLines: string[];
-  fileName?: string;
-};
-
-export type PdfToQtiResult = {
-  document: PdfDocumentData;
-  preview: PdfPreview;
-  questions: StructuredQuestion[];
-  packageBlob: Blob;
-  packageName: string;
-  summary: Awaited<ReturnType<typeof generateQtiPackageFromQuestions>>['summary'];
-};
+} from '../../shared-prompts';
+import { getInputFileName, toArrayBuffer } from '../../utils/file-input';
+import type { PdfDocumentData, PdfImageAsset, PdfInput, PdfPreview, PdfTextBlock, PdfTextItem } from './types';
 
 // Keep chunk sizes small to fit in Qwen2.5-7B context window (~4k tokens usable after prompts)
 const PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS = 100; // Fits with examples in context window
@@ -400,25 +353,8 @@ try {
   // Ignore worker URL setup issues here; getDocument will raise a clearer runtime error if loading fails.
 }
 
-const logPdfDebug = (label: string, data: unknown): void => {
+export const logPdfDebug = (label: string, data: unknown): void => {
   console.log(`[qti-convert-local-ai][pdf] ${label}`, data);
-};
-
-const getInputFileName = (input: PdfInput): string | undefined => {
-  if (typeof File !== 'undefined' && input instanceof File) {
-    return input.name;
-  }
-  return undefined;
-};
-
-const toArrayBuffer = async (input: PdfInput): Promise<ArrayBuffer> => {
-  if (input instanceof ArrayBuffer) {
-    return input;
-  }
-  if (input instanceof Uint8Array) {
-    return new Uint8Array(input).buffer.slice(0) as ArrayBuffer;
-  }
-  return input.arrayBuffer();
 };
 
 const normalizeWhitespace = (value: string): string =>
@@ -665,7 +601,7 @@ const boundariesToItemGroups = (boundaries: BoundaryDetectionResult, totalBlocks
  * Detect item boundaries using LLM (Phase 1).
  * Uses adaptive chunking based on page breaks and Y-gaps when enabled.
  */
-const detectBoundariesWithLlm = async (
+export const detectBoundariesWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: PdfTextBlock[],
   onProgress?: GenerateQtiPackageOptions['onProgress'],
@@ -1160,7 +1096,7 @@ const parseBatchedNormalizationResponse = (rawResponse: string): BatchedNormaliz
   };
 };
 
-const normalizePdfItemsWithLlm = async (
+export const normalizePdfItemsWithLlm = async (
   engine: WebLlmLikeEngine,
   blocks: PdfTextBlock[],
   itemBlockIndexes: number[][],
@@ -1316,101 +1252,4 @@ const normalizePdfItemsWithLlm = async (
   }
 
   return questions;
-};
-
-export const convertPdfToQtiPackage = async (
-  input: PdfInput,
-  options: GenerateQtiPackageOptions = {}
-): Promise<PdfToQtiResult> => {
-  options.onProgress?.({
-    stage: 'parse_started',
-    message: 'Parsing PDF input.'
-  });
-
-  const document = await parsePdf(input);
-
-  options.onProgress?.({
-    stage: 'parse_completed',
-    message: `Parsed ${document.blocks.length} text block${document.blocks.length === 1 ? '' : 's'} from ${document.pages.length} page${document.pages.length === 1 ? '' : 's'}.`,
-    data: {
-      pageCount: document.pages.length,
-      blockCount: document.blocks.length
-    }
-  });
-
-  options.onProgress?.({
-    stage: 'mapping_started',
-    message: 'Extracting likely assessment items from PDF text blocks.'
-  });
-
-  let questions: StructuredQuestion[];
-  try {
-    const engine = await createWebLlmEngine(options.llmSettings, event => {
-      options.onProgress?.(event);
-    });
-
-    // Phase 1: LLM-based boundary detection (identifies where items start)
-    options.onProgress?.({
-      stage: 'chunk_started',
-      message: 'Detecting item boundaries using LLM...'
-    });
-
-    const segmentedItems = await detectBoundariesWithLlm(engine, document.blocks, options.onProgress, options);
-
-    logPdfDebug('PDF boundary detection complete', {
-      itemCount: segmentedItems.length,
-      sampleItems: segmentedItems.slice(0, 3)
-    });
-
-    // Phase 2: Normalize items using LLM (convert to structured questions)
-    questions = await normalizePdfItemsWithLlm(
-      engine,
-      document.blocks,
-      segmentedItems,
-      document.images,
-      options.onProgress,
-      options
-    );
-  } catch (error) {
-    console.warn('PDF LLM parsing failed. Creating simple items from all blocks.', {
-      error,
-      blockCount: document.blocks.length
-    });
-    options.onProgress?.({
-      stage: 'mapping_started',
-      message: 'LLM parsing failed. Creating simple items from document blocks.'
-    });
-    // Create one item per block without pattern matching
-    questions = document.blocks.map((block, index) => ({
-      type: 'extended_text' as const,
-      identifier: `item-${index + 1}`,
-      prompt: block.text,
-      points: 1
-    }));
-  }
-
-  options.onProgress?.({
-    stage: 'mapping_completed',
-    message: `Extracted ${questions.length} likely question${questions.length === 1 ? '' : 's'}.`,
-    data: questions
-  });
-  logPdfDebug(
-    'Final PDF question mapping',
-    questions.map((question, index) => ({
-      questionIndex: index,
-      identifier: question.identifier,
-      prompt: question.prompt
-    }))
-  );
-
-  const { blob, packageName, summary } = await generateQtiPackageFromQuestions(questions, options);
-
-  return {
-    document,
-    preview: buildPdfPreview(document),
-    questions,
-    packageBlob: blob,
-    packageName,
-    summary
-  };
 };

@@ -2,8 +2,7 @@
 
 import JSZip from 'jszip';
 import { describe, expect, test } from 'vitest';
-import { convertSpreadsheetToQtiPackage } from './convert-spreadsheet';
-import { parseSpreadsheet } from './spreadsheet-parser';
+import { convertSpreadsheetToQtiPackage, parseSpreadsheet } from '../src/converters';
 
 const MOODLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <quiz>

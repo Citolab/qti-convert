@@ -4,7 +4,7 @@ import {
   createWebLlmQuestionInferer,
   inferQuestionsFromRawResponse,
   type WebLlmLikeEngine
-} from './mapping';
+} from '../src/mapping';
 
 describe('question inference helpers', () => {
   test('extracts normalized multiple choice questions from JSON responses', () => {

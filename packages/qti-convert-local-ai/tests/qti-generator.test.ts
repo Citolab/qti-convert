@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { describe, expect, test } from 'vitest';
-import { convertSpreadsheetToQtiPackage } from './convert-spreadsheet';
-import { generateQtiPackageFromQuestions } from './qti-generator';
+import { convertSpreadsheetToQtiPackage } from '../src/converters';
+import { generateQtiPackageFromQuestions } from '../src/qti-generator';
 
 describe('generateQtiPackageFromQuestions', () => {
   test('creates a QTI package zip with manifest, test, and items', async () => {

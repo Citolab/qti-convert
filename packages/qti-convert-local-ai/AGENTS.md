@@ -13,7 +13,7 @@ This package provides browser-side document-to-QTI conversion. It parses various
 | Spreadsheet | `spreadsheet-parser.ts` | `.csv`, `.xlsx`, `.xls` |
 | Google Forms | `google-form.ts` | Google Forms URLs |
 | Microsoft Forms | `microsoft-form.ts` | Microsoft Forms URLs |
-| Remote sources | `remote-source.ts` | URLs to any supported format |
+| Remote sources | `converters/remote-source/index.ts` | URLs to any supported format |
 
 ## Core Processing Pipeline (Two-Phase LLM Approach)
 

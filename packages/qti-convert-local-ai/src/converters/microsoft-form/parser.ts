@@ -1,5 +1,5 @@
-import { generateQtiPackageFromQuestions } from './qti-generator';
-import { GenerateQtiPackageOptions, SpreadsheetToQtiResult, StructuredOption, StructuredQuestion } from './types';
+import { generateQtiPackageFromQuestions } from '../../qti-generator';
+import { GenerateQtiPackageOptions, SpreadsheetToQtiResult, StructuredOption, StructuredQuestion } from '../../types';
 
 type MicrosoftFormInput = string;
 
