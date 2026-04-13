@@ -30,6 +30,24 @@ const GOOGLE_FORM_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
+// Alternative format with "var" keyword (some Google Forms use this)
+const GOOGLE_FORM_HTML_VAR_FORMAT = `<!DOCTYPE html>
+<html>
+  <head><title>Form</title></head>
+  <body>
+    <script>
+      var FB_PUBLIC_LOAD_DATA_ = [null,[
+        "Description",
+        [
+          ["q1","Simple question","",2,[[111,[["Yes"],["No"]],1]],null,null,null]
+        ],
+        null,null,null,null,null,null,
+        "Simple Form"
+      ],null,"simple-form"];
+    </script>
+  </body>
+</html>`;
+
 describe('Google Forms support', () => {
   test('parses supported Google Forms questions from FB_PUBLIC_LOAD_DATA_', () => {
     const parsed = parseGoogleForm(GOOGLE_FORM_HTML);
@@ -86,5 +104,19 @@ describe('Google Forms support', () => {
     expect(scaleItem).toContain('>5<');
     expect(gridRowItem).toContain('Match each city to a country');
     expect(gridRowItem).toContain('>France<');
+  });
+
+  test('parses Google Forms HTML with var keyword prefix', () => {
+    const parsed = parseGoogleForm(GOOGLE_FORM_HTML_VAR_FORMAT);
+
+    expect(parsed.title).toBe('Simple Form');
+    expect(parsed.description).toBe('Description');
+    expect(parsed.questions).toHaveLength(1);
+    expect(parsed.questions[0]).toMatchObject({
+      type: 'multiple_choice',
+      prompt: 'Simple question',
+      selectionMode: 'single'
+    });
+    expect(parsed.questions[0]?.options?.map(o => o.text)).toEqual(['Yes', 'No']);
   });
 });

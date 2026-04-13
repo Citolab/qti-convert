@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.11 (qti-convert-local-ai)
+
+### Fixed
+
+- **Google Forms parser**: Updated extraction logic to support multiple data patterns. Google Forms HTML no longer consistently uses `FB_PUBLIC_LOAD_DATA_` variable. The parser now tries multiple extraction patterns including:
+  - `FB_PUBLIC_LOAD_DATA_ = [...]` (original pattern)
+  - `var FB_PUBLIC_LOAD_DATA_ = [...]` (with var keyword)
+  - Fallback pattern that searches for the form data structure directly
+- Improved error message when form data cannot be extracted
+
 ## 0.4.0
 
 This release introduces a multi-package publish setup for the `qti-convert` repository and updates the recommended installation and CLI usage.

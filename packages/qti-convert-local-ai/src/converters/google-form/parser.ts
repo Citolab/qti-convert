@@ -18,7 +18,20 @@ type GoogleFormParseResult = {
 };
 
 const GOOGLE_FORM_URL_RE = /^https:\/\/docs\.google\.com\/forms\//i;
-const FB_PUBLIC_LOAD_DATA_RE = /FB_PUBLIC_LOAD_DATA_\s*=\s*(\[.*?\]);/s;
+
+// Multiple extraction patterns for Google Forms data (Google changes these periodically)
+const EXTRACTION_PATTERNS = [
+  // Original pattern (pre-2024)
+  /FB_PUBLIC_LOAD_DATA_\s*=\s*(\[.*?\]);/s,
+  // Alternative patterns Google may use
+  /var\s+FB_PUBLIC_LOAD_DATA_\s*=\s*(\[.*?\]);/s,
+  // AF_initDataCallback pattern used by some Google services
+  /AF_initDataCallback\s*\(\s*\{[^}]*data:\s*(\[.*?\])\s*\}\s*\)/s,
+  // Direct array assignment in script tags - look for form data structure
+  /<script[^>]*>\s*(\[\s*null\s*,\s*\[.*?\]\s*,\s*"[^"]*"\s*(?:,.*?)?\])\s*;?\s*<\/script>/s,
+  // Look for any variable assignment with form-like data structure
+  /=\s*(\[\s*null\s*,\s*\[\s*"[^"]*".*?\]\s*,\s*"https:\/\/docs\.google\.com\/forms[^"]*".*?\]);/s
+];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -39,15 +52,53 @@ const defaultGoogleFormFetcher: GoogleFormFetcher = async (url: string) => {
 
 const extractPayloadSource = (input: string): string => {
   const trimmed = input.trim();
+  // If already a JSON array, return as-is
   if (trimmed.startsWith('[')) {
     return trimmed;
   }
 
-  const match = input.match(FB_PUBLIC_LOAD_DATA_RE);
-  if (!match) {
-    throw new Error('Could not find FB_PUBLIC_LOAD_DATA_ in the Google Forms HTML.');
+  // Try each extraction pattern
+  for (const pattern of EXTRACTION_PATTERNS) {
+    const match = input.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
   }
-  return match[1];
+
+  // Fallback: search for large JSON array that looks like form data
+  // Look for pattern: [null,[ followed by form structure
+  const fallbackMatch = input.match(/(\[\s*null\s*,\s*\[[^\]]*"[^"]*"[^\]]*\])/s);
+  if (fallbackMatch?.[1]) {
+    // Try to find the complete balanced array
+    const startIndex = input.indexOf(fallbackMatch[1]);
+    if (startIndex !== -1) {
+      let depth = 0;
+      let endIndex = startIndex;
+      for (let i = startIndex; i < input.length && i < startIndex + 500000; i++) {
+        if (input[i] === '[') depth++;
+        else if (input[i] === ']') {
+          depth--;
+          if (depth === 0) {
+            endIndex = i + 1;
+            break;
+          }
+        }
+      }
+      if (endIndex > startIndex) {
+        const candidate = input.slice(startIndex, endIndex);
+        // Validate it looks like form data (has the expected structure)
+        if (candidate.includes('"docs.google.com/forms') || candidate.match(/\[\s*null\s*,\s*\[\s*"[^"]*"/)) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    'Could not extract form data from Google Forms HTML. ' +
+      'Google may have changed their page structure. ' +
+      'Please report this issue with a sample form URL.'
+  );
 };
 
 const parsePayload = (input: string): unknown[] => {
