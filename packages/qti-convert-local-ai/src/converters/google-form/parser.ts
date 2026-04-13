@@ -52,7 +52,7 @@ export const deriveGoogleFormIdentifier = (url: string): string => {
   if (match && match[1]) {
     return match[1];
   }
-  
+
   // Fallback: use a portion of the URL as identifier
   try {
     const urlObj = new URL(url);
@@ -64,7 +64,7 @@ export const deriveGoogleFormIdentifier = (url: string): string => {
   } catch {
     // URL parsing failed, continue to final fallback
   }
-  
+
   // Final fallback: generate from timestamp
   return `google-form-${Date.now()}`;
 };
