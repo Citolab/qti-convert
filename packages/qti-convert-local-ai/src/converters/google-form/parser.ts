@@ -19,6 +19,28 @@ type GoogleFormParseResult = {
 
 const GOOGLE_FORM_URL_RE = /^https:\/\/docs\.google\.com\/forms\//i;
 
+/**
+ * Normalizes Google Form URLs to the public viewform URL.
+ * Handles various URL formats:
+ * - /edit -> /viewform
+ * - /d/FORM_ID/edit -> /d/e/PUBLISHED_ID/viewform (via redirect)
+ * - Already viewform URLs pass through unchanged
+ */
+const normalizeGoogleFormUrl = (url: string): string => {
+  // If it's an edit URL, convert to viewform
+  // Pattern: https://docs.google.com/forms/d/FORM_ID/edit
+  // Should become: https://docs.google.com/forms/d/FORM_ID/viewform
+  if (url.includes('/edit')) {
+    return url.replace(/\/edit(\?.*)?$/, '/viewform$1').replace(/\/edit$/, '/viewform');
+  }
+  // If URL doesn't end with viewform, append it
+  if (!url.includes('/viewform')) {
+    // Remove trailing slash if present, then add /viewform
+    return url.replace(/\/?$/, '/viewform');
+  }
+  return url;
+};
+
 // Multiple extraction patterns for Google Forms data (Google changes these periodically)
 const EXTRACTION_PATTERNS = [
   // Original pattern (pre-2024)
@@ -328,9 +350,11 @@ export async function convertGoogleFormToQtiPackage(
     formDescription?: string;
   }
 > {
-  const source = GOOGLE_FORM_URL_RE.test(input)
-    ? await (options.fetchFormHtml || defaultGoogleFormFetcher)(input)
-    : input;
+  // Normalize URL (convert /edit to /viewform)
+  const normalizedInput = GOOGLE_FORM_URL_RE.test(input) ? normalizeGoogleFormUrl(input) : input;
+  const source = GOOGLE_FORM_URL_RE.test(normalizedInput)
+    ? await (options.fetchFormHtml || defaultGoogleFormFetcher)(normalizedInput)
+    : normalizedInput;
   const parsed = parseGoogleForm(source);
   if (parsed.questions.length === 0) {
     throw new Error('No supported Google Forms questions were found.');
