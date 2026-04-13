@@ -37,7 +37,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const asString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
-const asNumber = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const asNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 const defaultGoogleFormFetcher: GoogleFormFetcher = async (url: string) => {
   const response = await fetch(url, {
@@ -113,7 +114,8 @@ const parsePayload = (input: string): unknown[] => {
   }
 };
 
-const extractQuestionTitle = (field: unknown[], index: number): string => asString(field[1]) || `Google Form question ${index + 1}`;
+const extractQuestionTitle = (field: unknown[], index: number): string =>
+  asString(field[1]) || `Google Form question ${index + 1}`;
 const extractQuestionDescription = (field: unknown[]): string => asString(field[2]);
 const extractQuestionType = (field: unknown[]): GoogleFormQuestionType | null => {
   const value = asNumber(field[3]);
@@ -320,8 +322,15 @@ export const parseGoogleForm = (input: string): GoogleFormParseResult => {
 export async function convertGoogleFormToQtiPackage(
   input: GoogleFormInput,
   options: ConvertGoogleFormToQtiOptions = {}
-): Promise<Pick<SpreadsheetToQtiResult, 'questions' | 'packageBlob' | 'packageName' | 'summary'> & { formTitle?: string; formDescription?: string }> {
-  const source = GOOGLE_FORM_URL_RE.test(input) ? await (options.fetchFormHtml || defaultGoogleFormFetcher)(input) : input;
+): Promise<
+  Pick<SpreadsheetToQtiResult, 'questions' | 'packageBlob' | 'packageName' | 'summary'> & {
+    formTitle?: string;
+    formDescription?: string;
+  }
+> {
+  const source = GOOGLE_FORM_URL_RE.test(input)
+    ? await (options.fetchFormHtml || defaultGoogleFormFetcher)(input)
+    : input;
   const parsed = parseGoogleForm(source);
   if (parsed.questions.length === 0) {
     throw new Error('No supported Google Forms questions were found.');
