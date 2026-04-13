@@ -26,7 +26,7 @@ const GOOGLE_FORM_URL_RE = /^https:\/\/docs\.google\.com\/forms\//i;
  * - /d/FORM_ID/edit -> /d/e/PUBLISHED_ID/viewform (via redirect)
  * - Already viewform URLs pass through unchanged
  */
-const normalizeGoogleFormUrl = (url: string): string => {
+export const normalizeGoogleFormUrl = (url: string): string => {
   // If it's an edit URL, convert to viewform
   // Pattern: https://docs.google.com/forms/d/FORM_ID/edit
   // Should become: https://docs.google.com/forms/d/FORM_ID/viewform
@@ -39,6 +39,34 @@ const normalizeGoogleFormUrl = (url: string): string => {
     return url.replace(/\/?$/, '/viewform');
   }
   return url;
+};
+
+/**
+ * Extracts a short identifier from a Google Forms URL for use in package names
+ * Example: https://docs.google.com/forms/d/1twzZhH5iloxZIkq3fbN-y1IvAaIiPGO7r7r49tKCDE4/viewform
+ *          -> "1twzZhH5iloxZIkq3fbN-y1IvAaIiPGO7r7r49tKCDE4"
+ */
+export const deriveGoogleFormIdentifier = (url: string): string => {
+  // Extract form ID from URL pattern: /forms/d/FORM_ID/
+  const match = url.match(/\/forms\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  
+  // Fallback: use a portion of the URL as identifier
+  try {
+    const urlObj = new URL(url);
+    const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+    const formIndex = pathSegments.indexOf('forms');
+    if (formIndex >= 0 && pathSegments[formIndex + 2]) {
+      return pathSegments[formIndex + 2];
+    }
+  } catch {
+    // URL parsing failed, continue to final fallback
+  }
+  
+  // Final fallback: generate from timestamp
+  return `google-form-${Date.now()}`;
 };
 
 // Multiple extraction patterns for Google Forms data (Google changes these periodically)
