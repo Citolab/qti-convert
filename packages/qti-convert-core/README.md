@@ -11,7 +11,6 @@ npm install @citolab/qti-convert
 ## Exports
 
 - `@citolab/qti-convert/qti-convert`
-- `@citolab/qti-convert/qti-json-schema`
 - `@citolab/qti-convert/qti-convert-node`
 - `@citolab/qti-convert/qti-transformer`
 - `@citolab/qti-convert/qti-loader`
@@ -34,15 +33,6 @@ Convert a local package file in Node.js:
 import { convertPackageFile } from '@citolab/qti-convert/qti-convert-node';
 
 await convertPackageFile('input.zip', 'output.zip');
-```
-
-Convert a QTI package to the shared `qti-json-schemas` model types:
-
-```ts
-import { convertQtiPackageToSchema } from '@citolab/qti-convert/qti-json-schema';
-
-const result = await convertQtiPackageToSchema(buffer, 'import-user');
-console.log(result.exam, result.itemBlocks, result.items);
 ```
 
 Transform QTI XML:

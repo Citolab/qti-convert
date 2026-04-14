@@ -57,11 +57,7 @@
     "unzipper": "^0.12.3",
     "xml-formatter": "^3.6.7"
   },
-  "peerDependencies": {
-    "@citolab/qti-json-schemas": "^1.0.0"
-  },
   "devDependencies": {
-    "@citolab/qti-json-schemas": "file:../../../qti-json-schemas/generated/typescript",
     "@types/archiver": "^7.0.0",
     "@types/node": "^25.4.0",
     "@types/unzipper": "^0.10.11",
