@@ -1667,6 +1667,12 @@ async function processAssessmentReferences(
     if (!matchingItem) {
       const hrefItem = $assessment(assessmentRef).attr('href');
       const hrefTest = assessmentInManifest.attr('href');
+      // Both hrefs are required to resolve the item path. They can be missing
+      // when the item ref has no href or the manifest has no
+      // imsqti_test_xmlv3p0 resource; skip this ref instead of crashing.
+      if (!hrefItem || !hrefTest) {
+        continue;
+      }
       const relativePath = resolvePath(hrefItem, hrefTest);
 
       const matchingItemFile = itemFiles.find(item => {

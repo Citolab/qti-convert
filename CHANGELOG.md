@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.16
+
+### Fixed
+
+- **Namespace-prefixed manifests**: `convertManifestFile` (browser/`qti-convert` path) now strips the prefix bound to the IMS Content Packaging namespace (e.g. `<imscp:manifest>`, `<imscp:resource>`) before converting. Previously the prefix-blind selectors matched nothing, so resource types were never upgraded to `imsqti_*_xmlv3p0` and the manifest namespaces stayed at QTI 2.x. This brings the browser path in line with the node path, which already stripped the prefix.
+- **Package conversion crash**: `processAssessmentReferences` no longer throws `Cannot read properties of undefined (reading 'split')` when an assessment item ref or the manifest test resource has no resolvable `href`; such refs are now skipped instead of crashing `convertPackage`.
+
 ## 0.4.11 (qti-convert-local-ai)
 
 ### Fixed

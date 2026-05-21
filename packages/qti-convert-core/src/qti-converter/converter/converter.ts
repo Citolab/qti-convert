@@ -162,7 +162,42 @@ const convert = async (qti2, styleSheetString) => {
   });
 };
 
+// Some QTI 2.x packages namespace-prefix their content-packaging elements
+// (e.g. <imscp:manifest>, <imscp:resource>). The selectors below match by
+// plain tag name, so first strip the prefix bound to the IMS Content Packaging
+// namespace, leaving a clean default-namespace QTI 3 manifest. Metadata
+// namespaces (imsmd/imsqti) are left untouched.
+const stripContentPackagingPrefix = ($: cheerio.CheerioAPI) => {
+  const cpPrefixes = new Set<string>();
+  $('*').each((_, el) => {
+    if (el.type !== 'tag' || !el.attribs) {
+      return;
+    }
+    for (const [attrName, attrValue] of Object.entries(el.attribs)) {
+      if (attrName.startsWith('xmlns:') && attrValue.toLowerCase().includes('imscp')) {
+        cpPrefixes.add(attrName.slice('xmlns:'.length));
+      }
+    }
+  });
+
+  for (const prefix of cpPrefixes) {
+    $('*').each((_, el) => {
+      if (el.type !== 'tag') {
+        return;
+      }
+      if (el.name.startsWith(`${prefix}:`)) {
+        el.name = el.name.slice(prefix.length + 1);
+      }
+      if (el.attribs && Object.prototype.hasOwnProperty.call(el.attribs, `xmlns:${prefix}`)) {
+        delete el.attribs[`xmlns:${prefix}`];
+      }
+    });
+  }
+};
+
 export const convertManifestFile = ($: cheerio.CheerioAPI) => {
+  stripContentPackagingPrefix($);
+
   // Replace schemas
   $('manifest').attr({
     xmlns: 'http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1',
