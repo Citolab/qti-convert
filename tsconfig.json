@@ -27,8 +27,6 @@
     "forceConsistentCasingInFileNames": true,
     "useDefineForClassFields": false,
     "skipLibCheck": true,
-    "paths": {
-      "@citolab/qti-components/qti-convert": ["./src/lib/qti-converter"]
-    }
+    "ignoreDeprecations": "6.0"
   }
 }
