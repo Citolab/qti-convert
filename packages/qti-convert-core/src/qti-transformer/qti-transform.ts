@@ -20,8 +20,11 @@ import {
   changeAssetLocationAsync,
   configurePciAsync,
   stripStylesheets,
+  stripStylesheetsWithStimulusRefs,
   stylesheetsInline
 } from './transformers';
+import type { StimulusResolver, StripStylesheetsOptions } from './transformers/strip-stylesheets';
+export type { StimulusResolver, StripStylesheetsOptions } from './transformers/strip-stylesheets';
 import { customInteraction } from './transformers/custom-interaction';
 import { ModuleResolutionConfig, ConfigurePciOptions } from './transformers/configure-pci';
 export { type ModuleResolutionConfig, type ConfigurePciOptions } from './transformers/configure-pci';
@@ -60,7 +63,11 @@ interface QtiTransformAPI {
       | StylesheetsInlineOptions,
     options?: StylesheetsInlineOptions
   ): Promise<QtiTransformAPI>;
-  stripStylesheets(options?: { removePattern?: string; keepPattern?: string }): QtiTransformAPI;
+  stripStylesheets(options?: StripStylesheetsOptions): QtiTransformAPI;
+  stripStylesheets(
+    options: StripStylesheetsOptions | undefined,
+    resolver: StimulusResolver
+  ): Promise<QtiTransformAPI>;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
   qbCleanup(): QtiTransformAPI;
@@ -181,10 +188,13 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       await stylesheetsInline($, getStylesheetContent, stylesheetsInlineOptions);
       return api;
     },
-    stripStylesheets(options?: { removePattern?: string; keepPattern?: string }) {
+    stripStylesheets: ((options?: StripStylesheetsOptions, resolver?: StimulusResolver) => {
+      if (resolver) {
+        return stripStylesheetsWithStimulusRefs($, resolver, options).then(() => api);
+      }
       stripStylesheets($, options);
       return api;
-    },
+    }) as QtiTransformAPI['stripStylesheets'],
     customTypes() {
       customTypes($);
       return api;
