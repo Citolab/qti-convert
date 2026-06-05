@@ -21,10 +21,20 @@ import {
   configurePciAsync,
   stripStylesheets,
   stripStylesheetsWithStimulusRefs,
-  stylesheetsInline
+  stylesheetsInline,
+  wrapStimulusInSection
 } from './transformers';
 import type { StimulusResolver, StripStylesheetsOptions } from './transformers/strip-stylesheets';
 export type { StimulusResolver, StripStylesheetsOptions } from './transformers/strip-stylesheets';
+import type {
+  WrapStimulusInSectionResolver,
+  WrapStimulusInSectionOptions
+} from './transformers/wrap-stimulus-in-section';
+export type {
+  WrapStimulusInSectionResolver,
+  WrapStimulusInSectionOptions,
+  WrapStimulusInSectionItemMeta
+} from './transformers/wrap-stimulus-in-section';
 import { customInteraction } from './transformers/custom-interaction';
 import { ModuleResolutionConfig, ConfigurePciOptions } from './transformers/configure-pci';
 export { type ModuleResolutionConfig, type ConfigurePciOptions } from './transformers/configure-pci';
@@ -67,6 +77,10 @@ interface QtiTransformAPI {
   stripStylesheets(
     options: StripStylesheetsOptions | undefined,
     resolver: StimulusResolver
+  ): Promise<QtiTransformAPI>;
+  wrapStimulusInSection(
+    resolver: WrapStimulusInSectionResolver,
+    options?: WrapStimulusInSectionOptions
   ): Promise<QtiTransformAPI>;
   customTypes(): QtiTransformAPI;
   stripMaterialInfo(): QtiTransformAPI;
@@ -195,6 +209,13 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       stripStylesheets($, options);
       return api;
     }) as QtiTransformAPI['stripStylesheets'],
+    async wrapStimulusInSection(
+      resolver: WrapStimulusInSectionResolver,
+      options?: WrapStimulusInSectionOptions
+    ) {
+      await wrapStimulusInSection($, resolver, options);
+      return api;
+    },
     customTypes() {
       customTypes($);
       return api;
