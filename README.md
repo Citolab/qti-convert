@@ -8,6 +8,7 @@ Published packages:
 - `@citolab/qti-convert-cli`: command line tools
 - `@citolab/qti-browser-import`: browser-side QTI package import and cache URL rewriting
 - `@citolab/qti-convert-local-ai`: browser-side CSV/XLSX to QTI package conversion helpers
+- `@citolab/qti-convert-export`: QTI package → Word (`.docx`) / PDF export for paper use
 - `@citolab/qti-convert-tao-pci`: TAO PCI conversion helpers
 
 ## Install
@@ -20,7 +21,17 @@ npm install @citolab/qti-convert-cli
 npm install @citolab/qti-browser-import
 npm install @citolab/qti-convert-local-ai
 npm install @citolab/qti-convert-tao-pci
+npm install @citolab/qti-convert-export
 ```
+
+## Export to Word / PDF
+
+```sh
+npx --package=@citolab/qti-convert-cli qti-export-docx yourpackage.zip -o toets.docx
+npx --package=@citolab/qti-convert-cli qti-export-docx yourpackage.zip --pdf -o toets.pdf
+```
+
+See [`packages/qti-convert-export/README.md`](packages/qti-convert-export/README.md) for the library API (browser + Node), including Wikiwijs “Download Word” integration notes.
 
 ## CLI
 

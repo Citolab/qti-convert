@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Woorden selecteren" identifier="ITEM_HOTTEXT" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="identifier">
+    <qti-correct-response>
+      <qti-value>A</qti-value>
+      <qti-value>C</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-hottext-interaction max-choices="0" response-identifier="RESPONSE">
+      <qti-prompt>Selecteer de woorden die een oorzaak aanduiden:</qti-prompt>
+      <div>
+        <qti-hottext identifier="A">Door</qti-hottext>
+        een tekort daalde de
+        <qti-hottext identifier="B">productiviteit</qti-hottext>
+        <qti-hottext identifier="C">vanwege</qti-hottext>
+        schaarste.
+      </div>
+    </qti-hottext-interaction>
+  </qti-item-body>
+</qti-assessment-item>

@@ -1,0 +1,41 @@
+{
+  "name": "@citolab/qti-convert-export",
+  "version": "0.4.18",
+  "description": "Export QTI 3 packages to paper-friendly Word and PDF documents",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Citolab/qti-convert",
+  "author": "Marcel Hoekstra",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --target es2022 --dts --outDir dist --clean",
+    "build:yalc": "npm run build && yalc publish --push",
+    "test": "vitest run tests",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "docx": "^9.5.0",
+    "jszip": "^3.10.1",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

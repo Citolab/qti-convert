@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Punt selecteren" identifier="ITEM_SELECT_POINT" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="point">
+    <qti-area-mapping default-value="0">
+      <qti-area-map-entry shape="circle" coords="20,20,10" mapped-value="1"/>
+    </qti-area-mapping>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-select-point-interaction max-choices="1" response-identifier="RESPONSE">
+      <qti-prompt>Klik op één punt op de kaart.</qti-prompt>
+      <img src="resources/map.png" width="60" height="40" alt="Kaart"/>
+    </qti-select-point-interaction>
+  </qti-item-body>
+</qti-assessment-item>

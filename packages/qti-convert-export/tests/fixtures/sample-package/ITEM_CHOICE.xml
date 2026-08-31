@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Meerkeuzevraag één antwoord" identifier="ITEM_CHOICE" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="identifier">
+    <qti-correct-response>
+      <qti-value>CHOICE3</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <p><img src="resources/atom.png" alt="Atoom"/></p>
+    <qti-choice-interaction response-identifier="RESPONSE" max-choices="1">
+      <qti-prompt>Welke van de onderstaande elementen heeft de hoogste atoommassa?</qti-prompt>
+      <qti-simple-choice identifier="CHOICE1">Tin (Sn)</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE2">Jodium (I)</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE3">Xenon (Xe)</qti-simple-choice>
+    </qti-choice-interaction>
+  </qti-item-body>
+</qti-assessment-item>

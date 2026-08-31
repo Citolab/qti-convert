@@ -11,6 +11,7 @@ Main commands:
 - `qti-create-manifest`
 - `qti-create-assessment`
 - `qti-strip-media-pkg`
+- `qti-export-docx` (Word/PDF export via `@citolab/qti-convert-export`)
 
 ## Core principle: keep the CLI thin
 

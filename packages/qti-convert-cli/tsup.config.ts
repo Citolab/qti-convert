@@ -8,7 +8,8 @@ export default defineConfig({
     'src/qti-convert-cli/qti-package-assessment.ts',
     'src/qti-convert-cli/qti-strip-media-pkg.ts',
     'src/qti-convert-cli/qti-create-package.ts',
-    'src/qti-convert-cli/qti-create-package-per-item.ts'
+    'src/qti-convert-cli/qti-create-package-per-item.ts',
+    'src/qti-convert-cli/qti-export-docx.ts'
   ],
   format: ['esm'],
   target: 'node16',
@@ -17,7 +18,7 @@ export default defineConfig({
   splitting: true,
   bundle: true,
   clean: true,
-  external: ['saxon-js'],
+  external: ['saxon-js', '@citolab/qti-convert', '@citolab/qti-convert-export'],
   outExtension() {
     return {
       js: `.mjs`

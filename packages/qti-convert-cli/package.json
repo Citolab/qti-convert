@@ -19,7 +19,8 @@
     "qti-convert-folder": "./dist/qti-convert-folder.mjs",
     "qti-create-manifest": "./dist/qti-package-manifest.mjs",
     "qti-create-assessment": "./dist/qti-package-assessment.mjs",
-    "qti-strip-media-pkg": "./dist/qti-strip-media-pkg.mjs"
+    "qti-strip-media-pkg": "./dist/qti-strip-media-pkg.mjs",
+    "qti-export-docx": "./dist/qti-export-docx.mjs"
   },
   "files": [
     "dist"
@@ -30,6 +31,7 @@
   },
   "dependencies": {
     "@citolab/qti-convert": "^0.4.18",
+    "@citolab/qti-convert-export": "^0.4.18",
     "saxon-js": "^2.7.0"
   },
   "devDependencies": {

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Tekstvraag" identifier="ITEM_TEXT" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE1" cardinality="single" base-type="string">
+    <qti-correct-response>
+      <qti-value>kat</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-response-declaration identifier="RESPONSE2" cardinality="single" base-type="string">
+    <qti-correct-response>
+      <qti-value>muizen</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <p>
+      Als de
+      <qti-text-entry-interaction response-identifier="RESPONSE1"/>
+      van huis is, dansen de
+      <qti-text-entry-interaction response-identifier="RESPONSE2"/>
+      op tafel.
+    </p>
+  </qti-item-body>
+</qti-assessment-item>

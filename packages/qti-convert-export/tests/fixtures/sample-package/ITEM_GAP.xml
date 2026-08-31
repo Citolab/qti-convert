@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Gatentekst" identifier="ITEM_GAP" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="directedPair">
+    <qti-correct-response>
+      <qti-value>W1 G1</qti-value>
+      <qti-value>W2 G2</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-gap-match-interaction response-identifier="RESPONSE" shuffle="true">
+      <qti-gap-text identifier="W1" match-max="1">zuur</qti-gap-text>
+      <qti-gap-text identifier="W2" match-max="1">basisch</qti-gap-text>
+      <p>
+        Een oplossing met een pH lager dan 7 noemen we
+        <qti-gap identifier="G1"/>
+        , terwijl een oplossing met een pH hoger dan 7
+        <qti-gap identifier="G2"/>
+        is.
+      </p>
+    </qti-gap-match-interaction>
+  </qti-item-body>
+</qti-assessment-item>

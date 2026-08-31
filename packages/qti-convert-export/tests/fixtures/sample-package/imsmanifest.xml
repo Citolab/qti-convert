@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns="http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1" identifier="MANIFEST_EXPORT_SAMPLE">
+  <metadata>
+    <schema>QTI Package</schema>
+    <schemaversion>3.0.0</schemaversion>
+  </metadata>
+  <organizations/>
+  <resources>
+    <resource identifier="test" type="imsqti_test_xmlv3p0" href="AssessmentTest.xml">
+      <file href="AssessmentTest.xml"/>
+      <dependency identifierref="ITEM_CHOICE"/>
+      <dependency identifierref="ITEM_CHOICE_MULTI"/>
+      <dependency identifierref="ITEM_TEXT"/>
+      <dependency identifierref="ITEM_EXTENDED"/>
+      <dependency identifierref="ITEM_MATCH"/>
+      <dependency identifierref="ITEM_ORDER"/>
+      <dependency identifierref="ITEM_GAP"/>
+      <dependency identifierref="ITEM_HOTTEXT"/>
+      <dependency identifierref="ITEM_SELECT_POINT"/>
+    </resource>
+    <resource identifier="ITEM_CHOICE" type="imsqti_item_xmlv3p0" href="ITEM_CHOICE.xml">
+      <file href="ITEM_CHOICE.xml"/>
+    </resource>
+    <resource identifier="ITEM_CHOICE_MULTI" type="imsqti_item_xmlv3p0" href="ITEM_CHOICE_MULTI.xml">
+      <file href="ITEM_CHOICE_MULTI.xml"/>
+    </resource>
+    <resource identifier="ITEM_TEXT" type="imsqti_item_xmlv3p0" href="ITEM_TEXT.xml">
+      <file href="ITEM_TEXT.xml"/>
+    </resource>
+    <resource identifier="ITEM_EXTENDED" type="imsqti_item_xmlv3p0" href="ITEM_EXTENDED.xml">
+      <file href="ITEM_EXTENDED.xml"/>
+    </resource>
+    <resource identifier="ITEM_MATCH" type="imsqti_item_xmlv3p0" href="ITEM_MATCH.xml">
+      <file href="ITEM_MATCH.xml"/>
+    </resource>
+    <resource identifier="ITEM_ORDER" type="imsqti_item_xmlv3p0" href="ITEM_ORDER.xml">
+      <file href="ITEM_ORDER.xml"/>
+    </resource>
+    <resource identifier="ITEM_GAP" type="imsqti_item_xmlv3p0" href="ITEM_GAP.xml">
+      <file href="ITEM_GAP.xml"/>
+    </resource>
+    <resource identifier="ITEM_HOTTEXT" type="imsqti_item_xmlv3p0" href="ITEM_HOTTEXT.xml">
+      <file href="ITEM_HOTTEXT.xml"/>
+    </resource>
+    <resource identifier="ITEM_SELECT_POINT" type="imsqti_item_xmlv3p0" href="ITEM_SELECT_POINT.xml">
+      <file href="ITEM_SELECT_POINT.xml"/>
+    </resource>
+    <resource identifier="RES_ATOM" type="webcontent" href="resources/atom.png">
+      <file href="resources/atom.png"/>
+    </resource>
+    <resource identifier="RES_MAP" type="webcontent" href="resources/map.png">
+      <file href="resources/map.png"/>
+    </resource>
+  </resources>
+</manifest>

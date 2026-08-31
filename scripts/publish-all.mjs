@@ -27,6 +27,10 @@ const packages = [
     dir: 'packages/qti-convert-tao-pci'
   },
   {
+    name: '@citolab/qti-convert-export',
+    dir: 'packages/qti-convert-export'
+  },
+  {
     name: '@citolab/qti-convert-cli',
     dir: 'packages/qti-convert-cli'
   }

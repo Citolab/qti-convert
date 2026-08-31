@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Meerkeuzevraag meerdere antwoorden" identifier="ITEM_CHOICE_MULTI" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="identifier">
+    <qti-correct-response>
+      <qti-value>CHOICE1</qti-value>
+      <qti-value>CHOICE4</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-choice-interaction response-identifier="RESPONSE" max-choices="0">
+      <qti-prompt>Welke van de volgende landen zijn volledig door één enkel ander land ingesloten?</qti-prompt>
+      <qti-simple-choice identifier="CHOICE1">Lesotho</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE2">San Marino</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE3">Bolivia</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE4">Vaticaanstad</qti-simple-choice>
+    </qti-choice-interaction>
+  </qti-item-body>
+</qti-assessment-item>

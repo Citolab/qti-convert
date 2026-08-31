@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Sleepvraag" identifier="ITEM_MATCH" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="directedPair">
+    <qti-correct-response>
+      <qti-value>A1 B1</qti-value>
+      <qti-value>A2 B2</qti-value>
+      <qti-value>A3 B3</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-match-interaction response-identifier="RESPONSE" max-associations="3">
+      <qti-prompt>Koppel het natuurkundige verschijnsel aan de juiste eenheid:</qti-prompt>
+      <qti-simple-match-set>
+        <qti-simple-associable-choice identifier="A1" match-max="1">Vermogen</qti-simple-associable-choice>
+        <qti-simple-associable-choice identifier="A2" match-max="1">Druk</qti-simple-associable-choice>
+        <qti-simple-associable-choice identifier="A3" match-max="1">Frequentie</qti-simple-associable-choice>
+      </qti-simple-match-set>
+      <qti-simple-match-set>
+        <qti-simple-associable-choice identifier="B1" match-max="1">watt (W)</qti-simple-associable-choice>
+        <qti-simple-associable-choice identifier="B2" match-max="1">pascal (Pa)</qti-simple-associable-choice>
+        <qti-simple-associable-choice identifier="B3" match-max="1">hertz (Hz)</qti-simple-associable-choice>
+      </qti-simple-match-set>
+    </qti-match-interaction>
+  </qti-item-body>
+</qti-assessment-item>

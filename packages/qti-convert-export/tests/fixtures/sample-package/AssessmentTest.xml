@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  identifier="export-sample-test" title="Export sample toets">
+  <qti-test-part identifier="TEST-PART" navigation-mode="linear" submission-mode="individual">
+    <qti-assessment-section identifier="SECTION" title="Section" visible="true">
+      <qti-assessment-item-ref identifier="ITEM_CHOICE" href="ITEM_CHOICE.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_CHOICE_MULTI" href="ITEM_CHOICE_MULTI.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_TEXT" href="ITEM_TEXT.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_EXTENDED" href="ITEM_EXTENDED.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_MATCH" href="ITEM_MATCH.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_ORDER" href="ITEM_ORDER.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_GAP" href="ITEM_GAP.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_HOTTEXT" href="ITEM_HOTTEXT.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_SELECT_POINT" href="ITEM_SELECT_POINT.xml"/>
+    </qti-assessment-section>
+  </qti-test-part>
+</qti-assessment-test>

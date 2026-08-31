@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  title="Volgordevraag" identifier="ITEM_ORDER" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="ordered" base-type="identifier">
+    <qti-correct-response>
+      <qti-value>C1</qti-value>
+      <qti-value>C2</qti-value>
+      <qti-value>C3</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-order-interaction response-identifier="RESPONSE" shuffle="true">
+      <qti-prompt>Zet de volgende stappen van het wetenschappelijke proces in de juiste volgorde:</qti-prompt>
+      <qti-simple-choice identifier="C1">Hypothese formuleren</qti-simple-choice>
+      <qti-simple-choice identifier="C2">Data verzamelen</qti-simple-choice>
+      <qti-simple-choice identifier="C3">Conclusies trekken</qti-simple-choice>
+    </qti-order-interaction>
+  </qti-item-body>
+</qti-assessment-item>

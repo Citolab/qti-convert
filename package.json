@@ -17,15 +17,17 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build:core && npm run build:browser-import && npm run build:local-ai && npm run build:tao-pci && npm run build:cli",
+    "build": "npm run build:core && npm run build:browser-import && npm run build:local-ai && npm run build:tao-pci && npm run build:export && npm run build:cli",
     "build:core": "npm run build --workspace=@citolab/qti-convert",
     "build:browser-import": "npm run build --workspace=@citolab/qti-browser-import",
     "build:local-ai": "npm run build --workspace=@citolab/qti-convert-local-ai",
+    "build:export": "npm run build --workspace=@citolab/qti-convert-export",
     "build:cli": "npm run build --workspace=@citolab/qti-convert-cli",
     "build:tao-pci": "npm run build --workspace=@citolab/qti-convert-tao-pci",
     "test": "npm run test --workspaces --if-present",
     "test:core": "npm run test --workspace=@citolab/qti-convert",
     "test:cli": "npm run test --workspace=@citolab/qti-convert-cli",
+    "test:export": "npm run test --workspace=@citolab/qti-convert-export",
     "test:tao-pci": "npm run test --workspace=@citolab/qti-convert-tao-pci",
     "lint": "npm run lint --workspaces --if-present",
     "clean": "rimraf packages/*/dist",
@@ -34,7 +36,8 @@
     "update-dependencies": "npx npm-check-updates --peer -u && npm install",
     "publish:all": "node scripts/publish-all.mjs",
     "publish:all:dry-run": "node scripts/publish-all.mjs --dry-run --allow-dirty",
-    "yalc:push:tao-pci": "cd packages/qti-convert-tao-pci && yalc publish --push"
+    "yalc:push:tao-pci": "cd packages/qti-convert-tao-pci && yalc publish --push",
+    "yalc:push:export": "cd packages/qti-convert-export && npm run build && yalc publish --push"
   },
   "overrides": {
     "vite": "7.3.2",
