@@ -242,6 +242,8 @@ export const __test__ = {
   pickAliasedModuleResolutionPath,
   repairBareAttributesInXml,
   isQti3Xml,
+  resolveRuntimeAssetUrl,
+  resetRuntimeAssetUrlCache,
 };
 
 function getIdentifierFromItem(xml: string, fallback: string): string {
@@ -323,6 +325,10 @@ function getItemStemDirPath(filePath: string): string | null {
 }
 
 const runtimeAssetUrlCache = new Map<string, string>();
+
+function resetRuntimeAssetUrlCache(): void {
+  runtimeAssetUrlCache.clear();
+}
 
 /**
  * Resolves a package-relative runtime reference (a PCI module, a stylesheet) to the package URL the
