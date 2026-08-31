@@ -322,69 +322,52 @@ function getItemStemDirPath(filePath: string): string | null {
   return `${baseDir}/${withoutExt}`;
 }
 
-const runtimeBlobUrlCache = new Map<string, string>();
+const runtimeAssetUrlCache = new Map<string, string>();
 
-function rebaseCssUrls(cssText: string, sourceUrl: string): string {
-  return cssText.replace(/url\(([^)]+)\)/gi, (match, rawValue: string) => {
-    const unquoted = rawValue.trim().replace(/^['"]|['"]$/g, '');
-    if (!unquoted || /^(data:|blob:|https?:|#)/i.test(unquoted)) {
-      return match;
-    }
-
-    try {
-      const rebased = new URL(unquoted, sourceUrl).toString();
-      return `url("${rebased}")`;
-    } catch {
-      return match;
-    }
-  });
-}
-
-async function materializeRuntimeAssetUrl(url: string): Promise<string> {
+/**
+ * Resolves a package-relative runtime reference (a PCI module, a stylesheet) to the package URL the
+ * Service Worker serves it from, probing the `.js`/`.json` variants that module ids omit.
+ *
+ * This deliberately returns a package URL and not a `blob:` one. Object URLs live only as long as
+ * the document that created them, and these values get persisted into the package cache alongside
+ * the item XML - so a blob URL here loads once and then fails with ERR_FILE_NOT_FOUND on every
+ * later visit, taking the whole interaction down with it. The PCI iframe is `srcdoc`-based and
+ * therefore stays inside the Service Worker's scope, so it can fetch these URLs directly.
+ */
+async function resolveRuntimeAssetUrl(url: string): Promise<string> {
   if (!/^(https?:)/i.test(url)) return url;
 
-  const cached = runtimeBlobUrlCache.get(url);
+  const cached = runtimeAssetUrlCache.get(url);
   if (cached) return cached;
 
   const parsed = new URL(url, window.location.origin);
   const hasFileExtension = /\.(?:js|json|mjs|cjs|css|html)$/i.test(parsed.pathname);
   const candidates = hasFileExtension ? [url] : [url, `${url}.js`, `${url}.json`];
 
-  let response: Response | null = null;
-  let resolvedUrl = url;
+  let resolvedUrl: string | null = null;
   let lastStatus: number | null = null;
 
   for (const candidate of candidates) {
     const attempt = await fetch(candidate, { cache: 'no-store' });
     if (attempt.ok) {
-      response = attempt;
       resolvedUrl = candidate;
       break;
     }
     lastStatus = attempt.status;
   }
 
-  if (!response) {
+  if (!resolvedUrl) {
     throw new Error(`Runtime asset missing for ${url} (${lastStatus ?? 'network error'})`);
   }
 
-  let blob: Blob;
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('text/css') || resolvedUrl.toLowerCase().endsWith('.css')) {
-    const cssText = rebaseCssUrls(await response.text(), resolvedUrl);
-    blob = new Blob([cssText], { type: 'text/css' });
-  } else {
-    blob = await response.blob();
-  }
-  const blobUrl = URL.createObjectURL(blob);
-  runtimeBlobUrlCache.set(resolvedUrl, blobUrl);
-  runtimeBlobUrlCache.set(url, blobUrl);
-  return blobUrl;
+  runtimeAssetUrlCache.set(url, resolvedUrl);
+  runtimeAssetUrlCache.set(resolvedUrl, resolvedUrl);
+  return resolvedUrl;
 }
 
-async function tryMaterializeRuntimeAssetUrl(url: string): Promise<string | null> {
+async function tryResolveRuntimeAssetUrl(url: string): Promise<string | null> {
   try {
-    return await materializeRuntimeAssetUrl(url);
+    return await resolveRuntimeAssetUrl(url);
   } catch {
     return null;
   }
@@ -462,19 +445,19 @@ async function prepareItemXmlForRuntime(
 
     if (primary !== null) {
       if (hasFallback) {
-        const materializedPrimary = await tryMaterializeRuntimeAssetUrl(primary);
-        if (materializedPrimary) {
-          moduleEl.setAttribute('primary-path', materializedPrimary);
+        const resolvedPrimary = await tryResolveRuntimeAssetUrl(primary);
+        if (resolvedPrimary) {
+          moduleEl.setAttribute('primary-path', resolvedPrimary);
         }
       } else {
-        moduleEl.setAttribute('primary-path', await materializeRuntimeAssetUrl(primary));
+        moduleEl.setAttribute('primary-path', await resolveRuntimeAssetUrl(primary));
       }
     }
 
     if (fallback !== null) {
-      const materializedFallback = await tryMaterializeRuntimeAssetUrl(fallback);
-      if (materializedFallback) {
-        moduleEl.setAttribute('fallback-path', materializedFallback);
+      const resolvedFallback = await tryResolveRuntimeAssetUrl(fallback);
+      if (resolvedFallback) {
+        moduleEl.setAttribute('fallback-path', resolvedFallback);
       }
     }
   }
@@ -502,7 +485,7 @@ async function prepareItemXmlForRuntime(
     const resolved = resolveHref(itemPath, href);
     if (!resolved) continue;
     const absoluteUrl = `${origin}${makePackageUrl(packageId, resolved)}`;
-    stylesheet.setAttribute('href', await materializeRuntimeAssetUrl(absoluteUrl));
+    stylesheet.setAttribute('href', await resolveRuntimeAssetUrl(absoluteUrl));
   }
 
   return new XMLSerializer().serializeToString(doc);
