@@ -33,7 +33,6 @@ export interface ConvertToStimulusResult {
 
 const loadXml = (xml: string) => cheerio.load(xml, { xmlMode: true, xml: true });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type El = any;
 
 function hasClass($: cheerio.CheerioAPI, el: El, cls: string): boolean {

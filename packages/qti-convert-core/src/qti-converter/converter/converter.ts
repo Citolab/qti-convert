@@ -104,7 +104,6 @@ const normalizeConvertedQtiNamespace = (xml: string): string => {
  */
 const convert = async (qti2, styleSheetString) => {
   // Ensure SaxonJS is available globally
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SaxonJS = (window as any).SaxonJS || globalThis.SaxonJS;
 
   if (!SaxonJS) {

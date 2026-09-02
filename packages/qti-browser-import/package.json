@@ -34,6 +34,6 @@
     "@citolab/qti-convert-tao-pci": "^0.4.18",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   }
 }

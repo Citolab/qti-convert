@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as cheerio from 'cheerio';
 import unzipper from 'unzipper';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { convertQti2toQti3 } from './converter';
 import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { qtiTransform } from '../../qti-transformer';
@@ -394,7 +394,7 @@ export async function convertPackageStreamAndWriteToStream(
 
 // Helper function to create archive buffer
 async function createArchiveBuffer(files: Map<string, { content: string | Buffer; type: string }>): Promise<Buffer> {
-  const archive = archiver('zip', { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   const outputBuffers: Buffer[] = [];
 
   archive.on('data', chunk => {
@@ -420,7 +420,7 @@ async function streamArchiveToOutput(
   outputStream: NodeJS.WritableStream
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
 
     // Pipe directly to output stream
     archive.pipe(outputStream);

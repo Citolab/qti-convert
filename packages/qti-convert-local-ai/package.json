@@ -5,6 +5,9 @@
   "type": "module",
   "license": "Apache-2.0",
   "repository": "https://github.com/Citolab/qti-convert",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -21,16 +24,16 @@
     "test": "vitest run tests"
   },
   "dependencies": {
-    "@mlc-ai/web-llm": "^0.2.82",
+    "@mlc-ai/web-llm": "^0.2.84",
     "buffer": "^6.0.3",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.2",
     "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
-    "pdfjs-dist": "^4.10.38"
+    "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   }
 }
