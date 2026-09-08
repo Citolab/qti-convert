@@ -144,7 +144,9 @@ const fromPackage = (
 ).xml();
 ```
 
-The `template` attribute is tried first, then `template-location`. Options:
+`template-location` is tried first because it is the resolvable url; the `template` identifier is
+only a fallback, since a delivery engine is not expected to resolve that URI over the web.
+Options:
 
 | Option | Default | Description |
 | --- | --- | --- |

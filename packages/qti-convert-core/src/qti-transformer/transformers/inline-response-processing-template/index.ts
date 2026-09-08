@@ -3,9 +3,10 @@ import * as cheerio from 'cheerio';
 /**
  * Resolves the raw XML of a response processing template.
  *
- * It is called with the value of the `template` attribute first and, when that yields nothing,
- * with the value of `template-location`. Return `null`/`undefined` to signal "cannot resolve
- * this one" so the next candidate (or nothing at all) is used.
+ * It is called with the value of the `template-location` attribute first — that is the
+ * resolvable url — and, when that yields nothing, with the `template` identifier. Return
+ * `null`/`undefined` to signal "cannot resolve this one" so the next candidate (or nothing at
+ * all) is used.
  */
 export type ResponseProcessingTemplateResolver = (
   url: string,
@@ -101,9 +102,12 @@ export async function inlineResponseProcessingTemplate(
       continue;
     }
 
+    // `template` is a global identifier that a delivery engine is not expected to resolve over
+    // the web; `template-location` is the resolvable url (usually a file inside the package), so
+    // that is tried first and the identifier is only a fallback.
     const candidates: { url: string; attribute: 'template' | 'template-location' }[] = [];
-    if (template) candidates.push({ url: template, attribute: 'template' });
     if (templateLocation) candidates.push({ url: templateLocation, attribute: 'template-location' });
+    if (template) candidates.push({ url: template, attribute: 'template' });
 
     let rules: string | null = null;
     for (const candidate of candidates) {

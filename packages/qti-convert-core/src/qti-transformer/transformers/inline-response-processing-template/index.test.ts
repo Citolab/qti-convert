@@ -66,10 +66,8 @@ test('inlines a standard template when includeStandardTemplates is set', async (
   expect(result.xml()).toContain('WELL_DONE');
 });
 
-test('falls back to template-location when the template cannot be resolved', async () => {
-  const getTemplateContent = vi
-    .fn()
-    .mockImplementation(async (url: string) => (url.endsWith('.xml') ? customTemplate : null));
+test('prefers template-location over the template identifier', async () => {
+  const getTemplateContent = vi.fn().mockResolvedValue(customTemplate);
 
   const result = await qtiTransform(
     itemWithTemplate(
@@ -77,9 +75,29 @@ test('falls back to template-location when the template cannot be resolved', asy
     )
   ).inlineResponseProcessingTemplate(getTemplateContent, { cache: false });
 
-  expect(getTemplateContent).toHaveBeenCalledTimes(2);
+  expect(getTemplateContent).toHaveBeenCalledTimes(1);
+  expect(getTemplateContent).toHaveBeenCalledWith('templates/random_feedback.xml', {
+    template: 'https://example.com/rptemplates/random_feedback',
+    templateLocation: 'templates/random_feedback.xml',
+    attribute: 'template-location'
+  });
   expect(result.xml()).toContain('WELL_DONE');
   expect(result.xml()).not.toContain('template-location');
+});
+
+test('falls back to the template identifier when template-location cannot be resolved', async () => {
+  const getTemplateContent = vi
+    .fn()
+    .mockImplementation(async (url: string) => (url.startsWith('https://') ? customTemplate : null));
+
+  const result = await qtiTransform(
+    itemWithTemplate(
+      'template="https://example.com/rptemplates/random_feedback" template-location="missing/random_feedback.xml"'
+    )
+  ).inlineResponseProcessingTemplate(getTemplateContent, { cache: false });
+
+  expect(getTemplateContent).toHaveBeenCalledTimes(2);
+  expect(result.xml()).toContain('WELL_DONE');
 });
 
 test('resolves relative template references against baseUrl', async () => {
