@@ -22,6 +22,7 @@ import {
   stripStylesheets,
   stripStylesheetsWithStimulusRefs,
   stylesheetsInline,
+  inlineResponseProcessingTemplate,
   wrapStimulusInSection
 } from './transformers';
 import type { StimulusResolver, StripStylesheetsOptions } from './transformers/strip-stylesheets';
@@ -39,6 +40,14 @@ import { customInteraction } from './transformers/custom-interaction';
 import { ModuleResolutionConfig, ConfigurePciOptions } from './transformers/configure-pci';
 export { type ModuleResolutionConfig, type ConfigurePciOptions } from './transformers/configure-pci';
 import type { StylesheetsInlineOptions } from './transformers/stylesheets-inline';
+import type {
+  InlineResponseProcessingTemplateOptions,
+  ResponseProcessingTemplateResolver
+} from './transformers/inline-response-processing-template';
+export type {
+  InlineResponseProcessingTemplateOptions,
+  ResponseProcessingTemplateResolver
+} from './transformers/inline-response-processing-template';
 export const qtiReferenceAttributes = ['src', 'href', 'data', 'primary-path', 'fallback-path', 'template-location'];
 
 // Define the types for the API methods
@@ -72,6 +81,12 @@ interface QtiTransformAPI {
       | ((href: string) => Promise<string | null | undefined>)
       | StylesheetsInlineOptions,
     options?: StylesheetsInlineOptions
+  ): Promise<QtiTransformAPI>;
+  inlineResponseProcessingTemplate(
+    getTemplateContentOrOptions?:
+      | ResponseProcessingTemplateResolver
+      | InlineResponseProcessingTemplateOptions,
+    options?: InlineResponseProcessingTemplateOptions
   ): Promise<QtiTransformAPI>;
   stripStylesheets(options?: StripStylesheetsOptions): QtiTransformAPI;
   stripStylesheets(
@@ -200,6 +215,19 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       const stylesheetsInlineOptions =
         typeof getStylesheetContentOrOptions === 'function' ? options : getStylesheetContentOrOptions;
       await stylesheetsInline($, getStylesheetContent, stylesheetsInlineOptions);
+      return api;
+    },
+    async inlineResponseProcessingTemplate(
+      getTemplateContentOrOptions?:
+        | ResponseProcessingTemplateResolver
+        | InlineResponseProcessingTemplateOptions,
+      options?: InlineResponseProcessingTemplateOptions
+    ) {
+      const getTemplateContent =
+        typeof getTemplateContentOrOptions === 'function' ? getTemplateContentOrOptions : undefined;
+      const inlineOptions =
+        typeof getTemplateContentOrOptions === 'function' ? options : getTemplateContentOrOptions;
+      await inlineResponseProcessingTemplate($, getTemplateContent, inlineOptions);
       return api;
     },
     stripStylesheets: ((options?: StripStylesheetsOptions, resolver?: StimulusResolver) => {
