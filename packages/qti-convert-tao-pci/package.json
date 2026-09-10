@@ -45,7 +45,7 @@
     }
   },
   "devDependencies": {
-    "@citolab/qti-components": "^8.0.2",
+    "@citolab/qti-components": "^9.1.0",
     "@storybook/addon-a11y": "^10.5.10",
     "@storybook/addon-docs": "^10.5.10",
     "@storybook/addon-vitest": "^10.5.10",
