@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  identifier="TST-nested" title="Nested Toets">
+  <qti-test-part identifier="PART1" navigation-mode="nonlinear" submission-mode="simultaneous">
+    <qti-assessment-section identifier="SEC1" title="Sectie 1" visible="true">
+      <qti-assessment-item-ref identifier="ITM-A" href="item-a.xml"/>
+      <qti-assessment-item-ref identifier="ITM-B" href="item-b.xml"/>
+    </qti-assessment-section>
+  </qti-test-part>
+</qti-assessment-test>

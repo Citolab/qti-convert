@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+  identifier="TST-broken" title="My Test">
+  <qti-test-part identifier="PART1" navigation-mode="nonlinear" submission-mode="simultaneous">
+    <qti-assessment-section identifier="SEC1" title="Section 1" visible="true">
+      <qti-assessment-item-ref href="ITM-01xml" identifier="ITM-01"/>
+      <qti-assessment-item-ref href="ITM-02xml" identifier="ITM-02"/>
+    </qti-assessment-section>
+  </qti-test-part>
+</qti-assessment-test>

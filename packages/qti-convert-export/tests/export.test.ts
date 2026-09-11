@@ -13,12 +13,12 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureDir = path.join(__dirname, 'fixtures/sample-package');
 
-async function readFixtureFiles(): Promise<Map<string, Uint8Array>> {
+async function readFixtureFiles(dir: string = fixtureDir): Promise<Map<string, Uint8Array>> {
   const files = new Map<string, Uint8Array>();
-  async function walk(dir: string, prefix = '') {
-    for (const entry of await readdir(dir, { withFileTypes: true })) {
+  async function walk(current: string, prefix = '') {
+    for (const entry of await readdir(current, { withFileTypes: true })) {
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-      const full = path.join(dir, entry.name);
+      const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
         await walk(full, rel);
       } else {
@@ -26,16 +26,19 @@ async function readFixtureFiles(): Promise<Map<string, Uint8Array>> {
       }
     }
   }
-  await walk(fixtureDir);
+  await walk(dir);
   return files;
 }
 
-async function zipFixture(): Promise<Uint8Array> {
-  const files = await readFixtureFiles();
+async function zipFixture(dir: string = fixtureDir): Promise<Uint8Array> {
+  const files = await readFixtureFiles(dir);
   const zip = new JSZip();
   for (const [p, bytes] of files) zip.file(p, bytes);
   return zip.generateAsync({ type: 'uint8array' });
 }
+
+const nestedFixtureDir = path.join(__dirname, 'fixtures/nested-package');
+const brokenTestFixtureDir = path.join(__dirname, 'fixtures/broken-test-package');
 
 describe('parseItemXml', () => {
   it('parses choice single and multi', async () => {
@@ -99,6 +102,49 @@ describe('loadPackageFromFiles', () => {
     expect(kinds).toContain('selectPoint');
     // Relative package images are hydrated
     expect(paper.assets.has('resources/atom.png')).toBe(true);
+  });
+});
+
+describe('item href resolution', () => {
+  it('resolves assessment item refs against the test file location', async () => {
+    // The test lives in depitems/ and names its items as siblings ("item-a.xml"),
+    // which is what the spec means by a relative href. Resolving those against
+    // the package root finds nothing, and the paper used to come out with its
+    // title and headers intact and zero questions.
+    const files = await readFixtureFiles(nestedFixtureDir);
+    const paper = await loadPackageFromFiles(files);
+
+    expect(paper.title).toBe('Nested Toets');
+    expect(paper.items).toHaveLength(2);
+    // Order comes from the test, not the manifest.
+    expect(paper.items.map(i => i.identifier)).toEqual(['ITM-A', 'ITM-B']);
+    expect(paper.items[0].interaction.kind).toBe('choice');
+  });
+
+  it('exports a populated docx for a nested package', async () => {
+    const zip = await zipFixture(nestedFixtureDir);
+    const result = await convertPackageToDocx(zip, { locale: 'nl' });
+    expect(result.paper.items).toHaveLength(2);
+    expect(result.assessment.byteLength).toBeGreaterThan(2000);
+  });
+
+  it('falls back to the manifest when the test references files that are absent', async () => {
+    // This package's test says href="ITM-01xml" -- the dot lost before "xml" --
+    // while its manifest correctly says "ITM-01.xml". Two non-empty but
+    // unresolvable refs must not shadow a manifest that resolves.
+    const files = await readFixtureFiles(brokenTestFixtureDir);
+    const paper = await loadPackageFromFiles(files);
+
+    expect(paper.items).toHaveLength(2);
+    expect(paper.items.map(i => i.identifier)).toEqual(['ITM-01', 'ITM-02']);
+  });
+
+  it('keeps working when a test writes package-root-relative item hrefs', async () => {
+    // The flat sample package: test and items share a directory, so the
+    // test-relative and raw forms coincide. Guards against the resolution
+    // change regressing the common case.
+    const paper = await loadPackageFromFiles(await readFixtureFiles());
+    expect(paper.items).toHaveLength(9);
   });
 });
 

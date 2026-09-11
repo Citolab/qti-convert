@@ -4,6 +4,7 @@ import {
   isRemoteUrl,
   loadXml,
   normalizePath,
+  resolveAssetRef,
   textContent,
 } from './xml-utils.js';
 import { parseItemXml } from './parse-item.js';
@@ -68,16 +69,35 @@ function decodeUtf8(bytes: Uint8Array): string {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
-function itemRefsFromAssessment(assessmentXml: string): { identifier: string; href: string }[] {
+/**
+ * Item references declared by an assessment test.
+ *
+ * `assessmentHref` is required, not optional convenience: an
+ * `<qti-assessment-item-ref href>` is relative to the *test file*, not to the
+ * package root. A test at `depitems/TST-foo.xml` naming a sibling as
+ * `32mzlw.xml` means `depitems/32mzlw.xml`, and looking that up at the package
+ * root misses every item -- the paper then exports with its title and headers
+ * intact and no questions at all, which is why this went unnoticed.
+ *
+ * Assets have always resolved this way (`resolveAssetRef`); items simply never
+ * did. The raw href is kept alongside so a package whose test hrefs are already
+ * package-root-relative -- which is what a flat package produces, since the
+ * resolved and raw forms are then identical -- keeps working either way.
+ */
+function itemRefsFromAssessment(
+  assessmentXml: string,
+  assessmentHref: string
+): { identifier: string; href: string; rawHref: string }[] {
   const $ = loadXml(assessmentXml);
-  const refs: { identifier: string; href: string }[] = [];
+  const refs: { identifier: string; href: string; rawHref: string }[] = [];
   $('qti-assessment-item-ref, assessmentItemRef').each((_, el) => {
     const identifier = $(el).attr('identifier') || '';
     const href = $(el).attr('href') || '';
     const category = ($(el).attr('category') || '').toLowerCase();
     if (!href) return;
     if (category === 'info' || category === 'introduction') return;
-    refs.push({ identifier, href: normalizePath(href) });
+    const rawHref = normalizePath(href);
+    refs.push({ identifier, href: resolveAssetRef(href, assessmentHref) || rawHref, rawHref });
   });
   return refs;
 }
@@ -93,6 +113,69 @@ function itemHrefsFromManifest(manifestXml: string): { identifier: string; href:
     if (href) refs.push({ identifier, href: normalizePath(href) });
   });
   return refs;
+}
+
+/** An item reference, with both the test-relative resolution and the href as written. */
+type ItemRef = { identifier: string; href: string; rawHref?: string };
+
+/**
+ * The path an item actually lives at, or undefined if nothing matches.
+ *
+ * Tries the test-relative resolution first, then the href exactly as written --
+ * the latter covers packages that (contrary to the spec) already write
+ * package-root-relative item hrefs into the test.
+ */
+function resolveItemHref(files: Map<string, Uint8Array>, ref: ItemRef): string | undefined {
+  if (files.has(ref.href)) return ref.href;
+  if (ref.rawHref && files.has(ref.rawHref)) return ref.rawHref;
+  return undefined;
+}
+
+/** How many of `refs` point at a file that is actually in the package. */
+function resolvableCount(files: Map<string, Uint8Array>, refs: ItemRef[]): number {
+  let n = 0;
+  for (const ref of refs) if (resolveItemHref(files, ref)) n++;
+  return n;
+}
+
+/**
+ * The item references to build the paper from.
+ *
+ * Prefers the assessment test, because it carries the author's intended order
+ * and omits items marked as info/introduction. Falls back to the manifest when
+ * the test's references do not resolve -- not merely when there are none.
+ *
+ * That distinction is the whole point: a test whose hrefs are broken yields
+ * plenty of references that match nothing, so a `length === 0` check keeps the
+ * unusable list and the paper exports empty. Packages do ship this way (a test
+ * naming `ITM-01xml` while its own manifest says `ITM-01.xml`), and the manifest
+ * is right there with correct paths, so prefer whichever source actually
+ * resolves more items and treat the test's order as a preference, not a
+ * guarantee.
+ */
+function pickItemRefs(
+  files: Map<string, Uint8Array>,
+  manifestXml: string,
+  assessmentXml: string | undefined,
+  assessmentHref: string | undefined
+): ItemRef[] {
+  const fromAssessment =
+    assessmentXml && assessmentHref ? itemRefsFromAssessment(assessmentXml, assessmentHref) : [];
+  if (fromAssessment.length > 0) {
+    const resolved = resolvableCount(files, fromAssessment);
+    // Every reference accounted for: nothing the manifest could add.
+    if (resolved === fromAssessment.length) return fromAssessment;
+
+    const fromManifest = itemHrefsFromManifest(manifestXml);
+    if (resolvableCount(files, fromManifest) > resolved) {
+      console.warn(
+        `Assessment test references ${fromAssessment.length - resolved} item(s) that are not in the package; using the manifest instead.`
+      );
+      return fromManifest;
+    }
+    return fromAssessment;
+  }
+  return itemHrefsFromManifest(manifestXml);
 }
 
 function assessmentHrefFromManifest(manifestXml: string): string | undefined {
@@ -286,7 +369,7 @@ export async function hydrateImageAssets(
 
 function buildPaper(
   files: Map<string, Uint8Array>,
-  refs: { identifier: string; href: string }[],
+  refs: ItemRef[],
   assessmentXml: string | undefined,
   assessmentHref: string | undefined
 ): PaperAssessment {
@@ -294,12 +377,12 @@ function buildPaper(
   const items: PaperItem[] = [];
 
   for (const ref of refs) {
-    const itemBytes = files.get(ref.href);
-    if (!itemBytes) {
+    const href = resolveItemHref(files, ref);
+    if (!href) {
       console.warn(`Missing item file: ${ref.href}`);
       continue;
     }
-    const item = parseItemXml(decodeUtf8(itemBytes), assets, ref.href);
+    const item = parseItemXml(decodeUtf8(files.get(href)!), assets, href);
     if (ref.identifier) item.identifier = ref.identifier;
     if (item.interaction.kind === 'unsupported' && item.interaction.interactionType === 'none') {
       continue;
@@ -330,10 +413,7 @@ export async function loadPackage(source: PackageSource): Promise<PaperAssessmen
   const assessmentXml =
     assessmentHref && files.has(assessmentHref) ? decodeUtf8(files.get(assessmentHref)!) : undefined;
 
-  let refs = assessmentXml ? itemRefsFromAssessment(assessmentXml) : [];
-  if (refs.length === 0) {
-    refs = itemHrefsFromManifest(manifestXml);
-  }
+  const refs = pickItemRefs(files, manifestXml, assessmentXml, assessmentHref);
 
   const paper = buildPaper(files, refs, assessmentXml, assessmentHref);
   await hydrateImageAssets(paper, files);
@@ -356,8 +436,7 @@ export async function loadPackageFromFiles(files: Map<string, Uint8Array>): Prom
       ? decodeUtf8(normalized.get(assessmentHref)!)
       : undefined;
 
-  let refs = assessmentXml ? itemRefsFromAssessment(assessmentXml) : [];
-  if (refs.length === 0) refs = itemHrefsFromManifest(manifestXml);
+  const refs = pickItemRefs(normalized, manifestXml, assessmentXml, assessmentHref);
 
   const paper = buildPaper(normalized, refs, assessmentXml, assessmentHref);
   await hydrateImageAssets(paper, normalized);

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" identifier="MANIFEST-nested">
+  <resources>
+    <resource identifier="TST-nested" type="imsqti_test_xmlv3p0" href="depitems/TST-nested.xml">
+      <file href="depitems/TST-nested.xml"/>
+    </resource>
+    <resource identifier="ITM-A" type="imsqti_item_xmlv3p0" href="depitems/item-a.xml">
+      <file href="depitems/item-a.xml"/>
+    </resource>
+    <resource identifier="ITM-B" type="imsqti_item_xmlv3p0" href="depitems/item-b.xml">
+      <file href="depitems/item-b.xml"/>
+    </resource>
+  </resources>
+</manifest>

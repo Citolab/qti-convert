@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" identifier="MANIFEST-broken">
+  <resources>
+    <resource identifier="TST-broken" type="imsqti_test_xmlv3p0" href="test.xml">
+      <file href="test.xml"/>
+    </resource>
+    <resource identifier="ITM-01" type="imsqti_item_xmlv3p0" href="ITM-01.xml">
+      <file href="ITM-01.xml"/>
+    </resource>
+    <resource identifier="ITM-02" type="imsqti_item_xmlv3p0" href="ITM-02.xml">
+      <file href="ITM-02.xml"/>
+    </resource>
+  </resources>
+</manifest>
