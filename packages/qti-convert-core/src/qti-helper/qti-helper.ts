@@ -45,7 +45,6 @@ export function cleanXMLString(xmlString: string): string {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const removeItemsFromPackage = async (file: any, startIndex: number, endIndex: number) => {
   const zip = await JSZip.loadAsync(file);
   const newZip = new JSZip();
@@ -204,7 +203,6 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
     if (testResource) {
       markResourceToKeep(
         resourceMap,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         Array.from(resourceMap.entries()).find(([_, res]) => res.isTest)?.[0] || '',
         false
       );
@@ -1270,7 +1268,6 @@ async function listAllContent(zip: JSZip) {
   await zip.forEach(async (relativePath, zipEntry) => {
     const fileType = relativePath.split('.').pop().toLocaleLowerCase();
     if (fileType !== 'xml') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fileSizeKb = (zipEntry as any)._data.uncompressedSize / 1024;
       nonXMLFiles.push({
         type: getMediaTypeByExtension(fileType || '') || 'unknown',
@@ -1334,7 +1331,6 @@ function getAncestorWithTagName(
 }
 
 export const removeMediaFromPackage = async (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   file: any,
   filters = ['audio', 'video'],
   onResourceRemoved?: (name: string, fileContent: Blob | NodeJS.ReadableStream) => void

@@ -1,5 +1,6 @@
 import { convertQti2toQti3 } from '@citolab/qti-convert/qti-convert';
 import { qtiTransform } from '@citolab/qti-convert/qti-transformer';
+import type { ResponseProcessingTemplateResolver } from '@citolab/qti-convert/qti-transformer';
 import { convert as convertTaoPci } from '@citolab/qti-convert-tao-pci';
 import { getUpgraderStylesheetBlobUrl } from './upgrader-stylesheet';
 import * as cheerio3 from 'cheerio';
@@ -195,6 +196,31 @@ const resolveHref = (baseFilePath: string, href: string | undefined) => {
   } catch {
     return null;
   }
+};
+
+/**
+ * Resolves custom response processing templates: files shipped inside the package are read from
+ * the zip, absolute urls are fetched once here so scoring never needs a request per item.
+ */
+const createResponseProcessingTemplateResolver = (
+  xmlContentsByPath: Map<string, string>,
+  baseFilePath: string,
+): ResponseProcessingTemplateResolver => async (url) => {
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      return await response.text();
+    } catch {
+      return null;
+    }
+  }
+
+  const resolved = resolveHref(baseFilePath, url);
+  if (resolved && xmlContentsByPath.has(resolved)) {
+    return xmlContentsByPath.get(resolved)!;
+  }
+  return xmlContentsByPath.get(normalizeZipPath(url)) ?? null;
 };
 
 type XmlKind = 'item' | 'test' | 'other';
@@ -824,7 +850,7 @@ export async function importQtiPackage(
     const folderPath =
       relativePath.substring(0, relativePath.lastIndexOf('/') + 1) || '';
 
-    let transformResult = qtiTransform(qti3Xml)
+    let transformResult = await qtiTransform(qti3Xml)
       .objectToImg()
       .objectToVideo()
       .objectToAudio()
@@ -834,7 +860,10 @@ export async function importQtiPackage(
       .customInteraction('', folderPath)
       .qbCleanup()
       .depConvert()
-      .upgradePci();
+      .upgradePci()
+      .inlineResponseProcessingTemplate(
+        createResponseProcessingTemplateResolver(xmlContentsByPath, relativePath),
+      );
 
     if (removeStylesheets) {
       transformResult = transformResult.stripStylesheets();
@@ -863,7 +892,7 @@ export async function importQtiPackage(
       ? originalContent
       : await convertQti2toQti3(originalContent, xsltJsonUrl);
     const testBaseRef = `${QTI_PKG_URL_PREFIX}/${encodeURIComponent(packageId)}/`;
-    let transformResult = qtiTransform(qti3Xml)
+    let transformResult = await qtiTransform(qti3Xml)
       .objectToImg()
       .objectToVideo()
       .objectToAudio()
@@ -873,7 +902,10 @@ export async function importQtiPackage(
       .customInteraction(testBaseRef, '')
       .qbCleanup()
       .depConvert()
-      .upgradePci();
+      .upgradePci()
+      .inlineResponseProcessingTemplate(
+        createResponseProcessingTemplateResolver(xmlContentsByPath, testFilePath),
+      );
     if (removeStylesheets) {
       transformResult = transformResult.stripStylesheets();
     }

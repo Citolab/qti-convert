@@ -17,4 +17,5 @@ export * from './configure-pci';
 export * from './upgrade-pci';
 export * from './strip-stylesheets';
 export * from './stylesheets-inline';
+export * from './inline-response-processing-template';
 export * from './wrap-stimulus-in-section';

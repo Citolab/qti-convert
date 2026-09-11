@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-convert-tao-pci",
-  "version": "0.4.18",
+  "version": "0.6.2",
   "description": "TAO PCI conversion helpers for qti-convert",
   "type": "module",
   "license": "Apache-2.0",
@@ -31,8 +31,8 @@
     "build-storybook": "npm run prepare:storybook-assets && storybook build"
   },
   "dependencies": {
-    "@citolab/qti-browser-import": "^0.4.18",
-    "@citolab/qti-convert": "^0.4.18",
+    "@citolab/qti-browser-import": "^0.6.2",
+    "@citolab/qti-convert": "^0.6.2",
     "cheerio": "^1.2.0"
   },
   "overrides": {
@@ -45,18 +45,18 @@
     }
   },
   "devDependencies": {
-    "@citolab/qti-components": "^7.26.0",
-    "@storybook/addon-a11y": "^10.2.7",
-    "@storybook/addon-docs": "^10.2.7",
-    "@storybook/addon-vitest": "^10.2.7",
-    "@storybook/web-components-vite": "^10.2.7",
-    "@vitest/browser-playwright": "^4.1.7",
+    "@citolab/qti-components": "^9.1.0",
+    "@storybook/addon-a11y": "^10.5.10",
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/addon-vitest": "^10.5.10",
+    "@storybook/web-components-vite": "^10.5.10",
+    "@vitest/browser-playwright": "^4.1.11",
     "jszip": "^3.10.1",
     "lodash": "^4.18.1",
-    "playwright": "^1.58.2",
-    "storybook": "^10.2.7",
+    "playwright": "^1.62.1",
+    "storybook": "^10.5.10",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   }
 }

@@ -131,6 +131,46 @@ const transformedXml = qtiTransform('<qti-assessment-item ...>...</qti-assessmen
   .xml();
 ```
 
+#### Inline a custom response processing template
+
+QTI lets `qti-response-processing` point at an external template through `template` /
+`template-location`. Players such as `@citolab/qti-components` only implement the IMS supplied
+templates natively, and fetching a template while scoring would mean a request per item per
+candidate. `inlineResponseProcessingTemplate` resolves the reference once — at import or
+conversion time — and writes the rules into the item, so the delivered QTI is self-contained.
+
+```ts
+import { qtiTransform } from '@citolab/qti-convert/qti-transformer';
+
+// default resolver: fetch() the template url
+const transformedXml = (
+  await qtiTransform(itemXml).inlineResponseProcessingTemplate({
+    baseUrl: 'https://example.com/package/items/'
+  })
+).xml();
+
+// or resolve from wherever the templates live (zip entry, database, file system, ...)
+const fromPackage = (
+  await qtiTransform(itemXml).inlineResponseProcessingTemplate(async url => templatesByPath.get(url) ?? null)
+).xml();
+```
+
+`template-location` is tried first because it is the resolvable url; the `template` identifier is
+only a fallback, since a delivery engine is not expected to resolve that URI over the web.
+Options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `baseUrl` | – | Base used to resolve relative template references. |
+| `includeStandardTemplates` | `false` | Also inline `match_correct`, `map_response` and `map_response_point`. |
+| `standardTemplates` | the three above | Template names treated as natively supported. |
+| `overwriteExistingRules` | `false` | Inline even when the element already contains response rules. |
+| `keepTemplateAttributes` | `false` | Keep `template` / `template-location` after inlining. |
+| `cache` | `true` | Cache resolved templates in `sessionStorage` when available. |
+
+After inlining, the `template` and `template-location` attributes are removed — otherwise a player
+that recognises the attribute would clear the rules again.
+
 #### Generate an assessment and manifest in Node.js
 
 ```ts

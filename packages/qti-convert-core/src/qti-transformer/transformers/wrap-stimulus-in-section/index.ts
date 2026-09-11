@@ -45,7 +45,6 @@ interface ResolvedMeta {
   isInfo: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type El = any;
 
 function nameOf(el: El): string {

@@ -1,4 +1,4 @@
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import * as cheerio from 'cheerio';
 import { createWriteStream, existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import path, { dirname } from 'path';
@@ -222,7 +222,7 @@ export const createPackageZipsPerItem = async (foldername: string) => {
     const output = createWriteStream(packageFile);
 
     // Create the zip archive
-    const archive = archiver('zip', {
+    const archive = new ZipArchive({
       zlib: { level: 9 } // Compression level
     });
 
@@ -310,7 +310,7 @@ export const createPackageZip = async (foldername: string, createManifest = fals
   const output = createWriteStream(packageFile);
 
   // Create the zip archive
-  const archive = archiver('zip', {
+  const archive = new ZipArchive({
     zlib: { level: 9 } // Compression level
   });
 
