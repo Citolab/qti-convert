@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-convert-cli",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "QTI converter - Command Line Tools",
   "type": "module",
   "license": "Apache-2.0",
@@ -30,8 +30,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@citolab/qti-convert": "^0.6.3",
-    "@citolab/qti-convert-export": "^0.6.3",
+    "@citolab/qti-convert": "^0.6.4",
+    "@citolab/qti-convert-export": "^0.6.4",
     "saxon-js": "^2.7.0"
   },
   "devDependencies": {
