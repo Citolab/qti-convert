@@ -89,21 +89,8 @@ export const convertManifestFile = ($: cheerio.CheerioAPI) => {
   });
 };
 
-/**
- * Converts QTI 2.x to QTI 3.
- * @param xsltJson deprecated and ignored: the conversion no longer uses an XSLT stylesheet or Saxon-JS
- */
-export const convertQti2toQti3 = async (qti2: string, xsltJson?: string) => {
-  warnXsltJsonDeprecated(xsltJson);
-  return upgradeQti2toQti3(cleanXMLString(qti2));
-};
-
-let xsltJsonWarningShown = false;
-const warnXsltJsonDeprecated = (xsltJson?: string) => {
-  if (xsltJson === undefined || xsltJsonWarningShown) return;
-  xsltJsonWarningShown = true;
-  console.warn('[qti-convert] The xsltJson argument is deprecated and ignored: QTI 2 to 3 conversion no longer uses XSLT.');
-};
+/** Converts QTI 2.x to QTI 3. */
+export const convertQti2toQti3 = async (qti2: string) => upgradeQti2toQti3(cleanXMLString(qti2));
 
 export function cleanXMLString(xmlString: string): string {
   if (!xmlString) {
@@ -127,7 +114,6 @@ export function cleanXMLString(xmlString: string): string {
  * Browser-compatible function to convert assessment packages
  * Processes a package file and applies conversions to manifest, assessment, and item files
  * @param {Blob|File} file - The uploaded file object
- * @param {string} xsltJson - Deprecated and ignored (the conversion no longer uses XSLT)
  * @param {Function} convertManifest - Optional function to convert manifest files
  * @param {Function} convertAssessment - Optional function to convert assessment files
  * @param {Function} convertItem - Optional function to convert item files
@@ -136,7 +122,6 @@ export function cleanXMLString(xmlString: string): string {
  */
 export async function convertPackage(
   file,
-  xsltJson?: string,
   convertManifest = async $manifest => {
     // Default manifest conversion
     convertManifestFile($manifest);
@@ -198,7 +183,6 @@ export async function convertPackage(
     });
   }
 ) {
-  warnXsltJsonDeprecated(xsltJson);
   // Load the file into JSZip
   const zip = await JSZip.loadAsync(file);
   const newZip = new JSZip();

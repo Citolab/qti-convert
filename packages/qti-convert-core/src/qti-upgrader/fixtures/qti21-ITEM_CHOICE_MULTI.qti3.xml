@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" title="Meerkeuzevraag meerdere antwoorden" identifier="ITEM_CHOICE_MULTI" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="identifier">
+    <qti-correct-response>
+      <qti-value>CHOICE1</qti-value>
+      <qti-value>CHOICE4</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-item-body>
+    <qti-choice-interaction response-identifier="RESPONSE" max-choices="0">
+      <qti-prompt>Welke van de volgende landen zijn volledig door één enkel ander land ingesloten?</qti-prompt>
+      <qti-simple-choice identifier="CHOICE1">Lesotho</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE2">San Marino</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE3">Bolivia</qti-simple-choice>
+      <qti-simple-choice identifier="CHOICE4">Vaticaanstad</qti-simple-choice>
+    </qti-choice-interaction>
+  </qti-item-body>
+</qti-assessment-item>

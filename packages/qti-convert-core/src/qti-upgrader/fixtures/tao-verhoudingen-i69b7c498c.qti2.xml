@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p2" xmlns:m="http://www.w3.org/1998/Math/MathML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p2 http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd http://www.imsglobal.org/xsd/imsqtiv2p2_html5_v1p0 https://purl.imsglobal.org/spec/qti/v2p2/schema/xsd/imsqtiv2p2p4_html5_v1p0.xsd http://www.w3.org/1998/Math/MathML http://www.w3.org/Math/XMLSchema/mathml2/mathml2.xsd http://www.w3.org/2001/XInclude https://www.imsglobal.org/xsd/w3/2001/XInclude.xsd" identifier="000000005" title="verhoudingen" label="verhoudingen" xml:lang="en-US" adaptive="false" timeDependent="false" toolName="TAO" toolVersion="2025.10">
+  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">
+    <correctResponse>
+      <value><![CDATA[[{"color":"blue","percentage":12.5},{"color":"green","percentage":12.5},{"color":"red","percentage":75}]]]></value>
+    </correctResponse>
+  </responseDeclaration>
+  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float" normalMaximum="1" normalMinimum="0"/>
+  <outcomeDeclaration identifier="MAXSCORE" cardinality="single" baseType="float">
+    <defaultValue>
+      <value>1</value>
+    </defaultValue>
+  </outcomeDeclaration>
+  <itemBody>
+    <div class="grid-row">
+      <div class="col-12">
+        <customInteraction responseIdentifier="RESPONSE">
+          <portableCustomInteraction xmlns="http://www.imsglobal.org/xsd/portableCustomInteraction_v1" customInteractionTypeIdentifier="colorProportions" data-version="1.0.1">
+            <properties>
+              <property key="colors">red, blue, green</property>
+              <property key="width">400</property>
+              <property key="height">400</property>
+            </properties>
+            <modules>
+              <module id="colorProportions/interaction/runtime/js/index" primaryPath="../interaction/runtime/js/index.js"/>
+            </modules>
+            <markup xmlns="http://www.w3.org/1999/xhtml">
+              <div class="pciInteraction">
+                <style>
+        .pciInteraction ul.pci{
+            list-style-type: none;
+            margin: 0 5px;
+            padding: 0;
+            display: inline-block;
+            position: relative;
+            top: 7px;
+        }
+        .pciInteraction ul.pci li{
+            float: left;
+            text-align: left;
+            list-style-type: none;
+        }
+    </style>
+                <div class="prompt"/>
+                <ul class="pci"/>
+              </div>
+            </markup>
+          </portableCustomInteraction>
+        </customInteraction>
+      </div>
+    </div>
+  </itemBody>
+  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p2/rptemplates/match_correct"/>
+</assessmentItem>

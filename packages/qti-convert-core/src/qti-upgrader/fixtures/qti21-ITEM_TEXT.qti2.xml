@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Tekstvraag" identifier="ITEM_TEXT" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE1" cardinality="single" baseType="string">
+    <correctResponse>
+      <value>kat</value>
+    </correctResponse>
+  </responseDeclaration>
+  <responseDeclaration identifier="RESPONSE2" cardinality="single" baseType="string">
+    <correctResponse>
+      <value>muizen</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <p>
+      Als de
+      <textEntryInteraction responseIdentifier="RESPONSE1"/>
+      van huis is, dansen de
+      <textEntryInteraction responseIdentifier="RESPONSE2"/>
+      op tafel.
+    </p>
+  </itemBody>
+</assessmentItem>

@@ -2,21 +2,12 @@ import { readFileSync, readdirSync } from 'fs';
 import * as path from 'path';
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'domhandler';
-import JSZip from 'jszip';
-import { beforeAll, describe, expect, test } from 'vitest';
-import { convertPackageFilesToQti21 } from '../qti-downgrader';
+import { describe, expect, test } from 'vitest';
 import { upgradeQti2toQti3 } from './convert-qti2-to-qti3';
 
-// The original XSLT, run with Saxon-JS, is the reference implementation for the parity tests.
-import sef from '../../../../node_modules/qti30upgrader/qti2xTo30.sef.json' assert { type: 'json' };
-
-const xsltUpgrade = async (xml: string): Promise<string> => {
-  const result = await globalThis.SaxonJS.transform(
-    { stylesheetText: JSON.stringify(sef), sourceType: 'xml', sourceText: xml, destination: 'serialized' },
-    'async'
-  );
-  return result.principalResult;
-};
+// fixtures/<name>.qti2.xml is the input, fixtures/<name>.qti3.xml the output of the original qti2xTo30.xsl
+// (run with Saxon-JS when the XSLT was replaced), so the TypeScript upgrader is checked against it.
+const FIXTURES = path.join(__dirname, 'fixtures');
 
 type Canonical = { name: string; attrs: Record<string, string>; children: (Canonical | string)[] } | string;
 
@@ -48,106 +39,19 @@ const canonical = (xml: string): Canonical[] => {
   return $.root().contents().toArray().map(walk).filter(c => c !== null);
 };
 
-const kitchenSinkItem = `<?xml version="1.0" encoding="UTF-8"?>
-<?xml-model href="http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
-<!-- leading comment -->
-<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p2" xmlns:m="http://www.w3.org/1998/Math/MathML"
-  xmlns:ssml="http://www.w3.org/2010/10/synthesis" xmlns:apip="http://www.imsglobal.org/xsd/apip/apipv1p0/imsapip_qtiv1p0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:unused="urn:unused"
-  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p2 http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd"
-  identifier="sink" title="Kitchen &amp; sink" adaptive="false" timeDependent="false" xml:lang="nl-NL" toolName="x">
-  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">
-    <correctResponse><value>A</value></correctResponse>
-  </responseDeclaration>
-  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float" normalMaximum="1"><defaultValue><value>0</value></defaultValue></outcomeDeclaration>
-  <templateDeclaration identifier="T" cardinality="single" baseType="integer" paramVariable="false" mathVariable="true"/>
-  <templateProcessing><setTemplateValue identifier="T"><randomInteger min="1" max="9"/></setTemplateValue></templateProcessing>
-  <stylesheet href="style.css" type="text/css"/>
-  <itemBody class="body" data-custom="yes">
-    <?custom-pi keep me?>
-    <p aria-label="intro" data-fooBar="x">Tekst met één <b>vet</b> &amp; <m:math display="inline"><m:mi mathvariant="bold">x</m:mi><m:mo>+</m:mo></m:math> <ssml:sub alias="sub">s</ssml:sub></p>
-    <object type="image/png" data="img/a.png" width="10" height="20">Alt tekst</object>
-    <table><tbody><tr><td colspan="2">cell</td></tr></tbody></table>
-    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1" minChoices="0">
-      <prompt>Kies</prompt>
-      <simpleChoice identifier="A" fixed="true">A <printedVariable identifier="T"/></simpleChoice>
-      <simpleChoice identifier="B" showHide="show" templateIdentifier="T">B</simpleChoice>
-    </choiceInteraction>
-    <feedbackInline outcomeIdentifier="FB" identifier="A" showHide="show">inline</feedbackInline>
-    <rubricBlock view="scorer"><stylesheet href="r.css" type="text/css"/><p>rubric</p></rubricBlock>
-    <templateBlock templateIdentifier="T" identifier="1" showHide="show"><p>template</p></templateBlock>
-    <feedbackBlock outcomeIdentifier="FB" identifier="B" showHide="hide"><p>block</p></feedbackBlock>
-    <apip:apipAccessibility><apip:companionMaterialsInfo/></apip:apipAccessibility>
-  </itemBody>
-  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p2/rptemplates/match_correct"/>
-  <modalFeedback outcomeIdentifier="FB" identifier="C" showHide="show" title="Modal">modal <b>text</b></modalFeedback>
-</assessmentItem>`;
+describe('upgradeQti2toQti3 matches the qti2xTo30.xsl output', () => {
+  const names = readdirSync(FIXTURES)
+    .filter(name => name.endsWith('.qti2.xml'))
+    .map(name => name.replace(/\.qti2\.xml$/, ''));
 
-const kitchenSinkTest = `<?xml version="1.0" encoding="UTF-8"?>
-<assessmentTest xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" identifier="T1" title="Test" toolName="x">
-  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float"/>
-  <timeLimits maxTime="600" allowLateSubmission="false"/>
-  <testPart identifier="P1" navigationMode="nonlinear" submissionMode="simultaneous">
-    <itemSessionControl maxAttempts="1" showFeedback="false" allowReview="true"/>
-    <assessmentSection identifier="S1" title="Section" visible="true">
-      <selection select="1" withReplacement="false"/>
-      <ordering shuffle="true"/>
-      <rubricBlock view="candidate"><p>Instructions</p></rubricBlock>
-      <assessmentItemRef identifier="I1" href="items/i1.xml" category="c1"><weight identifier="W" value="2"/></assessmentItemRef>
-      <assessmentSectionRef identifier="S2" href="s2.xml"/>
-    </assessmentSection>
-    <branchRule target="EXIT_TEST"><gte><variable identifier="SCORE"/><baseValue baseType="float">1</baseValue></gte></branchRule>
-  </testPart>
-  <outcomeProcessing>
-    <setOutcomeValue identifier="SCORE"><sum><testVariables variableIdentifier="SCORE" weightIdentifier="W"/></sum></setOutcomeValue>
-    <outcomeCondition><outcomeIf><lt><variable identifier="SCORE"/><baseValue baseType="float">0</baseValue></lt>
-      <setOutcomeValue identifier="SCORE"><baseValue baseType="float">0</baseValue></setOutcomeValue></outcomeIf>
-      <outcomeElse><setOutcomeValue identifier="SCORE"><numberCorrect/></setOutcomeValue></outcomeElse></outcomeCondition>
-  </outcomeProcessing>
-</assessmentTest>`;
-
-const readZipXml = async (file: string) => {
-  const zip = await JSZip.loadAsync(readFileSync(file));
-  const entries = Object.entries(zip.files).filter(([name]) => name.endsWith('.xml') && !name.endsWith('imsmanifest.xml'));
-  return Promise.all(entries.map(async ([name, entry]) => [name, await entry.async('string')] as const));
-};
-
-const corpus = async (): Promise<(readonly [string, string])[]> => {
-  const packagesDir = path.resolve(__dirname, '../../..');
-  const taoZips = readdirSync(path.join(packagesDir, 'qti-convert-tao-pci/storybook-assets'))
-    .filter(name => name.endsWith('.zip'))
-    .map(name => path.join(packagesDir, 'qti-convert-tao-pci/storybook-assets', name));
-  const tao = (await Promise.all(taoZips.map(readZipXml))).flat();
-
-  // Realistic QTI 2.1 input: the QTI 3 export fixtures, downgraded
-  const fixtureDir = path.join(packagesDir, 'qti-convert-export/tests/fixtures/sample-package');
-  const fixtureFiles = new Map(
-    readdirSync(fixtureDir)
-      .filter(name => name.endsWith('.xml') && name !== 'imsmanifest.xml')
-      .map(name => [name, readFileSync(path.join(fixtureDir, name), 'utf8')] as const)
-  );
-  const downgraded = [...(await convertPackageFilesToQti21(fixtureFiles)).files].map(
-    ([name, content]) => [`downgraded/${name}`, content as string] as const
-  );
-
-  return [['kitchen-sink-item', kitchenSinkItem], ['kitchen-sink-test', kitchenSinkTest], ...tao, ...downgraded];
-};
-
-describe('upgradeQti2toQti3 parity with qti2xTo30.xsl', async () => {
-  beforeAll(async () => {
-    const saxonModule = await import('saxon-js');
-    globalThis.SaxonJS = saxonModule.default || saxonModule;
-  });
-  const inputs = await corpus();
-
-  test('corpus is not empty', () => {
-    expect(inputs.length).toBeGreaterThan(10);
+  test('fixtures are present', () => {
+    expect(names.length).toBeGreaterThan(10);
   });
 
-  test.each(inputs)('%s', async (_name, xml) => {
-    const expected = canonical(await xsltUpgrade(xml));
-    const actual = canonical(upgradeQti2toQti3(xml));
-    expect(actual).toEqual(expected);
+  test.each(names)('%s', name => {
+    const input = readFileSync(path.join(FIXTURES, `${name}.qti2.xml`), 'utf8');
+    const expected = readFileSync(path.join(FIXTURES, `${name}.qti3.xml`), 'utf8');
+    expect(canonical(upgradeQti2toQti3(input))).toEqual(canonical(expected));
   });
 });
 

@@ -45,8 +45,7 @@
     }
   },
   "files": [
-    "dist",
-    "src/assets"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",
@@ -64,7 +63,6 @@
     "@types/archiver": "^8.0.0",
     "@types/node": "^26.4.1",
     "@types/unzipper": "^0.10.11",
-    "saxon-js": "^2.7.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"

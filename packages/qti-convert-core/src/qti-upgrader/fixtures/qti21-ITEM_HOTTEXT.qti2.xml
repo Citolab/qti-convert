@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Woorden selecteren" identifier="ITEM_HOTTEXT" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="multiple" baseType="identifier">
+    <correctResponse>
+      <value>A</value>
+      <value>C</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <hottextInteraction maxChoices="0" responseIdentifier="RESPONSE">
+      <prompt>Selecteer de woorden die een oorzaak aanduiden:</prompt>
+      <div>
+        <hottext identifier="A">Door</hottext>
+        een tekort daalde de
+        <hottext identifier="B">productiviteit</hottext>
+        <hottext identifier="C">vanwege</hottext>
+        schaarste.
+      </div>
+    </hottextInteraction>
+  </itemBody>
+</assessmentItem>

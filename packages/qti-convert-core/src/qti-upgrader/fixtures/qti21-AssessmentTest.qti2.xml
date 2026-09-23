@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentTest xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" identifier="export-sample-test" title="Export sample toets">
+  <testPart identifier="TEST-PART" navigationMode="linear" submissionMode="individual">
+    <assessmentSection identifier="SECTION" title="Section" visible="true">
+      <assessmentItemRef identifier="ITEM_CHOICE" href="ITEM_CHOICE.xml"/>
+      <assessmentItemRef identifier="ITEM_CHOICE_MULTI" href="ITEM_CHOICE_MULTI.xml"/>
+      <assessmentItemRef identifier="ITEM_TEXT" href="ITEM_TEXT.xml"/>
+      <assessmentItemRef identifier="ITEM_EXTENDED" href="ITEM_EXTENDED.xml"/>
+      <assessmentItemRef identifier="ITEM_MATCH" href="ITEM_MATCH.xml"/>
+      <assessmentItemRef identifier="ITEM_ORDER" href="ITEM_ORDER.xml"/>
+      <assessmentItemRef identifier="ITEM_GAP" href="ITEM_GAP.xml"/>
+      <assessmentItemRef identifier="ITEM_HOTTEXT" href="ITEM_HOTTEXT.xml"/>
+      <assessmentItemRef identifier="ITEM_SELECT_POINT" href="ITEM_SELECT_POINT.xml"/>
+    </assessmentSection>
+  </testPart>
+</assessmentTest>

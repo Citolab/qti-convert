@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Meerkeuzevraag meerdere antwoorden" identifier="ITEM_CHOICE_MULTI" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="multiple" baseType="identifier">
+    <correctResponse>
+      <value>CHOICE1</value>
+      <value>CHOICE4</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <choiceInteraction responseIdentifier="RESPONSE" maxChoices="0">
+      <prompt>Welke van de volgende landen zijn volledig door één enkel ander land ingesloten?</prompt>
+      <simpleChoice identifier="CHOICE1">Lesotho</simpleChoice>
+      <simpleChoice identifier="CHOICE2">San Marino</simpleChoice>
+      <simpleChoice identifier="CHOICE3">Bolivia</simpleChoice>
+      <simpleChoice identifier="CHOICE4">Vaticaanstad</simpleChoice>
+    </choiceInteraction>
+  </itemBody>
+</assessmentItem>

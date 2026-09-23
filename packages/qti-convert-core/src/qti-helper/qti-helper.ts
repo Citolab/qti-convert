@@ -356,7 +356,6 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
 /**
  * Processes a package file, extracting and converting assessment items and tests
  * @param file - The package file (zip) to process
- * @param xsltJson - The XSLT transformation in JSON format
  * @param localMedia - Whether to process media files locally
  * @param options - Additional processing options
  * @param processItemCallback - Callback function that handles each processed assessment item
@@ -365,7 +364,6 @@ export const removeItemsFromPackage = async (file: any, startIndex: number, endI
  */
 export const processPackage = async (
   file: Blob,
-  xsltJson: string,
   localMedia: boolean,
   options: {
     removeStylesheets?: boolean;
@@ -803,7 +801,7 @@ export const processPackage = async (
   return results;
 
   async function convertAndTransform(originalContent: string, relativePath?: string) {
-    const convertedContent = await convertQti2toQti3(originalContent, xsltJson);
+    const convertedContent = await convertQti2toQti3(originalContent);
     const transform = qtiTransform(convertedContent);
     const folderPath = relativePath?.substring(0, relativePath.lastIndexOf('/') + 1) || '';
     let transformResult = await transform

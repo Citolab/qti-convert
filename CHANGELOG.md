@@ -8,13 +8,13 @@
 
 ### Changed
 
-- **QTI 2 → QTI 3 conversion no longer uses XSLT/Saxon-JS.** `convertQti2toQti3` now runs a TypeScript port of `qti2xTo30.xsl` (also exported as the synchronous `upgradeQti2toQti3`), verified against the XSLT by a parity test. It works the same in Node and the browser; no stylesheet or Saxon runtime has to be loaded. Beyond the XSLT it also converts `stimulusBody`, `durationLT`/`durationGTE`, `outcomeElseIf`, `exitTest`, `testFeedback`, `templateDefault`, `variableMapping` and prefixed QTI 2 elements, keeps inline SVG in its namespace, and no longer duplicates the children of video objects.
-- `saxon-js` is no longer a runtime dependency of `@citolab/qti-convert` and `@citolab/qti-convert-cli`. The `xsltJson` parameters of `convertQti2toQti3`/`convertPackage` are deprecated and ignored.
-- `@citolab/qti-browser-import`: `ensureSaxonJsLoaded` and the `saxonJsUrl` option are deprecated no-ops.
+- **QTI 2 → QTI 3 conversion no longer uses XSLT/Saxon-JS.** `convertQti2toQti3` now runs a TypeScript port of `qti2xTo30.xsl` (also exported as the synchronous `upgradeQti2toQti3`), checked against the XSLT's output for a set of QTI 2 fixtures. It works the same in Node and the browser; no stylesheet or Saxon runtime has to be loaded. Beyond the XSLT it also converts `stimulusBody`, `durationLT`/`durationGTE`, `outcomeElseIf`, `exitTest`, `testFeedback`, `templateDefault`, `variableMapping` and prefixed QTI 2 elements, keeps inline SVG in its namespace, and no longer duplicates the children of video objects.
 
-### Removed
+### Removed (breaking)
 
-- `@citolab/qti-browser-import`: `getUpgraderStylesheetBlobUrl` and `revokeUpgraderStylesheetBlobUrl` (the SEF stylesheet is no longer fetched).
+- All XSLT/Saxon-JS support: the `saxon-js` and `qti30upgrader` dependencies and the unused `src/assets/qb-TAO-qti3.xsl`.
+- The `xsltJson` parameter of `convertQti2toQti3`, `convertPackage` and `processPackage` (the following parameters move one position forward).
+- `@citolab/qti-browser-import`: `ensureSaxonJsLoaded`, the `saxonJsUrl` option, `getUpgraderStylesheetBlobUrl` and `revokeUpgraderStylesheetBlobUrl`.
 
 ### Fixed
 

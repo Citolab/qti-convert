@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" identifier="000000004" title="likert" label="likert" xml:lang="en-US" adaptive="false" time-dependent="false" tool-name="TAO" tool-version="2025.10">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="integer"/>
+  <qti-item-body>
+    <div class="grid-row">
+      <div class="col-12">
+        <qti-custom-interaction response-identifier="RESPONSE">
+          <qti-portable-custom-interaction custom-interaction-type-identifier="likertScoreInteraction" data-version="1.0.0">
+            <properties>
+              <property key="level">5</property>
+              <property key="label-min">min</property>
+              <property key="label-max">max</property>
+              <property key="icons"/>
+              <property key="numbers"/>
+            </properties>
+            <modules>
+              <module id="likertScoreInteraction/runtime/js/likertScoreInteraction.min" primary-path="../runtime/js/likertScoreInteraction.min.js"/>
+            </modules>
+            <markup>
+              <div class="likertScoreInteraction">
+                <div class="prompt"/>
+                <div class="scale">
+                  <ul class="likert"/>
+                </div>
+              </div>
+            </markup>
+          </qti-portable-custom-interaction>
+        </qti-custom-interaction>
+      </div>
+    </div>
+  </qti-item-body>
+</qti-assessment-item>

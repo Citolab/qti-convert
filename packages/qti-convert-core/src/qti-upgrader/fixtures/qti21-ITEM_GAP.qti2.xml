@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Gatentekst" identifier="ITEM_GAP" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="multiple" baseType="directedPair">
+    <correctResponse>
+      <value>W1 G1</value>
+      <value>W2 G2</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <gapMatchInteraction responseIdentifier="RESPONSE" shuffle="true">
+      <gapText identifier="W1" matchMax="1">zuur</gapText>
+      <gapText identifier="W2" matchMax="1">basisch</gapText>
+      <p>
+        Een oplossing met een pH lager dan 7 noemen we
+        <gap identifier="G1"/>
+        , terwijl een oplossing met een pH hoger dan 7
+        <gap identifier="G2"/>
+        is.
+      </p>
+    </gapMatchInteraction>
+  </itemBody>
+</assessmentItem>

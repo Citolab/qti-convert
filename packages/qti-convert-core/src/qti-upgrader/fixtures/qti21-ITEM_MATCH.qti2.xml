@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Sleepvraag" identifier="ITEM_MATCH" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="multiple" baseType="directedPair">
+    <correctResponse>
+      <value>A1 B1</value>
+      <value>A2 B2</value>
+      <value>A3 B3</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <matchInteraction responseIdentifier="RESPONSE" maxAssociations="3">
+      <prompt>Koppel het natuurkundige verschijnsel aan de juiste eenheid:</prompt>
+      <simpleMatchSet>
+        <simpleAssociableChoice identifier="A1" matchMax="1">Vermogen</simpleAssociableChoice>
+        <simpleAssociableChoice identifier="A2" matchMax="1">Druk</simpleAssociableChoice>
+        <simpleAssociableChoice identifier="A3" matchMax="1">Frequentie</simpleAssociableChoice>
+      </simpleMatchSet>
+      <simpleMatchSet>
+        <simpleAssociableChoice identifier="B1" matchMax="1">watt (W)</simpleAssociableChoice>
+        <simpleAssociableChoice identifier="B2" matchMax="1">pascal (Pa)</simpleAssociableChoice>
+        <simpleAssociableChoice identifier="B3" matchMax="1">hertz (Hz)</simpleAssociableChoice>
+      </simpleMatchSet>
+    </matchInteraction>
+  </itemBody>
+</assessmentItem>

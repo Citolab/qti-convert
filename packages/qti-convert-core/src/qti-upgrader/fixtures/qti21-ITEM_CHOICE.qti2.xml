@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Meerkeuzevraag één antwoord" identifier="ITEM_CHOICE" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">
+    <correctResponse>
+      <value>CHOICE3</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <p><img src="resources/atom.png" alt="Atoom"/></p>
+    <choiceInteraction responseIdentifier="RESPONSE" maxChoices="1">
+      <prompt>Welke van de onderstaande elementen heeft de hoogste atoommassa?</prompt>
+      <simpleChoice identifier="CHOICE1">Tin (Sn)</simpleChoice>
+      <simpleChoice identifier="CHOICE2">Jodium (I)</simpleChoice>
+      <simpleChoice identifier="CHOICE3">Xenon (Xe)</simpleChoice>
+    </choiceInteraction>
+  </itemBody>
+</assessmentItem>

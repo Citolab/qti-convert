@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Volgordevraag" identifier="ITEM_ORDER" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="ordered" baseType="identifier">
+    <correctResponse>
+      <value>C1</value>
+      <value>C2</value>
+      <value>C3</value>
+    </correctResponse>
+  </responseDeclaration>
+  <itemBody>
+    <orderInteraction responseIdentifier="RESPONSE" shuffle="true">
+      <prompt>Zet de volgende stappen van het wetenschappelijke proces in de juiste volgorde:</prompt>
+      <simpleChoice identifier="C1">Hypothese formuleren</simpleChoice>
+      <simpleChoice identifier="C2">Data verzamelen</simpleChoice>
+      <simpleChoice identifier="C3">Conclusies trekken</simpleChoice>
+    </orderInteraction>
+  </itemBody>
+</assessmentItem>

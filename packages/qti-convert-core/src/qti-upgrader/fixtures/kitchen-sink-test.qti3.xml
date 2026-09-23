@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-test xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" identifier="T1" title="Test" tool-name="x">
+  <qti-outcome-declaration identifier="SCORE" cardinality="single" base-type="float"/>
+  <qti-time-limits max-time="600" allow-late-submission="false"/>
+  <qti-test-part identifier="P1" navigation-mode="nonlinear" submission-mode="simultaneous">
+    <qti-item-session-control max-attempts="1" show-feedback="false" allow-review="true"/>
+    <qti-assessment-section identifier="S1" title="Section" visible="true">
+      <qti-selection select="1" with-replacement="false"/>
+      <qti-ordering shuffle="true"/>
+      <qti-rubric-block view="candidate"><qti-content-body><p>Instructions</p></qti-content-body></qti-rubric-block>
+      <qti-assessment-item-ref identifier="I1" href="items/i1.xml" category="c1"><qti-weight identifier="W" value="2"/></qti-assessment-item-ref>
+      <qti-assessment-section-ref identifier="S2" href="s2.xml"/>
+    </qti-assessment-section>
+    <qti-branch-rule target="EXIT_TEST"><qti-gte><qti-variable identifier="SCORE"/><qti-base-value base-type="float">1</qti-base-value></qti-gte></qti-branch-rule>
+  </qti-test-part>
+  <qti-outcome-processing>
+    <qti-set-outcome-value identifier="SCORE"><qti-sum><qti-test-variables variable-identifier="SCORE" weight-identifier="W"/></qti-sum></qti-set-outcome-value>
+    <qti-outcome-condition><qti-outcome-if><qti-lt><qti-variable identifier="SCORE"/><qti-base-value base-type="float">0</qti-base-value></qti-lt>
+      <qti-set-outcome-value identifier="SCORE"><qti-base-value base-type="float">0</qti-base-value></qti-set-outcome-value></qti-outcome-if>
+      <qti-outcome-else><qti-set-outcome-value identifier="SCORE"><qti-number-correct/></qti-set-outcome-value></qti-outcome-else></qti-outcome-condition>
+  </qti-outcome-processing>
+</qti-assessment-test>

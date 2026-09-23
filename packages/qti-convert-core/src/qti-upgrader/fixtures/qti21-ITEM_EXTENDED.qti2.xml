@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd" title="Open tekstvraag" identifier="ITEM_EXTENDED" adaptive="false" timeDependent="false" xml:lang="nl-NL">
+  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>
+  <itemBody>
+    <extendedTextInteraction responseIdentifier="RESPONSE">
+      <prompt>
+        Leg in 3–5 zinnen uit waarom veel landen overstappen op een mix van zonne- en windenergie.
+      </prompt>
+    </extendedTextInteraction>
+  </itemBody>
+</assessmentItem>

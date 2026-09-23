@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<!-- leading comment -->
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p2" xmlns:m="http://www.w3.org/1998/Math/MathML"
+  xmlns:ssml="http://www.w3.org/2010/10/synthesis" xmlns:apip="http://www.imsglobal.org/xsd/apip/apipv1p0/imsapip_qtiv1p0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:unused="urn:unused"
+  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p2 http://www.imsglobal.org/xsd/qti/qtiv2p2/imsqti_v2p2.xsd"
+  identifier="sink" title="Kitchen &amp; sink" adaptive="false" timeDependent="false" xml:lang="nl-NL" toolName="x">
+  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">
+    <correctResponse><value>A</value></correctResponse>
+  </responseDeclaration>
+  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float" normalMaximum="1"><defaultValue><value>0</value></defaultValue></outcomeDeclaration>
+  <templateDeclaration identifier="T" cardinality="single" baseType="integer" paramVariable="false" mathVariable="true"/>
+  <templateProcessing><setTemplateValue identifier="T"><randomInteger min="1" max="9"/></setTemplateValue></templateProcessing>
+  <stylesheet href="style.css" type="text/css"/>
+  <itemBody class="body" data-custom="yes">
+    <?custom-pi keep me?>
+    <p aria-label="intro" data-fooBar="x">Tekst met één <b>vet</b> &amp; <m:math display="inline"><m:mi mathvariant="bold">x</m:mi><m:mo>+</m:mo></m:math> <ssml:sub alias="sub">s</ssml:sub></p>
+    <object type="image/png" data="img/a.png" width="10" height="20">Alt tekst</object>
+    <table><tbody><tr><td colspan="2">cell</td></tr></tbody></table>
+    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1" minChoices="0">
+      <prompt>Kies</prompt>
+      <simpleChoice identifier="A" fixed="true">A <printedVariable identifier="T"/></simpleChoice>
+      <simpleChoice identifier="B" showHide="show" templateIdentifier="T">B</simpleChoice>
+    </choiceInteraction>
+    <feedbackInline outcomeIdentifier="FB" identifier="A" showHide="show">inline</feedbackInline>
+    <rubricBlock view="scorer"><stylesheet href="r.css" type="text/css"/><p>rubric</p></rubricBlock>
+    <templateBlock templateIdentifier="T" identifier="1" showHide="show"><p>template</p></templateBlock>
+    <feedbackBlock outcomeIdentifier="FB" identifier="B" showHide="hide"><p>block</p></feedbackBlock>
+    <apip:apipAccessibility><apip:companionMaterialsInfo/></apip:apipAccessibility>
+  </itemBody>
+  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p2/rptemplates/match_correct"/>
+  <modalFeedback outcomeIdentifier="FB" identifier="C" showHide="show" title="Modal">modal <b>text</b></modalFeedback>
+</assessmentItem>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<!-- leading comment --><qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" identifier="sink" title="Kitchen &amp; sink" adaptive="false" time-dependent="false" xml:lang="nl-NL" tool-name="x">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="identifier">
+    <qti-correct-response><qti-value>A</qti-value></qti-correct-response>
+  </qti-response-declaration>
+  <qti-outcome-declaration identifier="SCORE" cardinality="single" base-type="float" normal-maximum="1"><qti-default-value><qti-value>0</qti-value></qti-default-value></qti-outcome-declaration>
+  <qti-template-declaration identifier="T" cardinality="single" base-type="integer" param-variable="false" math-variable="true"/>
+  <qti-template-processing><qti-set-template-value identifier="T"><qti-random-integer min="1" max="9"/></qti-set-template-value></qti-template-processing>
+  <qti-stylesheet href="style.css" type="text/css"/>
+  <qti-item-body class="body" data-custom="yes">
+    <?custom-pi keep me?>
+    <p aria-label="intro" data-fooBar="x">Tekst met één <b>vet</b> &amp; <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mi mathvariant="bold">x</mi><mo>+</mo></math> <sub xmlns="http://www.w3.org/2001/10/synthesis" alias="sub">s</sub></p>
+    <img src="img/a.png" alt="Alt tekst" width="10" height="20"/>
+    <table><tbody><tr><td colspan="2">cell</td></tr></tbody></table>
+    <qti-choice-interaction response-identifier="RESPONSE" shuffle="false" max-choices="1" min-choices="0">
+      <qti-prompt>Kies</qti-prompt>
+      <qti-simple-choice identifier="A" fixed="true">A <qti-printed-variable identifier="T"/></qti-simple-choice>
+      <qti-simple-choice identifier="B" show-hide="show" template-identifier="T">B</qti-simple-choice>
+    </qti-choice-interaction>
+    <qti-feedback-inline outcome-identifier="FB" identifier="A" show-hide="show">inline</qti-feedback-inline>
+    <qti-rubric-block view="scorer"><qti-stylesheet href="r.css" type="text/css"/><qti-content-body><p>rubric</p></qti-content-body></qti-rubric-block>
+    <qti-template-block template-identifier="T" identifier="1" show-hide="show"><qti-content-body><p>template</p></qti-content-body></qti-template-block>
+    <qti-feedback-block outcome-identifier="FB" identifier="B" show-hide="hide"><qti-content-body><p>block</p></qti-content-body></qti-feedback-block>
+    
+  </qti-item-body>
+  <qti-response-processing template="https://purl.imsglobal.org/spec/qti/v3p0/rptemplates/match_correct.xml"/>
+  <qti-modal-feedback outcome-identifier="FB" identifier="C" show-hide="show" title="Modal"><qti-content-body>modal <b>text</b></qti-content-body></qti-modal-feedback>
+</qti-assessment-item>

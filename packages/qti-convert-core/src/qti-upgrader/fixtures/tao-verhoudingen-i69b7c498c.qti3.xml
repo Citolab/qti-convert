@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<qti-assessment-item xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqtiasi_v3p0 https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" identifier="000000005" title="verhoudingen" label="verhoudingen" xml:lang="en-US" adaptive="false" time-dependent="false" tool-name="TAO" tool-version="2025.10">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string">
+    <qti-correct-response>
+      <qti-value>[{"color":"blue","percentage":12.5},{"color":"green","percentage":12.5},{"color":"red","percentage":75}]</qti-value>
+    </qti-correct-response>
+  </qti-response-declaration>
+  <qti-outcome-declaration identifier="SCORE" cardinality="single" base-type="float" normal-maximum="1" normal-minimum="0"/>
+  <qti-outcome-declaration identifier="MAXSCORE" cardinality="single" base-type="float">
+    <qti-default-value>
+      <qti-value>1</qti-value>
+    </qti-default-value>
+  </qti-outcome-declaration>
+  <qti-item-body>
+    <div class="grid-row">
+      <div class="col-12">
+        <qti-custom-interaction response-identifier="RESPONSE">
+          <qti-portable-custom-interaction custom-interaction-type-identifier="colorProportions" data-version="1.0.1">
+            <properties>
+              <property key="colors">red, blue, green</property>
+              <property key="width">400</property>
+              <property key="height">400</property>
+            </properties>
+            <modules>
+              <module id="colorProportions/interaction/runtime/js/index" primary-path="../interaction/runtime/js/index.js"/>
+            </modules>
+            <markup>
+              <div class="pciInteraction">
+                <style>
+        .pciInteraction ul.pci{
+            list-style-type: none;
+            margin: 0 5px;
+            padding: 0;
+            display: inline-block;
+            position: relative;
+            top: 7px;
+        }
+        .pciInteraction ul.pci li{
+            float: left;
+            text-align: left;
+            list-style-type: none;
+        }
+    </style>
+                <div class="prompt"/>
+                <ul class="pci"/>
+              </div>
+            </markup>
+          </qti-portable-custom-interaction>
+        </qti-custom-interaction>
+      </div>
+    </div>
+  </qti-item-body>
+  <qti-response-processing template="https://purl.imsglobal.org/spec/qti/v3p0/rptemplates/match_correct.xml"/>
+</qti-assessment-item>

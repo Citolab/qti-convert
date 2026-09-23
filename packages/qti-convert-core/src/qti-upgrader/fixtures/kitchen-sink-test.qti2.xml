@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assessmentTest xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" identifier="T1" title="Test" toolName="x">
+  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float"/>
+  <timeLimits maxTime="600" allowLateSubmission="false"/>
+  <testPart identifier="P1" navigationMode="nonlinear" submissionMode="simultaneous">
+    <itemSessionControl maxAttempts="1" showFeedback="false" allowReview="true"/>
+    <assessmentSection identifier="S1" title="Section" visible="true">
+      <selection select="1" withReplacement="false"/>
+      <ordering shuffle="true"/>
+      <rubricBlock view="candidate"><p>Instructions</p></rubricBlock>
+      <assessmentItemRef identifier="I1" href="items/i1.xml" category="c1"><weight identifier="W" value="2"/></assessmentItemRef>
+      <assessmentSectionRef identifier="S2" href="s2.xml"/>
+    </assessmentSection>
+    <branchRule target="EXIT_TEST"><gte><variable identifier="SCORE"/><baseValue baseType="float">1</baseValue></gte></branchRule>
+  </testPart>
+  <outcomeProcessing>
+    <setOutcomeValue identifier="SCORE"><sum><testVariables variableIdentifier="SCORE" weightIdentifier="W"/></sum></setOutcomeValue>
+    <outcomeCondition><outcomeIf><lt><variable identifier="SCORE"/><baseValue baseType="float">0</baseValue></lt>
+      <setOutcomeValue identifier="SCORE"><baseValue baseType="float">0</baseValue></setOutcomeValue></outcomeIf>
+      <outcomeElse><setOutcomeValue identifier="SCORE"><numberCorrect/></setOutcomeValue></outcomeElse></outcomeCondition>
+  </outcomeProcessing>
+</assessmentTest>

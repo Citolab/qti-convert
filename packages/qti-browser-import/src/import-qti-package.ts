@@ -53,8 +53,6 @@ export interface ImportQtiPackageResult {
 }
 
 export interface PrepareQtiPackageOptions extends ImportQtiPackageOptions {
-  /** @deprecated No longer used: QTI 2 to 3 conversion doesn't need Saxon-JS anymore. */
-  saxonJsUrl?: string;
   componentsCdnUrl?: string;
   componentsCssUrl?: string;
 }
@@ -534,9 +532,6 @@ function extractPackagePathFromUrl(packageId: string, url: string): string | nul
     .map(segment => decodeURIComponent(segment))
     .join('/');
 }
-
-/** @deprecated QTI 2 to 3 conversion no longer needs Saxon-JS; this is a no-op kept for compatibility. */
-export async function ensureSaxonJsLoaded(saxonJsUrl?: string): Promise<void> {}
 
 export async function prepareQtiPackage(
   file: File,
