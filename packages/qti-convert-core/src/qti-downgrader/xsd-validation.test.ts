@@ -51,7 +51,7 @@ describe.skipIf(!hasXmllint)('QTI 2.1 output validates against imsqti_v2p1p2.xsd
 
   test.each(Object.entries(cases))('%s', (_name, input) => {
     if (!schema) return;
-    expect(validate(convertQti3toQti21(input).xml)).toBe('');
+    expect(validate(convertQti3toQti21(input, { sharedVocabularyStylesheetHref: 'qti3p0.css' }).xml)).toBe('');
   });
 
   test('inlined shared stimulus', () => {

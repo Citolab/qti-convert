@@ -29,6 +29,7 @@ export type Qti21WarningCode =
   | 'html5-element'
   | 'pci'
   | 'shared-vocabulary-classes'
+  | 'shared-vocabulary-stylesheet'
   | 'accessibility-attributes-removed'
   | 'gap-text-to-gap-img';
 
@@ -51,6 +52,11 @@ export interface ConvertQti3toQti21Options {
   resolveStimulus?: (href: string) => string | undefined;
   /** Used to tag warnings. */
   filePath?: string;
+  /**
+   * When set, an item that uses QTI 3 shared vocabulary classes (qti-*) gets a stylesheet with this href, so a
+   * QTI 2.1 player can style them. The file itself (QTI3_SHARED_VOCABULARY_CSS) is up to the caller.
+   */
+  sharedVocabularyStylesheetHref?: string;
 }
 
 const PCI_NAMESPACE = 'http://www.imsglobal.org/xsd/portableCustomInteraction';
@@ -343,11 +349,29 @@ export const convertQti3toQti21 = (xml: string, options: ConvertQti3toQti21Optio
   $('picture').each((_, el: Element) => unwrap($, el));
   stripSsml($, warnings);
 
-  if ($('[class*="qti-"]').length > 0) {
-    warnings.add(
-      'shared-vocabulary-classes',
-      'QTI 3 shared vocabulary classes (qti-*) were kept; QTI 2.1 players will ignore them.'
-    );
+  // qti-shared-stimulus marks inlined stimuli (added by this converter) and is not part of the vocabulary
+  const usesSharedVocabulary = $('[class*="qti-"]')
+    .toArray()
+    .some(el => (el.attribs.class || '').split(/\s+/).some(c => c.startsWith('qti-') && c !== 'qti-shared-stimulus'));
+  if (usesSharedVocabulary) {
+    const href = options.sharedVocabularyStylesheetHref;
+    const $itemBody = $('qti-item-body').first();
+    if (href && root.name === 'qti-assessment-item' && $itemBody.length > 0) {
+      const hasStylesheet = $('qti-stylesheet')
+        .toArray()
+        .some(el => el.attribs.href === href);
+      // stylesheets come right before the item body in QTI 2.1
+      if (!hasStylesheet) $itemBody.before(`<qti-stylesheet href="${href}" type="text/css"/>`);
+      warnings.add(
+        'shared-vocabulary-stylesheet',
+        `QTI 3 shared vocabulary classes (qti-*) are styled by the added ${href} stylesheet.`
+      );
+    } else {
+      warnings.add(
+        'shared-vocabulary-classes',
+        'QTI 3 shared vocabulary classes (qti-*) were kept; QTI 2.1 players will ignore them.'
+      );
+    }
   }
 
   const stats = { dataAttrs: 0 };

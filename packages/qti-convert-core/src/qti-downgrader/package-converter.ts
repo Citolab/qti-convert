@@ -8,7 +8,8 @@ import {
   QTI21_METADATA_NAMESPACE,
   qti3ResourceTypeToQti21
 } from './name-map';
-import { dirname, joinPath, normalizePath } from './path-utils';
+import { dirname, joinPath, normalizePath, relativePath } from './path-utils';
+import { QTI3_SHARED_VOCABULARY_CSS, QTI3_SHARED_VOCABULARY_CSS_PATH } from './qti3-shared-vocabulary-css';
 
 export type PackageFiles = Map<string, string | Uint8Array>;
 
@@ -114,6 +115,8 @@ export interface Qti21FileContext {
   path: string;
   /** Resolves a stimulus href relative to this file to its QTI 3 XML (and marks it as inlined). */
   resolveStimulus: (href: string) => string | undefined;
+  /** Href (relative to this file) of the shared vocabulary stylesheet, unless it is switched off. */
+  sharedVocabularyStylesheetHref?: string;
 }
 
 type Awaitable<T> = T | Promise<T>;
@@ -124,10 +127,53 @@ export interface Qti21PackageOptions {
   convertAssessment?: (xml: string, context: Qti21FileContext) => Awaitable<Qti21ConversionResult>;
   /** Receives the package paths of the stimuli that were inlined into items. */
   convertManifest?: (xml: string, inlinedStimulusHrefs: Set<string>) => Awaitable<string>;
+  /**
+   * Adds the 1EdTech QTI 3 shared vocabulary stylesheet (qti3p0.css) to the package and to every item that uses
+   * qti-* classes, so QTI 2.1 players can style them. Default true.
+   */
+  injectSharedVocabularyStylesheet?: boolean;
 }
 
 export const defaultConvertFileToQti21 = (xml: string, context: Qti21FileContext) =>
-  convertQti3toQti21(xml, { filePath: context.path, resolveStimulus: context.resolveStimulus });
+  convertQti3toQti21(xml, {
+    filePath: context.path,
+    resolveStimulus: context.resolveStimulus,
+    sharedVocabularyStylesheetHref: context.sharedVocabularyStylesheetHref
+  });
+
+/** Registers the shared vocabulary stylesheet in the manifest and adds it as a dependency of the given items. */
+export const addSharedVocabularyStylesheetToManifest = (
+  manifestXml: string,
+  manifestPath: string,
+  stylesheetPath: string,
+  itemPaths: string[]
+) => {
+  const $ = cheerio.load(manifestXml, { xml: { xmlMode: true, decodeEntities: false } });
+  const resourcesElement = byLocalName($, 'resources')[0];
+  if (!resourcesElement) return manifestXml;
+  const prefix = resourcesElement.name.includes(':') ? `${resourcesElement.name.split(':')[0]}:` : '';
+  const manifestDir = dirname(manifestPath);
+  const packagePathOf = (href: string) => normalizePath(joinPath(manifestDir, href));
+  const identifier = 'QTI3_SHARED_VOCABULARY_CSS';
+  const resources = byLocalName($, 'resource');
+  const existing = resources.find(r => packagePathOf(r.attribs.href || '') === stylesheetPath);
+  const resourceId = existing?.attribs.identifier || identifier;
+  if (!existing) {
+    const href = relativePath(manifestDir, stylesheetPath);
+    $(resourcesElement).append(
+      `<${prefix}resource identifier="${resourceId}" type="webcontent" href="${href}"><${prefix}file href="${href}"/></${prefix}resource>`
+    );
+  }
+  const items = new Set(itemPaths.map(path => normalizePath(path)));
+  for (const resource of resources) {
+    if (!items.has(packagePathOf(resource.attribs.href || ''))) continue;
+    const dependencies = byLocalName($, 'dependency', resource);
+    if (!dependencies.some(d => d.attribs.identifierref === resourceId)) {
+      $(resource).append(`<${prefix}dependency identifierref="${resourceId}"/>`);
+    }
+  }
+  return $.xml();
+};
 
 /**
  * Converts all files of a QTI 3 package to QTI 2.1. Shared stimuli are inlined into the items that
@@ -138,7 +184,8 @@ export const convertPackageFilesToQti21 = async (
   {
     convertItem = defaultConvertFileToQti21,
     convertAssessment = defaultConvertFileToQti21,
-    convertManifest = convertManifestToQti21
+    convertManifest = convertManifestToQti21,
+    injectSharedVocabularyStylesheet = true
   }: Qti21PackageOptions = {}
 ): Promise<Qti21PackageResult> => {
   const warnings: Qti21Warning[] = [];
@@ -149,6 +196,10 @@ export const convertPackageFilesToQti21 = async (
   const byNormalizedPath = new Map([...xmlFiles.keys()].map(path => [normalizePath(path), path]));
 
   const inlinedStimulusHrefs = new Set<string>();
+  const itemsWithSharedVocabulary: string[] = [];
+  // The package root is the folder of the manifest; the stylesheet goes there
+  const manifestPath = [...xmlFiles.keys()].find(isManifest);
+  const stylesheetPath = joinPath(dirname(manifestPath ?? ''), QTI3_SHARED_VOCABULARY_CSS_PATH);
   const output: PackageFiles = new Map();
   const stimulusPaths: string[] = [];
 
@@ -171,12 +222,16 @@ export const convertPackageFilesToQti21 = async (
         if (!stimulusPath) return undefined;
         inlinedStimulusHrefs.add(normalizePath(stimulusPath));
         return xmlFiles.get(stimulusPath);
-      }
+      },
+      sharedVocabularyStylesheetHref: injectSharedVocabularyStylesheet
+        ? relativePath(dirname(path), stylesheetPath)
+        : undefined
     };
     const convert = root === 'qti-assessment-test' ? convertAssessment : convertItem;
     const result = await convert(xml, context);
     output.set(path, result.xml);
     warnings.push(...result.warnings);
+    if (result.warnings.some(w => w.code === 'shared-vocabulary-stylesheet')) itemsWithSharedVocabulary.push(path);
   }
 
   // Stimuli that no item referenced are kept (as a QTI 2.2 assessmentStimulus)
@@ -187,9 +242,19 @@ export const convertPackageFilesToQti21 = async (
     warnings.push(...result.warnings);
   }
 
+  const addStylesheet = itemsWithSharedVocabulary.length > 0;
+  // An existing qti3p0.css in the package is kept (and used)
+  if (addStylesheet && !output.has(stylesheetPath)) {
+    output.set(stylesheetPath, QTI3_SHARED_VOCABULARY_CSS);
+  }
+
   for (const path of xmlFiles.keys()) {
     if (isManifest(path)) {
-      output.set(path, await convertManifest(xmlFiles.get(path)!, inlinedStimulusHrefs));
+      let manifest = await convertManifest(xmlFiles.get(path)!, inlinedStimulusHrefs);
+      if (addStylesheet) {
+        manifest = addSharedVocabularyStylesheetToManifest(manifest, path, stylesheetPath, itemsWithSharedVocabulary);
+      }
+      output.set(path, manifest);
     }
   }
 

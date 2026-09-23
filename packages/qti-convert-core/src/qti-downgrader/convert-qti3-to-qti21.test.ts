@@ -5,7 +5,13 @@ import JSZip from 'jszip';
 import * as xml2js from 'xml2js';
 import { describe, expect, test } from 'vitest';
 import { convertQti2toQti3 } from '../qti-converter-node/converter/converter';
-import { convertManifestToQti21, convertPackageFilesToQti21, convertPackageToQti21, convertQti3toQti21 } from './index';
+import {
+  convertManifestToQti21,
+  convertPackageFilesToQti21,
+  convertPackageToQti21,
+  convertQti3toQti21,
+  QTI3_SHARED_VOCABULARY_CSS
+} from './index';
 
 const load = (xml: string) => cheerio.load(xml, { xmlMode: true, xml: true });
 
@@ -108,6 +114,23 @@ describe('convertQti3toQti21', () => {
     expect($('gapImg > object').attr('data')).toBe('a.png');
     expect($('gapText').text()).toBe('text');
     expect(warnings.map(w => w.code)).toContain('gap-text-to-gap-img');
+  });
+
+  test('adds the shared vocabulary stylesheet when asked', () => {
+    const { xml, warnings } = convertQti3toQti21(qti3Choice, { sharedVocabularyStylesheetHref: '../qti3p0.css' });
+    const $ = load(xml);
+    expect($('stylesheet').attr('href')).toBe('../qti3p0.css');
+    expect($('stylesheet').attr('type')).toBe('text/css');
+    expect($('stylesheet').next()[0].name).toBe('itemBody');
+    expect(warnings.map(w => w.code)).toContain('shared-vocabulary-stylesheet');
+    expect(warnings.map(w => w.code)).not.toContain('shared-vocabulary-classes');
+
+    // without qti-* classes there is nothing to style
+    const plain = convertQti3toQti21(
+      `<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="p" adaptive="false" time-dependent="false"><qti-item-body><p>x</p></qti-item-body></qti-assessment-item>`,
+      { sharedVocabularyStylesheetHref: 'qti3p0.css' }
+    );
+    expect(plain.xml).not.toContain('stylesheet');
   });
 
   test('maps irregular operator names', () => {
@@ -364,5 +387,43 @@ describe('package conversion', () => {
     expect(converted.get('item.xml')).toContain('<assessmentItem');
     expect(converted.get('item.xml')).toContain('identifier="custom"');
     expect(converted.get('imsmanifest.xml')).toContain('identifier="M2"');
+  });
+
+  test('adds qti3p0.css to the package for items that use shared vocabulary classes', async () => {
+    const item = (id: string, body: string) =>
+      `<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="${id}" adaptive="false" time-dependent="false"><qti-item-body>${body}</qti-item-body></qti-assessment-item>`;
+    const files = new Map<string, string>([
+      [
+        'imsmanifest.xml',
+        `<manifest xmlns="http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1" identifier="M"><resources>
+          <resource identifier="A" type="imsqti_item_xmlv3p0" href="items/a.xml"><file href="items/a.xml"/></resource>
+          <resource identifier="B" type="imsqti_item_xmlv3p0" href="items/b.xml"><file href="items/b.xml"/></resource>
+        </resources></manifest>`
+      ],
+      ['items/a.xml', item('A', '<div class="qti-layout-row"><div class="qti-layout-col6"><p>x</p></div></div>')],
+      ['items/b.xml', item('B', '<p>y</p>')]
+    ]);
+
+    const { files: converted } = await convertPackageFilesToQti21(files);
+    expect(converted.get('qti3p0.css')).toBe(QTI3_SHARED_VOCABULARY_CSS);
+    expect(load(converted.get('items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3p0.css');
+    expect(converted.get('items/b.xml')).not.toContain('stylesheet');
+    const $manifest = load(converted.get('imsmanifest.xml') as string);
+    const css = $manifest('resource[href="qti3p0.css"]');
+    expect(css.attr('type')).toBe('webcontent');
+    expect(css.find('file').attr('href')).toBe('qti3p0.css');
+    expect($manifest('resource[identifier="A"] dependency').attr('identifierref')).toBe(css.attr('identifier'));
+    expect($manifest('resource[identifier="B"] dependency')).toHaveLength(0);
+
+    // the stylesheet goes next to the manifest (the package root), also when that is a folder in the zip
+    const nested = new Map([...files].map(([path, content]) => [`pkg/${path}`, content]));
+    const { files: nestedConverted } = await convertPackageFilesToQti21(nested);
+    expect(nestedConverted.has('pkg/qti3p0.css')).toBe(true);
+    expect(load(nestedConverted.get('pkg/items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3p0.css');
+    expect(load(nestedConverted.get('pkg/imsmanifest.xml') as string)('resource[href="qti3p0.css"]')).toHaveLength(1);
+
+    const { files: withoutCss } = await convertPackageFilesToQti21(files, { injectSharedVocabularyStylesheet: false });
+    expect(withoutCss.has('qti3p0.css')).toBe(false);
+    expect(withoutCss.get('items/a.xml')).not.toContain('stylesheet');
   });
 });
