@@ -39,9 +39,6 @@ Default local ZIP mapping:
   `QTI_PCI_ZIP_PATH` (or `/Users/marcelhoekstra/Downloads/PCI.zip`)
   to `storybook-assets/PCI.zip`
 - `/external-pci/PCI.zip` serves that copied file.
-- the same script also copies SaxonJS runtime to
-  `public/assets/saxon-js/SaxonJS2.rt.js` from:
-  `QTI_SAXON_JS_PATH` or `/Users/marcelhoekstra/repos/qti-playground/public/assets/saxon-js/SaxonJS2.rt.js`
 
 Optional local qti-components mapping:
 
@@ -52,6 +49,5 @@ npm run storybook --workspace=@citolab/qti-convert-tao-pci
 ```
 
 Then set story args to:
-- `saxonJsUrl`: `/assets/saxon-js/SaxonJS2.rt.js` (default, local) or your own URL
 - `componentsCdnUrl`: `/local-qti-components-cdn/index.js`
 - `componentsCssUrl`: `/local-qti-components-dist/item.css`

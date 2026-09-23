@@ -183,8 +183,6 @@ describe('convertQti3toQti21', () => {
   });
 
   test('round-trips QTI 2.1 -> QTI 3 -> QTI 2.1', async () => {
-    const saxonModule = await import('saxon-js');
-    globalThis.SaxonJS = saxonModule.default || saxonModule;
     const qti21 = `<?xml version="1.0" encoding="UTF-8"?>
 <assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd"

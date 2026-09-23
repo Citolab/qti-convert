@@ -18,7 +18,6 @@ npm install @citolab/qti-convert @citolab/qti-convert-tao-pci
 
 - package cache helpers from `qti-package-cache`
 - import helpers from `import-qti-package`
-- upgrader stylesheet helpers from `upgrader-stylesheet`
 - PCI helpers from `pci-helpers`
 
 ## Example

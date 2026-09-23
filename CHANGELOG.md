@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **QTI 3 → QTI 2.1 conversion** (`@citolab/qti-convert/qti-downgrader`, `qti-convert-pkg-qti21` CLI). Best-effort: shared stimuli are inlined, HTML5 media become `<object>`, and constructs without a 2.1 equivalent are reported as warnings.
+
+### Changed
+
+- **QTI 2 → QTI 3 conversion no longer uses XSLT/Saxon-JS.** `convertQti2toQti3` now runs a TypeScript port of `qti2xTo30.xsl` (also exported as the synchronous `upgradeQti2toQti3`), verified against the XSLT by a parity test. It works the same in Node and the browser; no stylesheet or Saxon runtime has to be loaded. Beyond the XSLT it also converts `stimulusBody`, `durationLT`/`durationGTE`, `outcomeElseIf`, `exitTest`, `testFeedback`, `templateDefault`, `variableMapping` and prefixed QTI 2 elements, keeps inline SVG in its namespace, and no longer duplicates the children of video objects.
+- `saxon-js` is no longer a runtime dependency of `@citolab/qti-convert` and `@citolab/qti-convert-cli`. The `xsltJson` parameters of `convertQti2toQti3`/`convertPackage` are deprecated and ignored.
+- `@citolab/qti-browser-import`: `ensureSaxonJsLoaded` and the `saxonJsUrl` option are deprecated no-ops.
+
+### Removed
+
+- `@citolab/qti-browser-import`: `getUpgraderStylesheetBlobUrl` and `revokeUpgraderStylesheetBlobUrl` (the SEF stylesheet is no longer fetched).
+
+### Fixed
+
+- `qti-convert-pkg` imported the non-exported `qti-converter-node` subpath and failed to start.
+
 ## 0.4.16
 
 ### Fixed

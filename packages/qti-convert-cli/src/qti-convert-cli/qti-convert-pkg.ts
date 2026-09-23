@@ -13,9 +13,6 @@ if (!inputPath) {
 }
 
 try {
-  const saxonModule = await import('saxon-js'); // Ensure saxon-js is installed
-  globalThis.SaxonJS = saxonModule.default || saxonModule;
-
   if (!existsSync(inputPath)) {
     throw new Error(`Input path does not exist: ${inputPath}`);
   }

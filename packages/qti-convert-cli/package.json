@@ -32,8 +32,7 @@
   },
   "dependencies": {
     "@citolab/qti-convert": "^0.6.4",
-    "@citolab/qti-convert-export": "^0.6.4",
-    "saxon-js": "^2.7.0"
+    "@citolab/qti-convert-export": "^0.6.4"
   },
   "devDependencies": {
     "tsup": "^8.5.1",

@@ -2,7 +2,6 @@ import { convertQti2toQti3 } from '@citolab/qti-convert/qti-convert';
 import { qtiTransform } from '@citolab/qti-convert/qti-transformer';
 import type { ResponseProcessingTemplateResolver } from '@citolab/qti-convert/qti-transformer';
 import { convert as convertTaoPci } from '@citolab/qti-convert-tao-pci';
-import { getUpgraderStylesheetBlobUrl } from './upgrader-stylesheet';
 import * as cheerio3 from 'cheerio';
 import JSZip from 'jszip';
 import { createModuleResolutionFetcher, detectPciBaseUrl } from './pci-helpers';
@@ -54,6 +53,7 @@ export interface ImportQtiPackageResult {
 }
 
 export interface PrepareQtiPackageOptions extends ImportQtiPackageOptions {
+  /** @deprecated No longer used: QTI 2 to 3 conversion doesn't need Saxon-JS anymore. */
   saxonJsUrl?: string;
   componentsCdnUrl?: string;
   componentsCssUrl?: string;
@@ -535,50 +535,14 @@ function extractPackagePathFromUrl(packageId: string, url: string): string | nul
     .join('/');
 }
 
-async function loadScript(src: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-    document.head.appendChild(script);
-  });
-}
-
-export async function ensureSaxonJsLoaded(saxonJsUrl = '/assets/saxon-js/SaxonJS2.rt.js'): Promise<void> {
-  const win = window as unknown as { SaxonJS?: unknown };
-  if (win.SaxonJS) return;
-
-  const candidates = Array.from(
-    new Set([
-      saxonJsUrl,
-      '/assets/saxon-js/SaxonJS2.rt.js',
-      'https://unpkg.com/saxon-js@2.7.0/SaxonJS2.rt.js',
-      'https://cdn.jsdelivr.net/npm/saxon-js@2.7.0/SaxonJS2.rt.js',
-    ]),
-  );
-
-  const errors: string[] = [];
-  for (const src of candidates) {
-    try {
-      await loadScript(src);
-      if (win.SaxonJS) return;
-      errors.push(`Loaded ${src} but window.SaxonJS is missing`);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  throw new Error(`Failed to load SaxonJS. Attempts: ${errors.join(' | ')}`);
-}
+/** @deprecated QTI 2 to 3 conversion no longer needs Saxon-JS; this is a no-op kept for compatibility. */
+export async function ensureSaxonJsLoaded(saxonJsUrl?: string): Promise<void> {}
 
 export async function prepareQtiPackage(
   file: File,
   options: PrepareQtiPackageOptions = {},
 ): Promise<PreparedQtiPackage> {
   await ensurePackageServiceWorkerReady();
-  await ensureSaxonJsLoaded(options.saxonJsUrl);
 
   const imported = await importQtiPackage(file, options);
   const assessment = imported.assessments[0];
@@ -831,8 +795,6 @@ export async function importQtiPackage(
     }
   }
 
-  const xsltJsonUrl = await getUpgraderStylesheetBlobUrl();
-
   const convertedItems: {
     identifier: string;
     relativePath: string;
@@ -846,7 +808,7 @@ export async function importQtiPackage(
 
     let qti3Xml = isQti3Xml(originalContent)
       ? originalContent
-      : await convertQti2toQti3(originalContent, xsltJsonUrl);
+      : await convertQti2toQti3(originalContent);
     const folderPath =
       relativePath.substring(0, relativePath.lastIndexOf('/') + 1) || '';
 
@@ -890,7 +852,7 @@ export async function importQtiPackage(
     const originalContent = xmlContentsByPath.get(testFilePath) || '';
     const qti3Xml = isQti3Xml(originalContent)
       ? originalContent
-      : await convertQti2toQti3(originalContent, xsltJsonUrl);
+      : await convertQti2toQti3(originalContent);
     const testBaseRef = `${QTI_PKG_URL_PREFIX}/${encodeURIComponent(packageId)}/`;
     let transformResult = await qtiTransform(qti3Xml)
       .objectToImg()

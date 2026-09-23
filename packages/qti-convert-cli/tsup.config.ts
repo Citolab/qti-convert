@@ -19,7 +19,7 @@ export default defineConfig({
   splitting: true,
   bundle: true,
   clean: true,
-  external: ['saxon-js', '@citolab/qti-convert', '@citolab/qti-convert-export'],
+  external: ['@citolab/qti-convert', '@citolab/qti-convert-export'],
   outExtension() {
     return {
       js: `.mjs`

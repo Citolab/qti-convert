@@ -14,7 +14,7 @@ export default defineConfig({
   target: 'ES2022',
   dts: true,
   sourcemap: 'inline',
-  external: ['cheerio', 'saxon-js'],
+  external: ['cheerio'],
   splitting: true,
   clean: true,
   define: {

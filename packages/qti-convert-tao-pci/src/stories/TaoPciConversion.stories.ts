@@ -4,7 +4,6 @@ import { prepareQtiPackageFromUrl, type PreparedQtiPackage } from '@citolab/qti-
 
 interface StoryArgs {
   zipUrl: string;
-  saxonJsUrl: string;
   componentsCdnUrl: string;
   componentsCssUrl: string;
 }
@@ -23,13 +22,11 @@ const meta: Meta<StoryArgs> = {
   },
   argTypes: {
     zipUrl: { control: 'text' },
-    saxonJsUrl: { control: 'text' },
     componentsCdnUrl: { control: 'text' },
     componentsCssUrl: { control: 'text' }
   },
   args: {
     zipUrl: '/external-pci/PCI.zip',
-    saxonJsUrl: '/assets/saxon-js/SaxonJS2.rt.js',
     componentsCdnUrl: '/local-qti-components-cdn/index.js',
     componentsCssUrl: '/local-qti-components-dist/item.css'
   }
@@ -153,7 +150,6 @@ export const ConvertAndRenderTaoPci: Story = {
     void (async () => {
       try {
         const prepared = await prepareQtiPackageFromUrl(args.zipUrl, {
-          saxonJsUrl: args.saxonJsUrl,
           componentsCdnUrl: args.componentsCdnUrl,
           componentsCssUrl: args.componentsCssUrl
         });

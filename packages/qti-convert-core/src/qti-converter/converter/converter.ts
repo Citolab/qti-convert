@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import { postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from '../../qti-helper';
 import { qtiTransform } from '../../qti-transformer';
+import { upgradeQti2toQti3 } from '../../qti-upgrader';
 
 const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
   $('*')
@@ -12,154 +13,6 @@ const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean 
       }
       return (el.name || '').split(':').pop() === localName;
     });
-
-const normalizeConvertedQtiNamespace = (xml: string): string => {
-  const $ = cheerio.load(xml, { xmlMode: true, xml: true });
-  const qtiNamespacePrefixes = new Set<string>();
-  const qtiNamespaceValue = 'http://www.imsglobal.org/xsd/imsqtiasi_v3p0';
-  const isQtiAssessmentRoot = (name: string) => {
-    const localName = (name || '').split(':').pop();
-    return (
-      localName === 'qti-assessment-item' ||
-      localName === 'qti-assessment-test' ||
-      localName === 'assessment-item' ||
-      localName === 'assessment-test'
-    );
-  };
-
-  $('*').each((_, el) => {
-    if (el.type !== 'tag' || !el.attribs) {
-      return;
-    }
-    for (const [attrName, attrValue] of Object.entries(el.attribs)) {
-      if (attrName.startsWith('xmlns:') && attrValue.toLowerCase().includes('imsqtiasi_v3p0')) {
-        qtiNamespacePrefixes.add(attrName.slice('xmlns:'.length));
-      }
-    }
-  });
-
-  $('*').each((_, el) => {
-    if (el.type !== 'tag') {
-      return;
-    }
-    if (isQtiAssessmentRoot(el.name) && el.name.includes(':')) {
-      qtiNamespacePrefixes.add(el.name.split(':')[0]);
-    }
-  });
-
-  if (qtiNamespacePrefixes.size === 0) {
-    return xml;
-  }
-
-  const root = $('*')
-    .toArray()
-    .find(el => el.type === 'tag' && isQtiAssessmentRoot(el.name));
-  let qtiNamespace = (root && $(root).attr('xmlns')) || qtiNamespaceValue;
-
-  for (const prefix of qtiNamespacePrefixes) {
-    if (root) {
-      qtiNamespace = $(root).attr(`xmlns:${prefix}`) || qtiNamespace;
-    }
-    $('*').each((_, el) => {
-      if (el.type !== 'tag') {
-        return;
-      }
-      if (el.name.startsWith(`${prefix}:`)) {
-        const strippedName = el.name.slice(prefix.length + 1);
-        el.name = strippedName.startsWith('qti-') ? strippedName : `qti-${strippedName}`;
-      }
-      if (el.attribs && Object.prototype.hasOwnProperty.call(el.attribs, `xmlns:${prefix}`)) {
-        delete el.attribs[`xmlns:${prefix}`];
-      }
-    });
-  }
-
-  const normalizedRoot = $('*')
-    .toArray()
-    .find(el => el.type === 'tag' && isQtiAssessmentRoot(el.name));
-  if (normalizedRoot) {
-    $(normalizedRoot).attr('xmlns', qtiNamespace);
-  }
-
-  return cleanXMLString($.xml());
-};
-// import styleSheetString from './../../../../node_modules/qti30upgrader/qti2xTo30.sef.json';
-
-/**
- * Converts QTI2.x to QTI3 using Saxon-JS in browser environment
- *
- * @param {string} qti2 - QTI2.x XML string
- * @returns {Promise<string>} QTI3 XML string
- */
-// Import cleaned up since browser import assertions may differ
-// You'll need to make sure this file is accessible from your web app
-// import styleSheetString from './path/to/qti2xTo30.sef.json';
-// import SaxonJS from 'saxon-js';
-/**
- * Converts QTI2.x to QTI3 using Saxon-JS in browser environment
- *
- * @param {string} qti2 - QTI2.x XML string
- * @param {Object} styleSheetString - The stylesheet as a JSON object
- * @returns {Promise<string>} QTI3 XML string
- */
-const convert = async (qti2, styleSheetString) => {
-  // Ensure SaxonJS is available globally
-  const SaxonJS = (window as any).SaxonJS || globalThis.SaxonJS;
-
-  if (!SaxonJS) {
-    throw new Error('SaxonJS is not loaded. Please include it via a CDN.');
-  }
-  if (typeof SaxonJS === 'undefined') {
-    throw new Error('SaxonJS is not loaded. Make sure to include the Saxon-JS library.');
-  }
-
-  qti2 = cleanXMLString(qti2);
-
-  return new Promise<string>((resolve, reject) => {
-    // There are two ways to use Saxon-JS in the browser:
-
-    // Option 1: If you have the stylesheet as a JSON object already loaded
-    if (styleSheetString) {
-      try {
-        // Use SaxonJS.transform for SaxonJS 2.x
-        SaxonJS.transform(
-          {
-            stylesheetInternal: styleSheetString,
-            sourceText: qti2,
-            destination: 'serialized'
-          },
-          'async'
-        )
-          .then(output => {
-            resolve(output.principalResult);
-          })
-          .catch(error => {
-            reject(error);
-          });
-      } catch (error) {
-        reject(error);
-      }
-    }
-    // Option 2: Load the stylesheet from a URL
-    else {
-      try {
-        SaxonJS.transform({
-          stylesheetLocation: './qti2xTo30.sef.json',
-          sourceText: qti2,
-          destination: 'serialized'
-        })
-          .then(output => {
-            resolve(output.principalResult);
-          })
-          .catch(error => {
-            reject(error);
-          });
-      } catch (error) {
-        reject(error);
-      }
-    }
-  });
-};
 
 // Some QTI 2.x packages namespace-prefix their content-packaging elements
 // (e.g. <imscp:manifest>, <imscp:resource>). The selectors below match by
@@ -236,25 +89,12 @@ export const convertManifestFile = ($: cheerio.CheerioAPI) => {
   });
 };
 
-export const convertQti2toQti3 = async (qti2: string, xsltJson = './qti2xTo30.sef.json') => {
-  qti2 = cleanXMLString(qti2);
+/**
+ * Converts QTI 2.x to QTI 3.
+ * @param xsltJson deprecated and ignored: the conversion no longer uses an XSLT stylesheet or Saxon-JS
+ */
+export const convertQti2toQti3 = async (qti2: string, xsltJson?: string) => upgradeQti2toQti3(cleanXMLString(qti2));
 
-  // If styleSheetString is already imported as a module:
-  // const qti3 = await convert(qti2, styleSheetString);
-
-  // If we need to fetch the stylesheet:
-  let styleSheet;
-  try {
-    const response = await fetch(xsltJson);
-    styleSheet = await response.json();
-  } catch (error) {
-    console.error('Failed to load stylesheet:', error);
-    throw new Error('Failed to load XSLT stylesheet');
-  }
-
-  const qti3 = await convert(qti2, styleSheet);
-  return normalizeConvertedQtiNamespace(qti3);
-};
 export function cleanXMLString(xmlString: string): string {
   if (!xmlString) {
     return xmlString;
@@ -277,7 +117,7 @@ export function cleanXMLString(xmlString: string): string {
  * Browser-compatible function to convert assessment packages
  * Processes a package file and applies conversions to manifest, assessment, and item files
  * @param {Blob|File} file - The uploaded file object
- * @param {string} xsltJson - Path to the XSLT JSON file for conversion
+ * @param {string} xsltJson - Deprecated and ignored (the conversion no longer uses XSLT)
  * @param {Function} convertManifest - Optional function to convert manifest files
  * @param {Function} convertAssessment - Optional function to convert assessment files
  * @param {Function} convertItem - Optional function to convert item files
@@ -286,7 +126,7 @@ export function cleanXMLString(xmlString: string): string {
  */
 export async function convertPackage(
   file,
-  xsltJson = './qti2xTo30.sef.json',
+  xsltJson?: string,
   convertManifest = async $manifest => {
     // Default manifest conversion
     convertManifestFile($manifest);
@@ -295,7 +135,7 @@ export async function convertPackage(
   convertAssessment = async $assessment => {
     // Default assessment conversion
     if (hasElementLocalName($assessment, 'assessmentTest')) {
-      const modifiedContent = await convertQti2toQti3(cleanXMLString($assessment.xml()), xsltJson);
+      const modifiedContent = await convertQti2toQti3(cleanXMLString($assessment.xml()));
       $assessment = cheerio.load(modifiedContent, { xmlMode: true, xml: true });
     }
     return $assessment;
@@ -303,7 +143,7 @@ export async function convertPackage(
   convertItem = async $item => {
     // Default item conversion
     if (hasElementLocalName($item, 'assessmentItem')) {
-      const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()), xsltJson);
+      const modifiedContent = await convertQti2toQti3(cleanXMLString($item.xml()));
       const transform = qtiTransform(modifiedContent);
       const transformResult = await transform
         .objectToImg()
@@ -320,7 +160,6 @@ export async function convertPackage(
     return $item;
   },
   postProcessing = async files => {
-    debugger;
     // Default post-processing: sync assessment item identifiers
     // Convert array to Map for shared post-processing
     const filesMap = new Map();

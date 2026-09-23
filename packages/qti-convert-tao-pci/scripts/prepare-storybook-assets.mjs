@@ -3,8 +3,6 @@ import path from 'node:path';
 
 const requiredAssets = [
   path.resolve(process.cwd(), 'storybook-assets/PCI.zip'),
-  path.resolve(process.cwd(), 'public/assets/saxon-js/SaxonJS2.rt.js'),
-  path.resolve(process.cwd(), 'public/assets/saxon-js/LICENSE.txt'),
 ];
 
 let missingAsset = false;

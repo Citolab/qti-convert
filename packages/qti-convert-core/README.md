@@ -16,16 +16,17 @@ npm install @citolab/qti-convert
 - `@citolab/qti-convert/qti-loader`
 - `@citolab/qti-convert/qti-helper`
 - `@citolab/qti-convert/qti-helper-node`
-- `@citolab/qti-convert/qti-downgrader` (QTI 3 → QTI 2.1, no Saxon-JS needed)
+- `@citolab/qti-convert/qti-downgrader` (QTI 3 → QTI 2.1)
 
 ## Examples
 
-Convert a QTI 2.x XML string:
+Convert a QTI 2.x XML string (pure TypeScript, works in Node and the browser; Saxon-JS is no longer needed):
 
 ```ts
-import { convertQti2toQti3 } from '@citolab/qti-convert/qti-convert';
+import { convertQti2toQti3, upgradeQti2toQti3 } from '@citolab/qti-convert/qti-convert';
 
 const qti3Xml = await convertQti2toQti3(qti2Xml);
+const sameButSync = upgradeQti2toQti3(qti2Xml);
 ```
 
 Convert a local package file in Node.js:
