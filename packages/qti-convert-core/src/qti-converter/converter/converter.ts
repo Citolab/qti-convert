@@ -93,7 +93,17 @@ export const convertManifestFile = ($: cheerio.CheerioAPI) => {
  * Converts QTI 2.x to QTI 3.
  * @param xsltJson deprecated and ignored: the conversion no longer uses an XSLT stylesheet or Saxon-JS
  */
-export const convertQti2toQti3 = async (qti2: string, xsltJson?: string) => upgradeQti2toQti3(cleanXMLString(qti2));
+export const convertQti2toQti3 = async (qti2: string, xsltJson?: string) => {
+  warnXsltJsonDeprecated(xsltJson);
+  return upgradeQti2toQti3(cleanXMLString(qti2));
+};
+
+let xsltJsonWarningShown = false;
+const warnXsltJsonDeprecated = (xsltJson?: string) => {
+  if (xsltJson === undefined || xsltJsonWarningShown) return;
+  xsltJsonWarningShown = true;
+  console.warn('[qti-convert] The xsltJson argument is deprecated and ignored: QTI 2 to 3 conversion no longer uses XSLT.');
+};
 
 export function cleanXMLString(xmlString: string): string {
   if (!xmlString) {
@@ -188,6 +198,7 @@ export async function convertPackage(
     });
   }
 ) {
+  warnXsltJsonDeprecated(xsltJson);
   // Load the file into JSZip
   const zip = await JSZip.loadAsync(file);
   const newZip = new JSZip();

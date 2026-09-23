@@ -54,6 +54,7 @@ export interface ConvertQti3toQti21Options {
 const PCI_NAMESPACE = 'http://www.imsglobal.org/xsd/portableCustomInteraction';
 const SKIP_SUBTREES = new Set(['math', 'svg']);
 const REBASE_ATTRIBUTES = ['src', 'data', 'href', 'poster'];
+const BLOCK_ONLY_PARENTS = new Set(['qti-item-body', 'blockquote', 'qti-rubric-block']);
 
 const localName = (name: string) => name.split(':').pop() || name;
 const isElement = (node: AnyNode): node is Element => node.type === 'tag';
@@ -174,7 +175,9 @@ const convertMediaToObject = ($: cheerio.CheerioAPI, warnings: WarningCollector)
       .toArray()
       .map(node => $.xml(node))
       .join('');
-    $el.replaceWith(guessedObject(src, $source.attr('type'), { width, height, id, class: className }, fallback));
+    const object = guessedObject(src, $source.attr('type'), { width, height, id, class: className }, fallback);
+    // <object> is inline in QTI 2.1, so it needs a block wrapper where only block content is allowed
+    $el.replaceWith(BLOCK_ONLY_PARENTS.has((el.parent as Element)?.name) ? `<div>${object}</div>` : object);
     warnings.add('media-to-object', `HTML5 <${el.name}> was converted to <object>.`);
   });
 };

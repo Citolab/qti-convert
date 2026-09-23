@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'domhandler';
-import { QTI3_NAMESPACE } from '../qti-downgrader/name-map';
+import { kabobize, QTI3_NAMESPACE, qti2ElementNameToQti3, qtiKabobify } from '../qti-names/qti-names';
 
 // TypeScript port of qti30upgrader/qti2xTo30.xsl (ETS, Apache-2.0) plus the Citolab additions,
 // without the XSLT/Saxon-JS dependency. Deliberate fixes compared to the XSLT:
@@ -23,55 +23,8 @@ const QTI3_RPTEMPLATES_URI = 'https://purl.imsglobal.org/spec/qti/v3p0/rptemplat
 const XML_MODEL_PI =
   '<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>';
 
-/** QTI 2.x element names that become qti-<kebab-name> (the two lists of the XSLT plus the missing ones). */
-const QTI2_ELEMENTS = new Set(
-  (
-    'and anyN areaMapEntry areaMapping assessmentStimulusRef associableHotspot associateInteraction baseValue ' +
-    'calculator calculatorInfo calculatorType card cardEntry catalog catalogInfo choiceInteraction ' +
-    'companionMaterialsInfo containerSize contains contentBody contextDeclaration contextVariable correct ' +
-    'correctResponse customInteraction customOperator default defaultValue delete description digitalMaterial ' +
-    'divide drawingInteraction durationGte durationLt endAttemptInteraction equal equalRounded exitResponse ' +
-    'exitTemplate extendedTextInteraction feedbackInline fieldValue fileHref gap gapImg gapMatchInteraction ' +
-    'gapText gcd graphicAssociateInteraction graphicGapMatchInteraction graphicOrderInteraction gt gte ' +
-    'hotspotChoice hotspotInteraction hottext hottextInteraction htmlContent incrementSi incrementUs index ' +
-    'inlineChoice inlineChoiceInteraction inside integerDivide integerModulus integerToFloat interactionMarkup ' +
-    'interactionModule interactionModules interpolationTable interpolationTableEntry isNull itemBody label lcm ' +
-    'lookupOutcomeValue lt lte majorIncrement mapEntry mapResponse mapResponsePoint mapping match ' +
-    'matchInteraction matchTable matchTableEntry mathConstant mathOperator max mediaInteraction member min ' +
-    'minimumLength minorIncrement multiple not null numberCorrect numberIncorrect numberPresented ' +
-    'numberResponded numberSelected or orderInteraction ordered outcomeDeclaration outcomeMaximum ' +
-    'outcomeMinimum patternMatch physicalMaterial portableCustomInteraction positionObjectInteraction ' +
-    'positionObjectStage power printedVariable product prompt protractor random randomFloat randomInteger ' +
-    'repeat resourceIcon responseCondition responseDeclaration responseElse responseElseIf responseIf ' +
-    'responseProcessing responseProcessingFragment round roundTo rule ruleSystemSi ruleSystemUs ' +
-    'selectPointInteraction setCorrectResponse setDefaultValue setOutcomeValue setTemplateValue ' +
-    'simpleAssociableChoice simpleChoice simpleMatchSet sliderInteraction statsOperator stringMatch stylesheet ' +
-    'substring subtract sum templateBlock templateCondition templateConstraint templateDeclaration templateElse ' +
-    'templateElseIf templateIf templateInline templateProcessing templateVariable textEntryInteraction truncate ' +
-    'uploadInteraction value variable ' +
-    // assessment test elements
-    'assessmentTest testPart assessmentSection assessmentSectionRef assessmentItemRef weight outcomeProcessing ' +
-    'outcomeCondition outcomeIf outcomeElse testVariables timeLimits itemSessionControl selection ordering ' +
-    'adaptiveSelection adaptiveEngineRef adaptiveSettingsRef metadataRef branchRule preCondition ' +
-    // not in the XSLT lists
-    'stimulusBody outcomeElseIf exitTest testFeedback templateDefault variableMapping infoControl'
-  ).split(' ')
-);
-
-const IRREGULAR_ELEMENT_NAMES: Record<string, string> = {
-  durationLT: 'qti-duration-lt',
-  durationGTE: 'qti-duration-gte',
-  incrementSI: 'qti-increment-si',
-  incrementUS: 'qti-increment-us',
-  ruleSystemSI: 'qti-rule-system-si',
-  ruleSystemUS: 'qti-rule-system-us'
-};
-
 const ROOT_ELEMENTS = new Set(['assessmentItem', 'assessmentStimulus', 'assessmentTest']);
 const CONTENT_BODY_ELEMENTS = new Set(['feedbackBlock', 'modalFeedback', 'rubricBlock', 'templateBlock', 'testFeedback']);
-
-export const kabobize = (name: string) => name.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
-const qtiKabobify = (localName: string) => IRREGULAR_ELEMENT_NAMES[localName] ?? `qti-${kabobize(localName)}`;
 
 const isElement = (node: AnyNode): node is Element => node.type === 'tag';
 const splitName = (name: string) => {
@@ -214,7 +167,7 @@ class Upgrader {
         name === 'template' ? [name, `${value.replace(/^.*\//, QTI3_RPTEMPLATES_URI)}.xml`] : [name, value]
       );
     }
-    const name = QTI2_ELEMENTS.has(local) || IRREGULAR_ELEMENT_NAMES[local] ? qtiKabobify(local) : local;
+    const name = qti2ElementNameToQti3(local) ?? local;
     return this.element(el, name, QTI3_NAMESPACE, attributes, scope, s => this.children(el.children, s));
   }
 }

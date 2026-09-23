@@ -126,7 +126,7 @@ const corpus = async (): Promise<(readonly [string, string])[]> => {
       .filter(name => name.endsWith('.xml') && name !== 'imsmanifest.xml')
       .map(name => [name, readFileSync(path.join(fixtureDir, name), 'utf8')] as const)
   );
-  const downgraded = [...convertPackageFilesToQti21(fixtureFiles).files].map(
+  const downgraded = [...(await convertPackageFilesToQti21(fixtureFiles)).files].map(
     ([name, content]) => [`downgraded/${name}`, content as string] as const
   );
 

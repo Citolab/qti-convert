@@ -8,8 +8,8 @@ export default defineConfig({
     'src/qti-convert-cli/qti-package-manifest.ts',
     'src/qti-convert-cli/qti-package-assessment.ts',
     'src/qti-convert-cli/qti-strip-media-pkg.ts',
-    'src/qti-convert-cli/qti-create-package.ts',
-    'src/qti-convert-cli/qti-create-package-per-item.ts',
+    'src/qti-convert-cli/qti-package.ts',
+    'src/qti-convert-cli/qti-package-per-item.ts',
     'src/qti-convert-cli/qti-export-docx.ts'
   ],
   format: ['esm'],

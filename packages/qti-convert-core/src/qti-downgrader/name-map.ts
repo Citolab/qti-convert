@@ -1,10 +1,10 @@
-// Name mappings between QTI 3.0 (kebab-case, qti- prefixed) and QTI 2.1 (camelCase).
-// QTI 3.0 names are derived from QTI 2.x by "kabobizing" (see qti30upgrader/qti2xTo30.xsl),
-// so the reverse is a generic camelCase conversion plus a few irregular names.
+// QTI 2.1 specifics for the downgrader; the element name table itself lives in ../qti-names.
+import { camelize, QTI3_NAMESPACE, qti3ElementNameToQti2 } from '../qti-names/qti-names';
+
+export { QTI3_NAMESPACE };
 
 export const QTI21_NAMESPACE = 'http://www.imsglobal.org/xsd/imsqti_v2p1';
 export const QTI21_SCHEMA_LOCATION = `${QTI21_NAMESPACE} http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd`;
-export const QTI3_NAMESPACE = 'http://www.imsglobal.org/xsd/imsqtiasi_v3p0';
 export const QTI21_RPTEMPLATES_URI = 'http://www.imsglobal.org/question/qti_v2p1/rptemplates/';
 
 export const IMSCP21_NAMESPACE = 'http://www.imsglobal.org/xsd/imscp_v1p1';
@@ -14,12 +14,6 @@ export const IMSCP21_SCHEMA_LOCATION = [
   `${QTI21_METADATA_NAMESPACE} http://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_metadata_v2p1p1.xsd`,
   'http://ltsc.ieee.org/xsd/LOM http://www.imsglobal.org/xsd/imsmd_loose_v1p3p2.xsd'
 ].join(' ');
-
-/** QTI 3 names whose QTI 2.1 counterpart is not a plain camelCase of the kebab name. */
-const IRREGULAR_ELEMENT_NAMES: Record<string, string> = {
-  'qti-duration-lt': 'durationLT',
-  'qti-duration-gte': 'durationGTE'
-};
 
 /** QTI 3 elements that only exist in QTI 3.0 (or 2.2) and are removed including their content. */
 export const QTI3_ONLY_REMOVE = new Set([
@@ -61,18 +55,11 @@ export const GRAPHIC_INTERACTIONS = new Set([
   'qti-gap-img'
 ]);
 
-const kebabToCamel = (name: string) => name.replace(/-([a-z0-9])/g, (_, c: string) => c.toUpperCase());
-
 /** qti-choice-interaction -> choiceInteraction. Returns null for non-QTI (e.g. XHTML) elements. */
-export const qti3ElementNameToQti21 = (name: string): string | null => {
-  if (!name.startsWith('qti-')) {
-    return null;
-  }
-  return IRREGULAR_ELEMENT_NAMES[name] ?? kebabToCamel(name.slice('qti-'.length));
-};
+export const qti3ElementNameToQti21 = qti3ElementNameToQti2;
 
 /** response-identifier -> responseIdentifier; xml:lang, xmlns and friends are left untouched. */
-export const qti3AttributeNameToQti21 = (name: string): string => (name.includes(':') ? name : kebabToCamel(name));
+export const qti3AttributeNameToQti21 = (name: string): string => (name.includes(':') ? name : camelize(name));
 
 /** https://purl.imsglobal.org/spec/qti/v3p0/rptemplates/match_correct.xml -> 2.1 template URI. */
 export const qti3RpTemplateToQti21 = (template: string): string => {

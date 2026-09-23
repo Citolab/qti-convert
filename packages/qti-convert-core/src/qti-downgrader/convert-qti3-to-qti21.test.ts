@@ -147,6 +147,8 @@ describe('convertQti3toQti21', () => {
     expect($('audio, video, figure, figcaption')).toHaveLength(0);
     expect($('object[data="media/a.mp3"]').attr('type')).toBe('audio/mpeg');
     expect($('object[data="media/a.mp3"]').text()).toBe('Audio');
+    // object is inline in QTI 2.1, so directly in the item body it gets a block wrapper
+    expect($('itemBody > div > object[data="media/a.mp3"]')).toHaveLength(1);
     expect($('object[data="media/v.mp4"]').attr('type')).toBe('video/mp4');
     expect($('object[data="media/v.mp4"]').attr('width')).toBe('320');
     const background = $('selectPointInteraction > object');
@@ -262,9 +264,9 @@ describe('package conversion', () => {
     return files;
   };
 
-  test('converts every QTI file of the sample package', () => {
+  test('converts every QTI file of the sample package', async () => {
     const input = readFolder(fixture);
-    const { files } = convertPackageFilesToQti21(input);
+    const { files } = await convertPackageFilesToQti21(input);
     expect([...files.keys()].sort()).toEqual([...input.keys()].sort());
 
     for (const [filePath, content] of files) {
@@ -322,5 +324,27 @@ describe('package conversion', () => {
     expect(warnings).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'stimulus-inlined', file: 'items/item.xml' })])
     );
+  });
+
+  test('uses the conversion callbacks when given', async () => {
+    const files = new Map<string, string>([
+      ['imsmanifest.xml', '<manifest xmlns="http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1" identifier="M"/>'],
+      ['item.xml', '<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i" adaptive="false" time-dependent="false"/>'],
+      ['test.xml', '<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="t" title="t"/>']
+    ]);
+    const seen: string[] = [];
+    const { files: converted } = await convertPackageFilesToQti21(files, {
+      convertItem: async (xml, context) => {
+        seen.push(`item:${context.path}`);
+        const result = convertQti3toQti21(xml, { filePath: context.path });
+        return { ...result, xml: result.xml.replace('identifier="i"', 'identifier="custom"') };
+      },
+      convertAssessment: (xml, context) => (seen.push(`test:${context.path}`), convertQti3toQti21(xml)),
+      convertManifest: async xml => (seen.push('manifest'), xml.replace('identifier="M"', 'identifier="M2"'))
+    });
+    expect(seen).toEqual(['item:item.xml', 'test:test.xml', 'manifest']);
+    expect(converted.get('item.xml')).toContain('<assessmentItem');
+    expect(converted.get('item.xml')).toContain('identifier="custom"');
+    expect(converted.get('imsmanifest.xml')).toContain('identifier="M2"');
   });
 });

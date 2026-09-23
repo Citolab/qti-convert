@@ -6,7 +6,7 @@ import { convertQti2toQti3 } from './converter';
 import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { qtiTransform } from '../../qti-transformer';
 import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from '../../qti-helper';
-import { convertPackageToQti21 } from '../../qti-downgrader';
+import { convertPackageToQti21, type Qti21PackageOptions } from '../../qti-downgrader';
 
 const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
   $('*')
@@ -627,8 +627,30 @@ export async function convertPackageFile(localFilePath: string, outputZipFilePat
 }
 
 // Converts a local QTI 3 package zip to QTI 2.1; returns the conversion warnings
-export async function convertPackageFileToQti21(localFilePath: string, outputZipFilePath: string) {
-  const { zip, warnings } = await convertPackageToQti21(readFileSync(localFilePath));
+export async function convertPackageFileToQti21(
+  localFilePath: string,
+  outputZipFilePath: string,
+  options?: Qti21PackageOptions
+) {
+  const { zip, warnings } = await convertPackageToQti21(readFileSync(localFilePath), 'uint8array', options);
   writeFileSync(outputZipFilePath, zip);
+  return warnings;
+}
+
+// Reads a zipped QTI 3 package from a stream and writes the QTI 2.1 zip to the output stream
+export async function convertPackageStreamToQti21(
+  input: NodeJS.ReadableStream,
+  outputStream: NodeJS.WritableStream,
+  options?: Qti21PackageOptions
+) {
+  const chunks: Buffer[] = [];
+  for await (const chunk of input) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk));
+  }
+  const { zip, warnings } = await convertPackageToQti21(Buffer.concat(chunks), 'uint8array', options);
+  await new Promise<void>((resolve, reject) => {
+    outputStream.on('error', reject);
+    outputStream.end(Buffer.from(zip), () => resolve());
+  });
   return warnings;
 }

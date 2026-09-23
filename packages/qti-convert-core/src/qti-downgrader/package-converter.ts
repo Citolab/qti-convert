@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { Element } from 'domhandler';
 import JSZip from 'jszip';
-import { convertQti3toQti21, type Qti21Warning } from './convert-qti3-to-qti21';
+import { convertQti3toQti21, type Qti21ConversionResult, type Qti21Warning } from './convert-qti3-to-qti21';
 import {
   IMSCP21_NAMESPACE,
   IMSCP21_SCHEMA_LOCATION,
@@ -109,11 +109,38 @@ export const convertManifestToQti21 = (manifestXml: string, inlinedStimulusHrefs
 const decode = (content: string | Uint8Array) =>
   typeof content === 'string' ? content : new TextDecoder('utf-8').decode(content);
 
+export interface Qti21FileContext {
+  /** Path of the file inside the package. */
+  path: string;
+  /** Resolves a stimulus href relative to this file to its QTI 3 XML (and marks it as inlined). */
+  resolveStimulus: (href: string) => string | undefined;
+}
+
+type Awaitable<T> = T | Promise<T>;
+
+/** Overrides for the default conversions, like the callbacks of the QTI 2 to 3 package converters. */
+export interface Qti21PackageOptions {
+  convertItem?: (xml: string, context: Qti21FileContext) => Awaitable<Qti21ConversionResult>;
+  convertAssessment?: (xml: string, context: Qti21FileContext) => Awaitable<Qti21ConversionResult>;
+  /** Receives the package paths of the stimuli that were inlined into items. */
+  convertManifest?: (xml: string, inlinedStimulusHrefs: Set<string>) => Awaitable<string>;
+}
+
+export const defaultConvertFileToQti21 = (xml: string, context: Qti21FileContext) =>
+  convertQti3toQti21(xml, { filePath: context.path, resolveStimulus: context.resolveStimulus });
+
 /**
  * Converts all files of a QTI 3 package to QTI 2.1. Shared stimuli are inlined into the items that
  * reference them and removed from the package. Non-QTI files are passed through unchanged.
  */
-export const convertPackageFilesToQti21 = (files: PackageFiles): Qti21PackageResult => {
+export const convertPackageFilesToQti21 = async (
+  files: PackageFiles,
+  {
+    convertItem = defaultConvertFileToQti21,
+    convertAssessment = defaultConvertFileToQti21,
+    convertManifest = convertManifestToQti21
+  }: Qti21PackageOptions = {}
+): Promise<Qti21PackageResult> => {
   const warnings: Qti21Warning[] = [];
   const xmlFiles = new Map<string, string>();
   for (const [path, content] of files) {
@@ -123,36 +150,31 @@ export const convertPackageFilesToQti21 = (files: PackageFiles): Qti21PackageRes
 
   const inlinedStimulusHrefs = new Set<string>();
   const output: PackageFiles = new Map();
-  const itemPaths: string[] = [];
   const stimulusPaths: string[] = [];
 
   for (const [path, content] of files) {
     const xml = xmlFiles.get(path);
-    if (xml === undefined || isManifest(path)) {
-      output.set(path, content);
-      continue;
-    }
-    const root = rootLocalName(xml);
+    const root = xml === undefined ? '' : rootLocalName(xml);
     if (root === 'qti-assessment-stimulus') {
       stimulusPaths.push(path);
       continue;
     }
-    if (root === 'qti-assessment-item') {
-      itemPaths.push(path);
-    }
-    if (!root.startsWith('qti-')) {
+    // Non-QTI files (and QTI 2.x files) are passed through; the manifest is converted last
+    if (xml === undefined || isManifest(path) || !root.startsWith('qti-')) {
       output.set(path, content);
       continue;
     }
-    const result = convertQti3toQti21(xml, {
-      filePath: path,
+    const context: Qti21FileContext = {
+      path,
       resolveStimulus: href => {
         const stimulusPath = byNormalizedPath.get(joinPath(dirname(path), href));
         if (!stimulusPath) return undefined;
         inlinedStimulusHrefs.add(normalizePath(stimulusPath));
         return xmlFiles.get(stimulusPath);
       }
-    });
+    };
+    const convert = root === 'qti-assessment-test' ? convertAssessment : convertItem;
+    const result = await convert(xml, context);
     output.set(path, result.xml);
     warnings.push(...result.warnings);
   }
@@ -167,7 +189,7 @@ export const convertPackageFilesToQti21 = (files: PackageFiles): Qti21PackageRes
 
   for (const path of xmlFiles.keys()) {
     if (isManifest(path)) {
-      output.set(path, convertManifestToQti21(xmlFiles.get(path)!, inlinedStimulusHrefs));
+      output.set(path, await convertManifest(xmlFiles.get(path)!, inlinedStimulusHrefs));
     }
   }
 
@@ -182,20 +204,26 @@ type ZipInput = Blob | ArrayBuffer | Uint8Array;
  */
 export async function convertPackageToQti21(
   input: ZipInput,
-  outputType?: 'uint8array'
+  outputType?: 'uint8array',
+  options?: Qti21PackageOptions
 ): Promise<{ zip: Uint8Array; warnings: Qti21Warning[] }>;
 export async function convertPackageToQti21(
   input: ZipInput,
-  outputType: 'blob'
+  outputType: 'blob',
+  options?: Qti21PackageOptions
 ): Promise<{ zip: Blob; warnings: Qti21Warning[] }>;
-export async function convertPackageToQti21(input: ZipInput, outputType: 'uint8array' | 'blob' = 'uint8array') {
+export async function convertPackageToQti21(
+  input: ZipInput,
+  outputType: 'uint8array' | 'blob' = 'uint8array',
+  options: Qti21PackageOptions = {}
+) {
   const zip = await JSZip.loadAsync(input);
   const files: PackageFiles = new Map();
   for (const [path, entry] of Object.entries(zip.files)) {
     if (entry.dir || path.includes('__MACOSX') || path.endsWith('.DS_Store')) continue;
     files.set(path, await entry.async('uint8array'));
   }
-  const { files: converted, warnings } = convertPackageFilesToQti21(files);
+  const { files: converted, warnings } = await convertPackageFilesToQti21(files, options);
   const outZip = new JSZip();
   for (const [path, content] of converted) {
     outZip.file(path, content);

@@ -249,3 +249,23 @@ test('should convert manifest file with imscp prefix to default namespace', () =
   // You can add more specific assertions based on what you expect
   // For now, let's see what the function actually produces
 });
+
+test('convertPackageStreamToQti21 streams a QTI 3 zip to a QTI 2.1 zip', async () => {
+  const { Readable, PassThrough } = await import('stream');
+  const JSZip = (await import('jszip')).default;
+  const { convertPackageStreamToQti21 } = await import('../index');
+  const zip = new JSZip();
+  zip.file(
+    'item.xml',
+    '<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i" adaptive="false" time-dependent="false"><qti-item-body><p>x</p></qti-item-body></qti-assessment-item>'
+  );
+  const input = Readable.from([await zip.generateAsync({ type: 'nodebuffer' })]);
+  const output = new PassThrough();
+  const chunks: Buffer[] = [];
+  output.on('data', chunk => chunks.push(chunk));
+
+  const warnings = await convertPackageStreamToQti21(input, output);
+  const result = await JSZip.loadAsync(Buffer.concat(chunks));
+  expect(warnings).toEqual([]);
+  expect(await result.file('item.xml')!.async('string')).toContain('<assessmentItem');
+});
