@@ -3,6 +3,7 @@
   <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float"/>
   <timeLimits maxTime="600" allowLateSubmission="false"/>
   <testPart identifier="P1" navigationMode="nonlinear" submissionMode="simultaneous">
+    <branchRule target="EXIT_TEST"><gte><variable identifier="SCORE"/><baseValue baseType="float">1</baseValue></gte></branchRule>
     <itemSessionControl maxAttempts="1" showFeedback="false" allowReview="true"/>
     <assessmentSection identifier="S1" title="Section" visible="true">
       <selection select="1" withReplacement="false"/>
@@ -11,7 +12,6 @@
       <assessmentItemRef identifier="I1" href="items/i1.xml" category="c1"><weight identifier="W" value="2"/></assessmentItemRef>
       <assessmentSectionRef identifier="S2" href="s2.xml"/>
     </assessmentSection>
-    <branchRule target="EXIT_TEST"><gte><variable identifier="SCORE"/><baseValue baseType="float">1</baseValue></gte></branchRule>
   </testPart>
   <outcomeProcessing>
     <setOutcomeValue identifier="SCORE"><sum><testVariables variableIdentifier="SCORE" weightIdentifier="W"/></sum></setOutcomeValue>

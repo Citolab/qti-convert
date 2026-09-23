@@ -13,19 +13,19 @@
   <templateDeclaration identifier="T" cardinality="single" baseType="integer" paramVariable="false" mathVariable="true"/>
   <templateProcessing><setTemplateValue identifier="T"><randomInteger min="1" max="9"/></setTemplateValue></templateProcessing>
   <stylesheet href="style.css" type="text/css"/>
-  <itemBody class="body" data-custom="yes">
+  <itemBody class="body">
     <?custom-pi keep me?>
     <p aria-label="intro" data-fooBar="x">Tekst met één <b>vet</b> &amp; <m:math display="inline"><m:mi mathvariant="bold">x</m:mi><m:mo>+</m:mo></m:math> <ssml:sub alias="sub">s</ssml:sub></p>
-    <object type="image/png" data="img/a.png" width="10" height="20">Alt tekst</object>
+    <p><object type="image/png" data="img/a.png" width="10" height="20">Alt tekst</object></p>
     <table><tbody><tr><td colspan="2">cell</td></tr></tbody></table>
     <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1" minChoices="0">
       <prompt>Kies</prompt>
       <simpleChoice identifier="A" fixed="true">A <printedVariable identifier="T"/></simpleChoice>
       <simpleChoice identifier="B" showHide="show" templateIdentifier="T">B</simpleChoice>
     </choiceInteraction>
-    <feedbackInline outcomeIdentifier="FB" identifier="A" showHide="show">inline</feedbackInline>
+    <p><feedbackInline outcomeIdentifier="FB" identifier="A" showHide="show">inline</feedbackInline></p>
     <rubricBlock view="scorer"><stylesheet href="r.css" type="text/css"/><p>rubric</p></rubricBlock>
-    <templateBlock templateIdentifier="T" identifier="1" showHide="show"><p>template</p></templateBlock>
+    <templateBlock templateIdentifier="T" identifier="TB1" showHide="show"><p>template</p></templateBlock>
     <feedbackBlock outcomeIdentifier="FB" identifier="B" showHide="hide"><p>block</p></feedbackBlock>
     <apip:apipAccessibility><apip:companionMaterialsInfo/></apip:apipAccessibility>
   </itemBody>

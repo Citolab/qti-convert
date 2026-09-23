@@ -6,6 +6,7 @@ import { kabobize, QTI3_NAMESPACE, qti2ElementNameToQti3, qtiKabobify } from '..
 // without the XSLT/Saxon-JS dependency. Deliberate fixes compared to the XSLT:
 // - stimulusBody, durationLT/GTE and a few QTI 2.x elements missing from the XSLT lists get their qti- name
 // - testFeedback content is wrapped in qti-content-body like the other feedback elements
+// - qti-rubric-block gets the use attribute QTI 3 requires (scoring for scorer-only rubrics, else instructions)
 // - elements are matched by local name, so prefixed QTI 2 elements convert correctly
 // - an <object> video keeps its converted children once (the XSLT copied them twice)
 // - inline SVG stays in the SVG namespace
@@ -154,7 +155,13 @@ class Upgrader {
 
     if (CONTENT_BODY_ELEMENTS.has(local)) {
       const isStylesheet = (node: AnyNode) => isElement(node) && splitName(node.name).local === 'stylesheet';
-      return this.element(el, qtiKabobify(local), QTI3_NAMESPACE, kabobAttributes(el), scope, s => {
+      const attributes = kabobAttributes(el);
+      if (local === 'rubricBlock' && !el.attribs.use) {
+        // use is required in QTI 3; derive it from the audience
+        const views = (el.attribs.view || '').split(/\s+/);
+        attributes.push(['use', views.includes('scorer') && !views.includes('candidate') ? 'scoring' : 'instructions']);
+      }
+      return this.element(el, qtiKabobify(local), QTI3_NAMESPACE, attributes, scope, s => {
         const stylesheets = this.children(el.children.filter(isStylesheet), s);
         const body = this.children(el.children.filter(node => !isStylesheet(node)), s);
         return stylesheets + this.element(el, 'qti-content-body', QTI3_NAMESPACE, [], s, () => body);

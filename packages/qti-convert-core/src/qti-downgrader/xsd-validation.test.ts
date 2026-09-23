@@ -1,74 +1,12 @@
-import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
-import * as os from 'os';
+import { readdirSync, readFileSync } from 'fs';
 import * as path from 'path';
 import { beforeAll, describe, expect, test } from 'vitest';
+import { hasXmllint, prepareQtiSchema, QTI21_XSD_URL, validateXml } from '../test-utils/xsd-validator';
 import { convertPackageFilesToQti21, convertQti3toQti21 } from './index';
 
-// Validates the QTI 2.1 output against the official IMS XSD with xmllint. The XSD is downloaded once and
-// cached; MathML, XInclude and APIP are replaced by lax stubs so only the QTI part is checked strictly.
-// Skipped when xmllint or the network is unavailable.
-
-const CACHE_DIR = path.join(os.tmpdir(), 'qti-convert-xsd-cache');
-const QTI21_XSD = path.join(CACHE_DIR, 'qti21-local.xsd');
-
-const hasXmllint = (() => {
-  try {
-    execFileSync('xmllint', ['--version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-})();
-
-const laxSchema = (namespace: string, element: string) => `<?xml version="1.0"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="${namespace}" elementFormDefault="qualified">
-  <xs:element name="${element}"><xs:complexType mixed="true"><xs:sequence><xs:any processContents="skip" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:anyAttribute processContents="skip"/></xs:complexType></xs:element>
-</xs:schema>`;
-
-const prepareSchema = async (): Promise<boolean> => {
-  if (existsSync(QTI21_XSD)) return true;
-  try {
-    mkdirSync(CACHE_DIR, { recursive: true });
-    const [qti, xml] = await Promise.all(
-      ['https://www.imsglobal.org/xsd/qti/qtiv2p1/imsqti_v2p1p2.xsd', 'https://www.w3.org/2001/xml.xsd'].map(async url => {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`${url}: ${response.status}`);
-        return response.text();
-      })
-    );
-    writeFileSync(path.join(CACHE_DIR, 'xml.xsd'), xml);
-    writeFileSync(path.join(CACHE_DIR, 'mathml-stub.xsd'), laxSchema('http://www.w3.org/1998/Math/MathML', 'math'));
-    writeFileSync(path.join(CACHE_DIR, 'xinclude-stub.xsd'), laxSchema('http://www.w3.org/2001/XInclude', 'include'));
-    writeFileSync(
-      path.join(CACHE_DIR, 'apip-stub.xsd'),
-      laxSchema('http://www.imsglobal.org/xsd/apip/apipv1p0/imsapip_qtiv1p0', 'apipAccessibility')
-    );
-    writeFileSync(
-      QTI21_XSD,
-      qti
-        .replace('http://www.imsglobal.org/xsd/w3/2001/xml.xsd', 'xml.xsd')
-        .replace('http://www.imsglobal.org/xsd/w3/2001/XInclude.xsd', 'xinclude-stub.xsd')
-        .replace('http://www.w3.org/Math/XMLSchema/mathml2/mathml2.xsd', 'mathml-stub.xsd')
-        .replace('http://www.imsglobal.org/profile/apip/apipv1p0/apipv1p0_qtiextv2p1_v1p0.xsd', 'apip-stub.xsd')
-    );
-    return true;
-  } catch (error) {
-    console.warn('QTI 2.1 XSD could not be downloaded, skipping XSD validation:', error);
-    return false;
-  }
-};
-
-const validate = (xml: string): string => {
-  const file = path.join(CACHE_DIR, `validate-${process.pid}-${Math.random().toString(36).slice(2)}.xml`);
-  writeFileSync(file, xml);
-  try {
-    execFileSync('xmllint', ['--noout', '--nonet', '--schema', QTI21_XSD, file], { stdio: 'pipe' });
-    return '';
-  } catch (error) {
-    return String((error as { stderr?: Buffer }).stderr ?? error).replaceAll(file, '<output>');
-  }
-};
+// Validates the QTI 2.1 output against the official IMS XSD (skipped without xmllint or network).
+let schema: string | null = null;
+const validate = (xml: string) => validateXml(xml, schema!);
 
 const qti3 = (body: string, head = '') => `<?xml version="1.0" encoding="UTF-8"?>
 <qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i" title="t" adaptive="false" time-dependent="false" xml:lang="en">
@@ -107,18 +45,17 @@ const cases: Record<string, string> = {
 };
 
 describe.skipIf(!hasXmllint)('QTI 2.1 output validates against imsqti_v2p1p2.xsd', async () => {
-  let schemaReady = false;
   beforeAll(async () => {
-    schemaReady = await prepareSchema();
+    schema = await prepareQtiSchema('qti21', QTI21_XSD_URL);
   });
 
   test.each(Object.entries(cases))('%s', (_name, input) => {
-    if (!schemaReady) return;
+    if (!schema) return;
     expect(validate(convertQti3toQti21(input).xml)).toBe('');
   });
 
   test('inlined shared stimulus', () => {
-    if (!schemaReady) return;
+    if (!schema) return;
     const item = qti3(choice).replace(
       '<qti-item-body>',
       '<qti-assessment-stimulus-ref identifier="S" href="s.xml"/><qti-item-body>'
@@ -129,7 +66,7 @@ describe.skipIf(!hasXmllint)('QTI 2.1 output validates against imsqti_v2p1p2.xsd
   });
 
   test('export fixture package', async () => {
-    if (!schemaReady) return;
+    if (!schema) return;
     const fixtureDir = path.resolve(__dirname, '../../../qti-convert-export/tests/fixtures/sample-package');
     const files = new Map(
       readdirSync(fixtureDir)

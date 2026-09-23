@@ -4,15 +4,15 @@
   <qti-outcome-declaration identifier="SCORE" cardinality="single" base-type="float"/>
   <qti-time-limits max-time="600" allow-late-submission="false"/>
   <qti-test-part identifier="P1" navigation-mode="nonlinear" submission-mode="simultaneous">
+    <qti-branch-rule target="EXIT_TEST"><qti-gte><qti-variable identifier="SCORE"/><qti-base-value base-type="float">1</qti-base-value></qti-gte></qti-branch-rule>
     <qti-item-session-control max-attempts="1" show-feedback="false" allow-review="true"/>
     <qti-assessment-section identifier="S1" title="Section" visible="true">
       <qti-selection select="1" with-replacement="false"/>
       <qti-ordering shuffle="true"/>
-      <qti-rubric-block view="candidate"><qti-content-body><p>Instructions</p></qti-content-body></qti-rubric-block>
+      <qti-rubric-block view="candidate" use="instructions"><qti-content-body><p>Instructions</p></qti-content-body></qti-rubric-block>
       <qti-assessment-item-ref identifier="I1" href="items/i1.xml" category="c1"><qti-weight identifier="W" value="2"/></qti-assessment-item-ref>
       <qti-assessment-section-ref identifier="S2" href="s2.xml"/>
     </qti-assessment-section>
-    <qti-branch-rule target="EXIT_TEST"><qti-gte><qti-variable identifier="SCORE"/><qti-base-value base-type="float">1</qti-base-value></qti-gte></qti-branch-rule>
   </qti-test-part>
   <qti-outcome-processing>
     <qti-set-outcome-value identifier="SCORE"><qti-sum><qti-test-variables variable-identifier="SCORE" weight-identifier="W"/></qti-sum></qti-set-outcome-value>

@@ -8,19 +8,19 @@
   <qti-template-declaration identifier="T" cardinality="single" base-type="integer" param-variable="false" math-variable="true"/>
   <qti-template-processing><qti-set-template-value identifier="T"><qti-random-integer min="1" max="9"/></qti-set-template-value></qti-template-processing>
   <qti-stylesheet href="style.css" type="text/css"/>
-  <qti-item-body class="body" data-custom="yes">
+  <qti-item-body class="body">
     <?custom-pi keep me?>
     <p aria-label="intro" data-fooBar="x">Tekst met één <b>vet</b> &amp; <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mi mathvariant="bold">x</mi><mo>+</mo></math> <sub xmlns="http://www.w3.org/2001/10/synthesis" alias="sub">s</sub></p>
-    <img src="img/a.png" alt="Alt tekst" width="10" height="20"/>
+    <p><img src="img/a.png" alt="Alt tekst" width="10" height="20"/></p>
     <table><tbody><tr><td colspan="2">cell</td></tr></tbody></table>
     <qti-choice-interaction response-identifier="RESPONSE" shuffle="false" max-choices="1" min-choices="0">
       <qti-prompt>Kies</qti-prompt>
       <qti-simple-choice identifier="A" fixed="true">A <qti-printed-variable identifier="T"/></qti-simple-choice>
       <qti-simple-choice identifier="B" show-hide="show" template-identifier="T">B</qti-simple-choice>
     </qti-choice-interaction>
-    <qti-feedback-inline outcome-identifier="FB" identifier="A" show-hide="show">inline</qti-feedback-inline>
-    <qti-rubric-block view="scorer"><qti-stylesheet href="r.css" type="text/css"/><qti-content-body><p>rubric</p></qti-content-body></qti-rubric-block>
-    <qti-template-block template-identifier="T" identifier="1" show-hide="show"><qti-content-body><p>template</p></qti-content-body></qti-template-block>
+    <p><qti-feedback-inline outcome-identifier="FB" identifier="A" show-hide="show">inline</qti-feedback-inline></p>
+    <qti-rubric-block view="scorer" use="scoring"><qti-stylesheet href="r.css" type="text/css"/><qti-content-body><p>rubric</p></qti-content-body></qti-rubric-block>
+    <qti-template-block template-identifier="T" identifier="TB1" show-hide="show"><qti-content-body><p>template</p></qti-content-body></qti-template-block>
     <qti-feedback-block outcome-identifier="FB" identifier="B" show-hide="hide"><qti-content-body><p>block</p></qti-content-body></qti-feedback-block>
     
   </qti-item-body>
