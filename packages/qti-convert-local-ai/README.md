@@ -266,4 +266,4 @@ The package supports multiple-choice, short-text, and extended-text items, plus 
 
 ## License
 
-Apache-2.0
+GPL-3.0-only

@@ -76,4 +76,4 @@ const assessment = await createAssessmentTest('path/to/folder');
 
 ## License
 
-Apache-2.0
+GPL-3.0-only

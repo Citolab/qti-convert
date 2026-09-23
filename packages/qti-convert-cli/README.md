@@ -60,4 +60,4 @@ npx --package=@citolab/qti-convert-cli qti-strip-media-pkg yourpackage.zip
 
 ## License
 
-Apache-2.0
+GPL-3.0-only

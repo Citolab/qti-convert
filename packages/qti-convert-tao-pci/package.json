@@ -3,7 +3,7 @@
   "version": "0.7.1",
   "description": "TAO PCI conversion helpers for qti-convert",
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-only",
   "repository": "https://github.com/Citolab/qti-convert",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

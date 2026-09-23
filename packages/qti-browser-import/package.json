@@ -3,7 +3,7 @@
   "version": "0.7.1",
   "description": "Browser-side QTI package import and cache URL rewriting",
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-only",
   "repository": "https://github.com/Citolab/qti-convert",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

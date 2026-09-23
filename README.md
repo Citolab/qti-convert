@@ -203,4 +203,4 @@ getAllResourcesRecursively(allResources, 'path/to/qti-folder');
 
 ## License
 
-Apache-2.0. See [LICENSE](./LICENSE).
+GPL-3.0-only. See [LICENSE](./LICENSE). Versions up to 0.7.0 were published under Apache-2.0.
