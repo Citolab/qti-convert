@@ -12,6 +12,7 @@ Exports of interest:
 - `qti-transformer`
 - `qti-helper`
 - `qti-helper-node`
+- `qti-downgrader` (QTI 3 → 2.1, cheerio only, shared by node and browser)
 
 ## Core principle: keep this layer generic
 

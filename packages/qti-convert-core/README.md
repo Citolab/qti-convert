@@ -16,6 +16,7 @@ npm install @citolab/qti-convert
 - `@citolab/qti-convert/qti-loader`
 - `@citolab/qti-convert/qti-helper`
 - `@citolab/qti-convert/qti-helper-node`
+- `@citolab/qti-convert/qti-downgrader` (QTI 3 → QTI 2.1, no Saxon-JS needed)
 
 ## Examples
 
@@ -33,6 +34,16 @@ Convert a local package file in Node.js:
 import { convertPackageFile } from '@citolab/qti-convert/qti-convert-node';
 
 await convertPackageFile('input.zip', 'output.zip');
+```
+
+Convert QTI 3 back to QTI 2.1 (best-effort; anything without a 2.1 equivalent is reported in `warnings`):
+
+```ts
+import { convertQti3toQti21, convertPackageToQti21 } from '@citolab/qti-convert/qti-downgrader';
+
+const { xml, warnings } = convertQti3toQti21(qti3Xml);
+// Packages: shared stimuli are inlined into the items that reference them
+const { zip } = await convertPackageToQti21(qti3ZipBytes); // or (file, 'blob') in the browser
 ```
 
 Transform QTI XML:

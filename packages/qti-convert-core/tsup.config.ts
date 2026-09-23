@@ -7,7 +7,8 @@ export default defineConfig({
     'src/qti-transformer/index.ts',
     'src/qti-loader/index.ts',
     'src/qti-helper/index.ts',
-    'src/qti-helper-node/index.ts'
+    'src/qti-helper-node/index.ts',
+    'src/qti-downgrader/index.ts'
   ],
   format: ['esm'],
   target: 'ES2022',

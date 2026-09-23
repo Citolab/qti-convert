@@ -38,6 +38,10 @@
     "./qti-helper-node": {
       "types": "./dist/qti-helper-node/index.d.ts",
       "default": "./dist/qti-helper-node/index.js"
+    },
+    "./qti-downgrader": {
+      "types": "./dist/qti-downgrader/index.d.ts",
+      "default": "./dist/qti-downgrader/index.js"
     }
   },
   "files": [

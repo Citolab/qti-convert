@@ -22,6 +22,12 @@ Convert all zip packages in a folder:
 npx --package=@citolab/qti-convert-cli qti-convert-pkg /path/to/folder-with-zips
 ```
 
+Convert a QTI 3 zip package (or a folder with zips) back to QTI 2.1:
+
+```sh
+npx --package=@citolab/qti-convert-cli qti-convert-pkg-qti21 yourpackage.zip
+```
+
 Convert a folder:
 
 ```sh

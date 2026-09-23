@@ -6,6 +6,7 @@ import { convertQti2toQti3 } from './converter';
 import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { qtiTransform } from '../../qti-transformer';
 import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from '../../qti-helper';
+import { convertPackageToQti21 } from '../../qti-downgrader';
 
 const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
   $('*')
@@ -623,4 +624,11 @@ export async function convertPackageFile(localFilePath: string, outputZipFilePat
   const unzipStream = createReadStream(localFilePath).pipe(unzipper.Parse({ forceStream: true }));
   const buffer = await convertPackageStream(unzipStream);
   writeFileSync(outputZipFilePath, buffer);
+}
+
+// Converts a local QTI 3 package zip to QTI 2.1; returns the conversion warnings
+export async function convertPackageFileToQti21(localFilePath: string, outputZipFilePath: string) {
+  const { zip, warnings } = await convertPackageToQti21(readFileSync(localFilePath));
+  writeFileSync(outputZipFilePath, zip);
+  return warnings;
 }

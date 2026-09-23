@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { convertPackageFile } from '@citolab/qti-convert/qti-converter-node';
+import { convertPackageFile } from '@citolab/qti-convert/qti-convert-node';
 
 const inputPath = process.argv[2];
 
