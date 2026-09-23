@@ -128,7 +128,7 @@ export interface Qti21PackageOptions {
   /** Receives the package paths of the stimuli that were inlined into items. */
   convertManifest?: (xml: string, inlinedStimulusHrefs: Set<string>) => Awaitable<string>;
   /**
-   * Adds the 1EdTech QTI 3 shared vocabulary stylesheet (qti3p0.css) to the package and to every item that uses
+   * Adds the QTI 3 shared vocabulary stylesheet (qti3-shared-vocabulary.css) to the package and to every item that uses
    * qti-* classes, so QTI 2.1 players can style them. Default true.
    */
   injectSharedVocabularyStylesheet?: boolean;
@@ -243,7 +243,7 @@ export const convertPackageFilesToQti21 = async (
   }
 
   const addStylesheet = itemsWithSharedVocabulary.length > 0;
-  // An existing qti3p0.css in the package is kept (and used)
+  // An existing stylesheet with that name in the package is kept (and used)
   if (addStylesheet && !output.has(stylesheetPath)) {
     output.set(stylesheetPath, QTI3_SHARED_VOCABULARY_CSS);
   }

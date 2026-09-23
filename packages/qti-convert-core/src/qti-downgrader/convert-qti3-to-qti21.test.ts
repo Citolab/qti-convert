@@ -117,9 +117,9 @@ describe('convertQti3toQti21', () => {
   });
 
   test('adds the shared vocabulary stylesheet when asked', () => {
-    const { xml, warnings } = convertQti3toQti21(qti3Choice, { sharedVocabularyStylesheetHref: '../qti3p0.css' });
+    const { xml, warnings } = convertQti3toQti21(qti3Choice, { sharedVocabularyStylesheetHref: '../qti3-shared-vocabulary.css' });
     const $ = load(xml);
-    expect($('stylesheet').attr('href')).toBe('../qti3p0.css');
+    expect($('stylesheet').attr('href')).toBe('../qti3-shared-vocabulary.css');
     expect($('stylesheet').attr('type')).toBe('text/css');
     expect($('stylesheet').next()[0].name).toBe('itemBody');
     expect(warnings.map(w => w.code)).toContain('shared-vocabulary-stylesheet');
@@ -128,7 +128,7 @@ describe('convertQti3toQti21', () => {
     // without qti-* classes there is nothing to style
     const plain = convertQti3toQti21(
       `<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="p" adaptive="false" time-dependent="false"><qti-item-body><p>x</p></qti-item-body></qti-assessment-item>`,
-      { sharedVocabularyStylesheetHref: 'qti3p0.css' }
+      { sharedVocabularyStylesheetHref: 'qti3-shared-vocabulary.css' }
     );
     expect(plain.xml).not.toContain('stylesheet');
   });
@@ -389,7 +389,24 @@ describe('package conversion', () => {
     expect(converted.get('imsmanifest.xml')).toContain('identifier="M2"');
   });
 
-  test('adds qti3p0.css to the package for items that use shared vocabulary classes', async () => {
+  test('the shared vocabulary stylesheet has the 1EdTech utilities, a row-relative grid and no page rules', () => {
+    const css = QTI3_SHARED_VOCABULARY_CSS;
+    // 1EdTech utility classes
+    for (const rule of ['.qti-display-flex {', '.qti-margin-t-4 {', '.qti-align-center {', '.qti-list-style-type-lower-alpha {', '.qti-underline {']) {
+      expect(css, rule).toContain(rule);
+    }
+    // no rules for the page itself
+    expect(css).not.toMatch(/^\s*(body|html)\s*\{/m);
+    expect(css).not.toMatch(/^\s*\.container(-fluid)?\b[^{]*\{/m);
+    // the grid is relative to the row
+    expect(css).toContain('.qti-layout-col6 { width:48.93617021276595%; }');
+    expect(css).not.toMatch(/qti-layout-col\d+\s*\{\s*width:\d+px/);
+    // defaults for the 1EdTech custom properties and the missing-comma fix
+    expect(css).toContain('--table-border-color:');
+    expect(css).toContain('.qti-float-clear-both { clear: both; }');
+  });
+
+  test('adds qti3-shared-vocabulary.css to the package for items that use shared vocabulary classes', async () => {
     const item = (id: string, body: string) =>
       `<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="${id}" adaptive="false" time-dependent="false"><qti-item-body>${body}</qti-item-body></qti-assessment-item>`;
     const files = new Map<string, string>([
@@ -405,25 +422,25 @@ describe('package conversion', () => {
     ]);
 
     const { files: converted } = await convertPackageFilesToQti21(files);
-    expect(converted.get('qti3p0.css')).toBe(QTI3_SHARED_VOCABULARY_CSS);
-    expect(load(converted.get('items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3p0.css');
+    expect(converted.get('qti3-shared-vocabulary.css')).toBe(QTI3_SHARED_VOCABULARY_CSS);
+    expect(load(converted.get('items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3-shared-vocabulary.css');
     expect(converted.get('items/b.xml')).not.toContain('stylesheet');
     const $manifest = load(converted.get('imsmanifest.xml') as string);
-    const css = $manifest('resource[href="qti3p0.css"]');
+    const css = $manifest('resource[href="qti3-shared-vocabulary.css"]');
     expect(css.attr('type')).toBe('webcontent');
-    expect(css.find('file').attr('href')).toBe('qti3p0.css');
+    expect(css.find('file').attr('href')).toBe('qti3-shared-vocabulary.css');
     expect($manifest('resource[identifier="A"] dependency').attr('identifierref')).toBe(css.attr('identifier'));
     expect($manifest('resource[identifier="B"] dependency')).toHaveLength(0);
 
     // the stylesheet goes next to the manifest (the package root), also when that is a folder in the zip
     const nested = new Map([...files].map(([path, content]) => [`pkg/${path}`, content]));
     const { files: nestedConverted } = await convertPackageFilesToQti21(nested);
-    expect(nestedConverted.has('pkg/qti3p0.css')).toBe(true);
-    expect(load(nestedConverted.get('pkg/items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3p0.css');
-    expect(load(nestedConverted.get('pkg/imsmanifest.xml') as string)('resource[href="qti3p0.css"]')).toHaveLength(1);
+    expect(nestedConverted.has('pkg/qti3-shared-vocabulary.css')).toBe(true);
+    expect(load(nestedConverted.get('pkg/items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3-shared-vocabulary.css');
+    expect(load(nestedConverted.get('pkg/imsmanifest.xml') as string)('resource[href="qti3-shared-vocabulary.css"]')).toHaveLength(1);
 
     const { files: withoutCss } = await convertPackageFilesToQti21(files, { injectSharedVocabularyStylesheet: false });
-    expect(withoutCss.has('qti3p0.css')).toBe(false);
+    expect(withoutCss.has('qti3-shared-vocabulary.css')).toBe(false);
     expect(withoutCss.get('items/a.xml')).not.toContain('stylesheet');
   });
 });

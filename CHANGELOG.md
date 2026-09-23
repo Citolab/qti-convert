@@ -4,7 +4,7 @@
 
 ### Added
 
-- **QTI 3 → QTI 2.1: shared vocabulary stylesheet.** Items that use QTI 3 shared vocabulary classes (`qti-layout-row`, `qti-underline`, ...) get a `<stylesheet>` to the 1EdTech `qti3p0.css`, which is added (unmodified) to the package and the manifest, so QTI 2.1 players can style those classes. On by default; `injectSharedVocabularyStylesheet: false` switches it off. For single items use the `sharedVocabularyStylesheetHref` option and `QTI3_SHARED_VOCABULARY_CSS`.
+- **QTI 3 → QTI 2.1: shared vocabulary stylesheet.** Items that use QTI 3 shared vocabulary classes (`qti-layout-row`, `qti-underline`, ...) get a `<stylesheet>` to `qti3-shared-vocabulary.css`, which is added next to the manifest and registered in it, so QTI 2.1 players can style those classes. It contains the 1EdTech `qti3p0.css` utility classes unmodified, with its page-level layout section replaced by a grid sized by the row (not the screen), plus defaults for its CSS variables and a fix for its missing-comma `qti-float-clear-*` rules. On by default; `injectSharedVocabularyStylesheet: false` switches it off. For single items use the `sharedVocabularyStylesheetHref` option and `QTI3_SHARED_VOCABULARY_CSS`.
 
 ## 0.7.0
 

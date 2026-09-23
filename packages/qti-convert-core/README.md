@@ -53,7 +53,7 @@ import { convertQti3toQti21, convertPackageToQti21 } from '@citolab/qti-convert/
 
 const { xml, warnings } = convertQti3toQti21(qti3Xml);
 // Packages: shared stimuli are inlined into the items that reference them, and items using QTI 3 shared
-// vocabulary classes (qti-layout-row, ...) get the 1EdTech qti3p0.css stylesheet (added to the package)
+// vocabulary classes (qti-layout-row, ...) get a stylesheet for those classes (added to the package)
 const { zip } = await convertPackageToQti21(qti3ZipBytes); // or (file, 'blob') in the browser
 ```
 
