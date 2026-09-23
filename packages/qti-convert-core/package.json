@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-convert",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "QTI converter - Core functionality",
   "type": "module",
   "license": "Apache-2.0",
