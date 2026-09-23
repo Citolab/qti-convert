@@ -1,6 +1,6 @@
 import { qtiTransform } from '../../qti-transformer';
 import { convertManifestFile, convertPackageStream, convertQti2toQti3 } from '../index';
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import * as xml2js from 'xml2js';
 import { createReadStream, writeFile } from 'fs';
 import unzipper from 'unzipper';
@@ -268,4 +268,69 @@ test('convertPackageStreamToQti21 streams a QTI 3 zip to a QTI 2.1 zip', async (
   const result = await JSZip.loadAsync(Buffer.concat(chunks));
   expect(warnings).toEqual([]);
   expect(await result.file('item.xml')!.async('string')).toContain('<assessmentItem');
+});
+
+describe('shared stimulus extraction during the QTI 2 to 3 package conversion', async () => {
+  const JSZip = (await import('jszip')).default;
+  const passage =
+    '<p>Dit is een lange leestekst die in beide items staat. Hij gaat over het weer in Nederland, dat vaak wisselvallig is: zon, regen en wind op een dag. Neem dus altijd een jas mee.</p>';
+  const qti2Item = (id: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" identifier="${id}" title="${id}" adaptive="false" timeDependent="false">
+  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier"/>
+  <itemBody>${passage}<choiceInteraction responseIdentifier="RESPONSE" maxChoices="1"><simpleChoice identifier="A">A</simpleChoice></choiceInteraction></itemBody>
+</assessmentItem>`;
+  const zipBytes = async () => {
+    const zip = new JSZip();
+    zip.file(
+      'imsmanifest.xml',
+      `<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" identifier="M"><resources>
+        <resource identifier="I1" type="imsqti_item_xmlv2p1" href="I1.xml"><file href="I1.xml"/></resource>
+        <resource identifier="I2" type="imsqti_item_xmlv2p1" href="I2.xml"><file href="I2.xml"/></resource>
+      </resources></manifest>`
+    );
+    zip.file('I1.xml', qti2Item('I1'));
+    zip.file('I2.xml', qti2Item('I2'));
+    return zip.generateAsync({ type: 'nodebuffer' });
+  };
+  const assertExtracted = async (output: Buffer | Blob | Uint8Array) => {
+    // JSZip can't read a Node Blob directly
+    const result = await JSZip.loadAsync(output instanceof Blob ? new Uint8Array(await output.arrayBuffer()) : output);
+    const stimulusPath = Object.keys(result.files).find(name => name.startsWith('stimuli/') && !result.files[name].dir);
+    expect(stimulusPath).toMatch(/^stimuli\/STIM_\w+\.xml$/);
+    expect(await result.file(stimulusPath!)!.async('string')).toContain('Dit is een lange leestekst');
+    for (const item of ['I1.xml', 'I2.xml']) {
+      const xml = await result.file(item)!.async('string');
+      const $ = cheerio.load(xml, { xml: true });
+      expect($('qti-assessment-stimulus-ref').attr('href')).toBe(stimulusPath);
+      expect($('qti-item-body').text()).not.toContain('Dit is een lange leestekst');
+    }
+    expect(await result.file('imsmanifest.xml')!.async('string')).toContain('imsqti_stimulus_xmlv3p0');
+  };
+
+  test('node: convertPackageStream with extractSharedStimuli', async () => {
+    const { Readable } = await import('stream');
+    const unzipStream = Readable.from([await zipBytes()]).pipe(unzipper.Parse({ forceStream: true }));
+    const reports: unknown[] = [];
+    const output = await convertPackageStream(unzipStream, undefined, undefined, undefined, undefined, {
+      extractSharedStimuli: true,
+      onSharedStimuliReport: report => reports.push(report)
+    });
+    await assertExtracted(output);
+    expect(reports).toHaveLength(1);
+  });
+
+  test('node: off by default', async () => {
+    const { Readable } = await import('stream');
+    const unzipStream = Readable.from([await zipBytes()]).pipe(unzipper.Parse({ forceStream: true }));
+    const result = await JSZip.loadAsync(await convertPackageStream(unzipStream));
+    expect(Object.keys(result.files).some(name => name.startsWith('stimuli/'))).toBe(false);
+  });
+
+  test('browser: convertPackage with extractSharedStimuli', async () => {
+    const { convertPackage } = await import('../../qti-converter/converter/converter');
+    const output = await convertPackage(await zipBytes(), undefined, undefined, undefined, undefined, {
+      extractSharedStimuli: true
+    });
+    await assertExtracted(output);
+  });
 });

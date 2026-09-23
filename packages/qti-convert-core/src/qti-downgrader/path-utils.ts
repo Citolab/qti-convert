@@ -22,6 +22,15 @@ export const dirname = (path: string) => {
 
 export const joinPath = (base: string, relative: string) => (base ? normalizePath(`${base}/${relative}`) : relative);
 
+/** Path of `target` relative to the directory `fromDir` (both package-relative). */
+export const relativePath = (fromDir: string, target: string) => {
+  const from = normalizePath(fromDir).split('/').filter(Boolean);
+  const to = normalizePath(target).split('/').filter(Boolean);
+  let common = 0;
+  while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
+  return [...from.slice(common).map(() => '..'), ...to.slice(common)].join('/');
+};
+
 const MIME_TYPES: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',

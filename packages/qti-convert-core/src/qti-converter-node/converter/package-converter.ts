@@ -7,6 +7,7 @@ import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readd
 import { qtiTransform } from '../../qti-transformer';
 import { cleanXMLString, postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from '../../qti-helper';
 import { convertPackageToQti21, type Qti21PackageOptions } from '../../qti-downgrader';
+import { extractSharedStimuliIfEnabled, type SharedStimuliPackageOptions } from '../../qti-upgrader';
 
 const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
   $('*')
@@ -333,12 +334,16 @@ export async function convertPackageStream(
   convertItem?: ($item: cheerio.CheerioAPI) => Promise<cheerio.CheerioAPI>,
   postProcessing?: (
     files: { path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]
-  ) => Promise<{ path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]>
+  ) => Promise<{ path: string; content: string; type: 'test' | 'item' | 'manifest' | 'other' }[]>,
+  options: SharedStimuliPackageOptions = {}
 ): Promise<Buffer> {
   // Process files using shared logic
   const processedFiles = await processPackageFiles(unzipStream, convertManifest, convertAssessment, convertItem);
   // Apply post-processing using shared logic
-  const updatedFiles = await postProcessPackageFilesSyncAssessmentItemAndItemRefIds(processedFiles);
+  const updatedFiles = extractSharedStimuliIfEnabled(
+    await postProcessPackageFilesSyncAssessmentItemAndItemRefIds(processedFiles),
+    options
+  );
 
   // If custom post-processing is provided, apply it
   if (postProcessing) {
@@ -620,9 +625,13 @@ export async function convertPackageFolder(
 }
 
 // Function to read a local file and convert it
-export async function convertPackageFile(localFilePath: string, outputZipFilePath: string): Promise<void> {
+export async function convertPackageFile(
+  localFilePath: string,
+  outputZipFilePath: string,
+  options: SharedStimuliPackageOptions = {}
+): Promise<void> {
   const unzipStream = createReadStream(localFilePath).pipe(unzipper.Parse({ forceStream: true }));
-  const buffer = await convertPackageStream(unzipStream);
+  const buffer = await convertPackageStream(unzipStream, undefined, undefined, undefined, undefined, options);
   writeFileSync(outputZipFilePath, buffer);
 }
 

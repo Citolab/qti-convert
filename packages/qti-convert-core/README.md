@@ -35,7 +35,16 @@ Convert a local package file in Node.js:
 import { convertPackageFile } from '@citolab/qti-convert/qti-convert-node';
 
 await convertPackageFile('input.zip', 'output.zip');
+
+// Optionally move content that several items share (e.g. a reading passage) into shared stimuli.
+// Only identical content is extracted; similar content is reported in nearDuplicates.
+await convertPackageFile('input.zip', 'output.zip', {
+  extractSharedStimuli: true, // or { minTextLength, similarityThreshold, stimulusFolder }
+  onSharedStimuliReport: report => console.log(report.stimuli, report.nearDuplicates)
+});
 ```
+
+In the browser `convertPackage(file, convertManifest, convertAssessment, convertItem, postProcessing, options)` takes the same options, and `extractSharedStimuli(files)` can be used on any map of converted QTI 3 package files.
 
 Convert QTI 3 back to QTI 2.1 (best-effort; anything without a 2.1 equivalent is reported in `warnings`):
 

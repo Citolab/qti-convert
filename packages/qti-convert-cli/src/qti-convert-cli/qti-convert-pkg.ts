@@ -3,14 +3,26 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { convertPackageFile } from '@citolab/qti-convert/qti-convert-node';
+import { convertPackageFile, type SharedStimuliReport } from '@citolab/qti-convert/qti-convert-node';
 
-const inputPath = process.argv[2];
+const args = process.argv.slice(2);
+const inputPath = args.find(arg => !arg.startsWith('--'));
+const extractSharedStimuli = args.includes('--extract-stimuli');
 
 if (!inputPath) {
-  console.error('Please provide a .zip file path or a folder containing .zip files as an argument.');
+  console.error('Usage: qti-convert-pkg <zip|folder-with-zips> [--extract-stimuli]');
   process.exit(1);
 }
+
+const printReport = (report: SharedStimuliReport) => {
+  for (const stimulus of report.stimuli) {
+    console.log(`  shared stimulus ${stimulus.path} ("${stimulus.title}") used by: ${stimulus.items.join(', ')}`);
+  }
+  for (const duplicate of report.nearDuplicates) {
+    console.log(`  similar but not identical (${duplicate.similarity}), not extracted: ${duplicate.items.join(' <> ')}`);
+  }
+};
+const options = { extractSharedStimuli, onSharedStimuliReport: printReport };
 
 try {
   if (!existsSync(inputPath)) {
@@ -38,7 +50,7 @@ try {
     for (const zipFileName of zipFiles) {
       const inputZipPath = path.join(inputFolder, zipFileName);
       const outputZipPath = path.join(outputFolder, zipFileName.replace(/\.zip$/i, '-qti3.zip'));
-      await convertPackageFile(inputZipPath, outputZipPath);
+      await convertPackageFile(inputZipPath, outputZipPath, options);
       console.log(`Successfully converted: ${outputZipPath}`);
     }
 
@@ -49,7 +61,7 @@ try {
     }
 
     const outputFileName = inputPath.replace(/\.zip$/i, '-qti3.zip');
-    await convertPackageFile(inputPath, outputFileName);
+    await convertPackageFile(inputPath, outputFileName, options);
     console.log('Successfully converted the package: ' + outputFileName + '.');
   }
 } catch (error) {

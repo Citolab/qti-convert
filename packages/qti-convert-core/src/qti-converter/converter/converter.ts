@@ -2,7 +2,12 @@ import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import { postProcessPackageFilesSyncAssessmentItemAndItemRefIds } from '../../qti-helper';
 import { qtiTransform } from '../../qti-transformer';
-import { upgradeQti2toQti3 } from '../../qti-upgrader';
+import {
+  extractSharedStimuliIfEnabled,
+  type SharedStimuliPackageOptions,
+  type SharedStimulusPackageFiles,
+  upgradeQti2toQti3
+} from '../../qti-upgrader';
 
 const hasElementLocalName = ($: cheerio.CheerioAPI, localName: string): boolean =>
   $('*')
@@ -118,6 +123,7 @@ export function cleanXMLString(xmlString: string): string {
  * @param {Function} convertAssessment - Optional function to convert assessment files
  * @param {Function} convertItem - Optional function to convert item files
  * @param {Function} postProcessing - Optional function for post-processing
+ * @param {SharedStimuliPackageOptions} options - Optional: extract content shared by items into shared stimuli
  * @returns {Promise<Blob>} A blob containing the converted zip file
  */
 export async function convertPackage(
@@ -181,7 +187,8 @@ export async function convertPackage(
       }
       return originalFile;
     });
-  }
+  },
+  options: SharedStimuliPackageOptions = {}
 ) {
   // Load the file into JSZip
   const zip = await JSZip.loadAsync(file);
@@ -249,7 +256,15 @@ export async function convertPackage(
   }
 
   // Apply post-processing (includes identifier sync by default)
-  const finalFiles = await postProcessing(processedFiles);
+  const postProcessedFiles = await postProcessing(processedFiles);
+  const finalFiles = options.extractSharedStimuli
+    ? [
+        ...extractSharedStimuliIfEnabled(
+          new Map(postProcessedFiles.map(({ path, content, type }) => [path, { content, type }])) as SharedStimulusPackageFiles,
+          options
+        )
+      ].map(([path, file]) => ({ path, ...file }))
+    : postProcessedFiles;
 
   // Add all processed files to the new zip
   for (const file of finalFiles) {

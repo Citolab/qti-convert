@@ -16,6 +16,12 @@ Convert a zip package:
 npx --package=@citolab/qti-convert-cli qti-convert-pkg yourpackage.zip
 ```
 
+Move content that several items share (e.g. a reading passage) into shared stimuli while converting:
+
+```sh
+npx --package=@citolab/qti-convert-cli qti-convert-pkg yourpackage.zip --extract-stimuli
+```
+
 Convert all zip packages in a folder:
 
 ```sh

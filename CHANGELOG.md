@@ -6,6 +6,10 @@
 
 - **QTI 3 → QTI 2.1 conversion** (`@citolab/qti-convert/qti-downgrader`, `qti-convert-pkg-qti21` CLI). Best-effort: shared stimuli are inlined, HTML5 media become `<object>`, and constructs without a 2.1 equivalent are reported as warnings.
 
+- **Shared stimulus extraction** in the QTI 2 → 3 package conversion (opt-in: `extractSharedStimuli` option, `qti-convert-pkg --extract-stimuli`). Content that is identical in two or more items (e.g. a reading passage, also a column of a `qti-layout-row`) is moved into a `qti-assessment-stimulus`, referenced from the items and registered in the manifest. Similar but not identical content is only reported.
+- QTI 2.1 and QTI 3 output is validated against the official IMS XSDs in the tests (when `xmllint` is available).
+- `qti-rubric-block` gets the `use` attribute QTI 3 requires.
+
 ### Changed
 
 - **QTI 2 → QTI 3 conversion no longer uses XSLT/Saxon-JS.** `convertQti2toQti3` now runs a TypeScript port of `qti2xTo30.xsl` (also exported as the synchronous `upgradeQti2toQti3`), checked against the XSLT's output for a set of QTI 2 fixtures. It works the same in Node and the browser; no stylesheet or Saxon runtime has to be loaded. Beyond the XSLT it also converts `stimulusBody`, `durationLT`/`durationGTE`, `outcomeElseIf`, `exitTest`, `testFeedback`, `templateDefault`, `variableMapping` and prefixed QTI 2 elements, keeps inline SVG in its namespace, and no longer duplicates the children of video objects.
