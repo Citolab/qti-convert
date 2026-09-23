@@ -34,7 +34,12 @@ export const HTML5_TO_HTML4: Record<string, string> = {
   header: 'div',
   mark: 'span',
   nav: 'div',
-  section: 'div'
+  section: 'div',
+  bdo: 'span',
+  ruby: 'span',
+  rb: 'span',
+  rt: 'span',
+  rp: 'span'
 };
 
 /** Attributes added in QTI 3.0 (or 2.2) that have no QTI 2.1 equivalent, per QTI 3 element name. */
@@ -52,6 +57,8 @@ export const GRAPHIC_INTERACTIONS = new Set([
   'qti-graphic-associate-interaction',
   'qti-graphic-gap-match-interaction',
   'qti-position-object-stage',
+  'qti-position-object-interaction',
+  'qti-drawing-interaction',
   'qti-gap-img'
 ]);
 

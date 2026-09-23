@@ -4,7 +4,7 @@
 
 ### Added
 
-- **QTI 3 → QTI 2.1 conversion** (`@citolab/qti-convert/qti-downgrader`, `qti-convert-pkg-qti21` CLI). Best-effort: shared stimuli are inlined, HTML5 media become `<object>`, and constructs without a 2.1 equivalent are reported as warnings.
+- **QTI 3 → QTI 2.1 conversion** (`@citolab/qti-convert/qti-downgrader`, `qti-convert-pkg-qti21` CLI). Best-effort: shared stimuli are inlined, HTML5 media become `<object>`, image-only gap texts become `gapImg`, `aria-*`/`role`/`dir` are removed, and constructs without a 2.1 equivalent are reported as warnings. Output is validated against the QTI 2.1 XSD.
 
 - **Shared stimulus extraction** in the QTI 2 → 3 package conversion (opt-in: `extractSharedStimuli` option, `qti-convert-pkg --extract-stimuli`). Content that is identical in two or more items (e.g. a reading passage, also a column of a `qti-layout-row`) is moved into a `qti-assessment-stimulus`, referenced from the items and registered in the manifest. Similar but not identical content is only reported.
 - QTI 2.1 and QTI 3 output is validated against the official IMS XSDs in the tests (when `xmllint` is available).

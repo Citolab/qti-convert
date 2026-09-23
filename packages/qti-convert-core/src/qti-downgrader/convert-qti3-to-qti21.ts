@@ -28,7 +28,9 @@ export type Qti21WarningCode =
   | 'img-to-object'
   | 'html5-element'
   | 'pci'
-  | 'shared-vocabulary-classes';
+  | 'shared-vocabulary-classes'
+  | 'accessibility-attributes-removed'
+  | 'gap-text-to-gap-img';
 
 export interface Qti21Warning {
   code: Qti21WarningCode;
@@ -194,6 +196,24 @@ const convertGraphicImagesToObject = ($: cheerio.CheerioAPI, warnings: WarningCo
   }
 };
 
+/** A qti-gap-text with only an image becomes a gapImg: QTI 2.1 gapText can only contain text. */
+const convertImageGapTextsToGapImg = ($: cheerio.CheerioAPI, warnings: WarningCollector) => {
+  $('qti-gap-text').each((_, gapText: Element) => {
+    const $gapText = $(gapText);
+    const children = $gapText.children();
+    if (children.length !== 1 || children[0].name !== 'img' || $gapText.text().trim()) return;
+    const img = children[0] as Element;
+    const { src, alt, width, height, id, class: className } = img.attribs;
+    const attrs = Object.entries(gapText.attribs)
+      .map(([name, value]) => ` ${name}="${value.replace(/"/g, '&quot;')}"`)
+      .join('');
+    $gapText.replaceWith(
+      `<qti-gap-img${attrs}>${guessedObject(src || '', undefined, { width, height, id, class: className }, alt || '')}</qti-gap-img>`
+    );
+    warnings.add('gap-text-to-gap-img', 'A gap text with only an image was converted to gapImg, as QTI 2.1 requires.');
+  });
+};
+
 /** qti-portable-custom-interaction -> customInteraction wrapping the PCI markup in the PCI namespace. */
 const convertPci = ($: cheerio.CheerioAPI, warnings: WarningCollector) => {
   $('qti-portable-custom-interaction').each((_, el: Element) => {
@@ -247,7 +267,11 @@ const renameTree = ($: cheerio.CheerioAPI, el: Element, warnings: WarningCollect
       stats.dataAttrs++;
       continue;
     }
-    if (!qti21Name || name.startsWith('aria-') || name.startsWith('xmlns')) {
+    if (name.startsWith('aria-') || name === 'role' || name === 'dir') {
+      warnings.add('accessibility-attributes-removed', 'aria-*, role and dir attributes are not allowed in QTI 2.1 and were removed.');
+      continue;
+    }
+    if (!qti21Name || name.startsWith('xmlns')) {
       newAttribs[name] = value;
       continue;
     }
@@ -314,6 +338,7 @@ export const convertQti3toQti21 = (xml: string, options: ConvertQti3toQti21Optio
   convertPci($, warnings);
   convertMediaToObject($, warnings);
   convertGraphicImagesToObject($, warnings);
+  convertImageGapTextsToGapImg($, warnings);
   $('wbr, track, picture > source').remove();
   $('picture').each((_, el: Element) => unwrap($, el));
   stripSsml($, warnings);

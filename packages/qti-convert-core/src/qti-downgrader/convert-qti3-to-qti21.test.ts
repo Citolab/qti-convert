@@ -82,14 +82,32 @@ describe('convertQti3toQti21', () => {
     );
   });
 
-  test('unwraps qti-content-body, strips data-* but keeps aria-* and MathML untouched', () => {
-    const $ = load(convertQti3toQti21(qti3Choice).xml);
+  test('unwraps qti-content-body, strips data-* and aria-*, keeps MathML untouched', () => {
+    const { xml, warnings } = convertQti3toQti21(qti3Choice);
+    const $ = load(xml);
     expect($('modalFeedback > p').text()).toBe('Well done');
     expect($('modalFeedback').attr('showHide')).toBe('show');
     expect($('[data-foo]')).toHaveLength(0);
     expect($('[dataMaxSelectionsMessage]')).toHaveLength(0);
-    expect($('div').attr('aria-label')).toBe('row');
+    // QTI 2.1 has no aria-*, role or dir
+    expect($('div').attr('aria-label')).toBeUndefined();
+    expect(warnings.map(w => w.code)).toContain('accessibility-attributes-removed');
     expect($('mi').attr('mathvariant')).toBe('bold');
+  });
+
+  test('converts an image-only gap text to gapImg', () => {
+    const { xml, warnings } = convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="g" adaptive="false" time-dependent="false">
+      <qti-item-body><qti-gap-match-interaction response-identifier="RESPONSE">
+        <qti-gap-text identifier="W1" match-max="1"><img src="a.png" alt="A"/></qti-gap-text>
+        <qti-gap-text identifier="W2" match-max="1">text</qti-gap-text>
+        <p>A <qti-gap identifier="G1"/></p>
+      </qti-gap-match-interaction></qti-item-body></qti-assessment-item>`);
+    const $ = load(xml);
+    expect($('gapImg').attr('identifier')).toBe('W1');
+    expect($('gapImg').attr('matchMax')).toBe('1');
+    expect($('gapImg > object').attr('data')).toBe('a.png');
+    expect($('gapText').text()).toBe('text');
+    expect(warnings.map(w => w.code)).toContain('gap-text-to-gap-img');
   });
 
   test('maps irregular operator names', () => {
