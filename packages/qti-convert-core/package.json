@@ -42,6 +42,10 @@
     "./qti-downgrader": {
       "types": "./dist/qti-downgrader/index.d.ts",
       "default": "./dist/qti-downgrader/index.js"
+    },
+    "./qti-references": {
+      "types": "./dist/qti-references/index.d.ts",
+      "default": "./dist/qti-references/index.js"
     }
   },
   "files": [

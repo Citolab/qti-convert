@@ -17,6 +17,7 @@ npm install @citolab/qti-convert
 - `@citolab/qti-convert/qti-helper`
 - `@citolab/qti-convert/qti-helper-node`
 - `@citolab/qti-convert/qti-downgrader` (QTI 3 → QTI 2.1)
+- `@citolab/qti-convert/qti-references` (repair broken file references in a QTI 2.x or 3 package)
 
 ## Examples
 
@@ -56,6 +57,32 @@ const { xml, warnings } = convertQti3toQti21(qti3Xml);
 // vocabulary classes (qti-layout-row, ...) get a stylesheet for those classes (added to the package)
 const { zip } = await convertPackageToQti21(qti3ZipBytes); // or (file, 'blob') in the browser
 ```
+
+Repair broken file references in a package (QTI 2.x or 3), for example `src="mediafiles/a.png"` in
+`questions/q1.xml`, which is relative to the package root instead of to the item. It's a separate step: run it before
+or after a conversion.
+
+```ts
+import { fixPackageReferences, fixPackageReferencesZip } from '@citolab/qti-convert/qti-references';
+
+const { zip, fixed, unresolved } = await fixPackageReferencesZip(zipBytes); // or (file, 'blob') in the browser
+const result = fixPackageReferences(files); // Map<path, string | Uint8Array>
+```
+
+Every reference in the items, tests and stimuli (`src`, `href`, `data`, `poster`, `template-location`, `primary-path`,
+... see `REFERENCE_ATTRIBUTES`) is resolved in this order:
+
+1. relative to its own file, as the specs require (a reference that only differs in case is corrected: `case`);
+2. relative to the package root, the folder of `imsmanifest.xml`, which also covers paths starting with `/`
+   (`package-root`);
+3. by file name anywhere in the package (`file-name`). When several files have that name, the one whose folders match
+   the reference best wins; a tie is reported with the candidates. `searchByFileName: false` switches this off.
+
+A reference found in step 2 or 3 is rewritten relative to its own file (`../mediafiles/a.png`), keeping query strings,
+fragments and URL encoding. Only those attribute values change; the rest of each file stays byte-for-byte the same, and
+running it again changes nothing. References that aren't found are left as they are and returned in `unresolved`. The
+Python package [`qti-convert`](https://pypi.org/project/qti-convert/) has the same function (`fix_package_references`),
+with the same results.
 
 Transform QTI XML:
 

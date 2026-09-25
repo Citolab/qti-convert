@@ -4,6 +4,7 @@ export default defineConfig({
   entry: [
     'src/qti-convert-cli/qti-convert-pkg.ts',
     'src/qti-convert-cli/qti-convert-pkg-qti21.ts',
+    'src/qti-convert-cli/qti-fix-references-pkg.ts',
     'src/qti-convert-cli/qti-convert-folder.ts',
     'src/qti-convert-cli/qti-package-manifest.ts',
     'src/qti-convert-cli/qti-package-assessment.ts',

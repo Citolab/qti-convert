@@ -34,6 +34,13 @@ Convert a QTI 3 zip package (or a folder with zips) back to QTI 2.1:
 npx --package=@citolab/qti-convert-cli qti-convert-pkg-qti21 yourpackage.zip
 ```
 
+Repair broken file references (images, stylesheets, templates, ...) in a QTI 2.x or 3 zip package (or a folder with
+zips); writes `yourpackage-fixed.zip` and lists what was fixed and what wasn't found:
+
+```sh
+npx --package=@citolab/qti-convert-cli qti-fix-references-pkg yourpackage.zip
+```
+
 Convert a folder:
 
 ```sh

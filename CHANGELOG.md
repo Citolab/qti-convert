@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Repair broken file references in a package** (`@citolab/qti-convert/qti-references`: `fixPackageReferences(files)`, `fixPackageReferencesZip(zip)`; `qti-fix-references-pkg` CLI). A separate step for QTI 2.x and 3 packages, not part of the conversion. Every reference in the items, tests and stimuli (`src`, `href`, `data`, `poster`, `template-location`, `primary-path`, ...) is resolved relative to its file; if that fails, relative to the package root (the folder of `imsmanifest.xml`, also for paths starting with `/`); and if that fails, by file name anywhere in the package. The ones found the second or third way are rewritten relative to their file, and only those attribute values change. References that can't be found are reported. The Python package `qti-convert` has the same function.
+
 ## 0.7.1
 
 ### Changed

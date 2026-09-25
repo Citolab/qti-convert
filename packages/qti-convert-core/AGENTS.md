@@ -13,6 +13,7 @@ Exports of interest:
 - `qti-helper`
 - `qti-helper-node`
 - `qti-downgrader` (QTI 3 → 2.1, cheerio only, shared by node and browser)
+- `qti-references` (repair broken file references in QTI 2.x/3 packages; the Python port `qti-convert` on PyPI has the same function, keep them in sync)
 
 ## Core principle: keep this layer generic
 

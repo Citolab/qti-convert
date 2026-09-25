@@ -17,6 +17,7 @@
   "bin": {
     "qti-convert-pkg": "./dist/qti-convert-pkg.mjs",
     "qti-convert-pkg-qti21": "./dist/qti-convert-pkg-qti21.mjs",
+    "qti-fix-references-pkg": "./dist/qti-fix-references-pkg.mjs",
     "qti-convert-folder": "./dist/qti-convert-folder.mjs",
     "qti-create-manifest": "./dist/qti-package-manifest.mjs",
     "qti-create-assessment": "./dist/qti-package-assessment.mjs",
