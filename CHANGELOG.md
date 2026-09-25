@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
 
 ### Added
 
-- **Repair broken file references in a package** (`@citolab/qti-convert/qti-references`: `fixPackageReferences(files)`, `fixPackageReferencesZip(zip)`; `qti-fix-references-pkg` CLI). A separate step for QTI 2.x and 3 packages, not part of the conversion. Every reference in the items, tests and stimuli (`src`, `href`, `data`, `poster`, `template-location`, `primary-path`, ...) is resolved relative to its file; if that fails, relative to the package root (the folder of `imsmanifest.xml`, also for paths starting with `/`); and if that fails, by file name anywhere in the package. The ones found the second or third way are rewritten relative to their file, and only those attribute values change. References that can't be found are reported. The Python package `qti-convert` has the same function.
+- **Repair broken file references in a package** (`@citolab/qti-convert/qti-references`: `fixPackageReferences(files)`, `fixPackageReferencesZip(zip)`; `qti-fix-references-pkg` CLI). A separate step for QTI 2.x and 3 packages, not part of the conversion. Every reference in the items, tests and stimuli (`src`, `href`, `data`, `poster`, `template-location`, `primary-path`, ...) is resolved relative to its file; if that fails, relative to the package root (the folder of `imsmanifest.xml`, also for paths starting with `/`); and if that fails, by file name anywhere in the package. The ones found the second or third way are rewritten relative to their file, and only those attribute values change. References that can't be found are reported. The Python package `citolab-qti-convert` (0.2.0) has the same function, with the same results.
+- **`PackageReferenceResolver`** (`@citolab/qti-convert/qti-references`): the same resolving for code that reads a package file by file. It needs only the file paths of the package (e.g. the entries of a zip), not their contents, and a resolved target is always a path in the package.
 
 ## 0.7.1
 

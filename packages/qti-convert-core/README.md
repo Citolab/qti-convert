@@ -81,8 +81,20 @@ Every reference in the items, tests and stimuli (`src`, `href`, `data`, `poster`
 A reference found in step 2 or 3 is rewritten relative to its own file (`../mediafiles/a.png`), keeping query strings,
 fragments and URL encoding. Only those attribute values change; the rest of each file stays byte-for-byte the same, and
 running it again changes nothing. References that aren't found are left as they are and returned in `unresolved`. The
-Python package [`qti-convert`](https://pypi.org/project/qti-convert/) has the same function (`fix_package_references`),
-with the same results.
+Python package [`citolab-qti-convert`](https://pypi.org/project/citolab-qti-convert/) has the same function
+(`fix_package_references`), with the same results.
+
+To resolve references while reading a package file by file, without loading it whole, use `PackageReferenceResolver`.
+It needs only the file paths:
+
+```ts
+import { PackageReferenceResolver } from '@citolab/qti-convert/qti-references';
+
+const resolver = new PackageReferenceResolver(Object.keys(zip.files)); // rootDir: the folder of imsmanifest.xml
+const resolution = resolver.resolve('questions/q1.xml', 'mediafiles/a.png', 'src');
+// { target: 'mediafiles/a.png', method: 'package-root', newValue: '../mediafiles/a.png', candidates: [] }
+// undefined for values that aren't a file in the package (URLs, data: URIs, fragments)
+```
 
 Transform QTI XML:
 

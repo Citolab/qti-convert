@@ -1,6 +1,6 @@
 {
   "name": "@citolab/qti-convert-cli",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "QTI converter - Command Line Tools",
   "type": "module",
   "license": "GPL-3.0-only",
@@ -32,8 +32,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@citolab/qti-convert": "^0.7.1",
-    "@citolab/qti-convert-export": "^0.7.1"
+    "@citolab/qti-convert": "^0.8.0",
+    "@citolab/qti-convert-export": "^0.8.0"
   },
   "devDependencies": {
     "tsup": "^8.5.1",

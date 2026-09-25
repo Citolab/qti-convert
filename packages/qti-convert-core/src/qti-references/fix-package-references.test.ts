@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import JSZip from 'jszip';
 import { describe, expect, test } from 'vitest';
-import { fixPackageReferences, fixPackageReferencesZip } from './index';
+import { fixPackageReferences, fixPackageReferencesZip, PackageReferenceResolver } from './index';
 
 const QTI2 = 'http://www.imsglobal.org/xsd/imsqti_v2p1';
 const QTI3 = 'http://www.imsglobal.org/xsd/imsqtiasi_v3p0';
@@ -152,5 +152,48 @@ describe('fixPackageReferences', () => {
     expect(unresolved).toEqual([]);
     const result = await JSZip.loadAsync(output);
     expect(await result.file('questions/q1.xml')!.async('string')).toContain('src="../mediafiles/a.png"');
+  });
+
+  test('the resolver works with only the paths of a zip', async () => {
+    const zip = new JSZip();
+    for (const [path, content] of pkg(qti2Item('<img src="mediafiles/a.png"/>'))) zip.file(path, content);
+    const loaded = await JSZip.loadAsync(await zip.generateAsync({ type: 'uint8array' }));
+    const resolver = new PackageReferenceResolver(Object.keys(loaded.files));
+    expect(resolver.rootDir).toBe('');
+    expect(resolver.resolve('questions/q1.xml', 'mediafiles/a.png', 'src')).toEqual({
+      target: 'mediafiles/a.png',
+      method: 'package-root',
+      newValue: '../mediafiles/a.png',
+      candidates: []
+    });
+    expect(resolver.resolve('questions/q1.xml', '../mediafiles/a.png', 'src')).toEqual({
+      target: 'mediafiles/a.png',
+      method: '',
+      candidates: []
+    });
+    expect(resolver.resolve('questions/q1.xml', '/templates/rp.xml')?.newValue).toBe('../templates/rp.xml');
+  });
+
+  test('the resolver skips what is not a file reference and stays inside the package', () => {
+    const resolver = new PackageReferenceResolver([
+      'pkg/imsmanifest.xml',
+      'pkg/items/q1.xml',
+      'pkg/img/a.png',
+      'pkg/img/'
+    ]);
+    expect(resolver.rootDir).toBe('pkg');
+    for (const value of ['https://example.com/a.png', 'data:image/png;base64,AAAA', '#part', '', '  ']) {
+      expect(resolver.resolve('pkg/items/q1.xml', value, 'src')).toBeUndefined();
+    }
+    expect(resolver.resolve('pkg/items/q1.xml', 'true', 'value')).toBeUndefined();
+    expect(resolver.resolve('pkg/items/q1.xml', '../../../etc/passwd', 'src')).toEqual({ method: '', candidates: [] });
+    expect(resolver.resolve('pkg/items/q1.xml', '../../img/a.png')?.target).toBe('pkg/img/a.png');
+    expect(new PackageReferenceResolver(['b/x.png', 'a/x.png']).resolve('q.xml', 'x.png')?.candidates).toEqual([
+      'a/x.png',
+      'b/x.png'
+    ]);
+    expect(
+      new PackageReferenceResolver(['img/a.png'], { searchByFileName: false }).resolve('q/q.xml', 'a.png')?.target
+    ).toBeUndefined();
   });
 });
