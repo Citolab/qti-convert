@@ -11,6 +11,9 @@ export const depConvert = ($: cheerio.CheerioAPI) => {
       // Check if this trigger has already been processed
       const parentIsButton = $(dialogTrigger).parent().is('button');
       if (!parentIsButton) {
+        // data-stimulus-idref is also the shared-stimulus hook of qti-components, which empties
+        // every element carrying it; the button's popovertarget takes over the reference.
+        $(dialogTrigger).removeAttr('data-stimulus-idref');
         // wrap ref in button
         const triggerContent = $.html(dialogTrigger);
         const button = $(`<button popovertarget="${ref}">${triggerContent}</button>`);

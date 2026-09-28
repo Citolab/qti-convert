@@ -59,6 +59,8 @@ test('convert dep dialog to html popover', async () => {
 
   expect(triggerParent.is('button')).toEqual(true);
   expect(triggerParent.attr('popovertarget')).toEqual(id);
+  // qti-components empties every [data-stimulus-idref], which would wipe the trigger content
+  expect($newQti('.dep-dialogTrigger').attr('data-stimulus-idref')).toBeUndefined();
 
   const dialog = $newQti(`#${id}[popover]`);
   expect(dialog).length(1);

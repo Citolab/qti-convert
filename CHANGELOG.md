@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+### Fixed
+
+- **DEP dialogs: the trigger no longer disappears** (`depConvertExtended`, `depConvert`). The `dep-dialogTrigger` kept its `data-stimulus-idref`, which is also the shared-stimulus hook of qti-components: it empties every element with that attribute, so the thumbnail that opens the popup was wiped before it was shown. The attribute is now removed from the trigger once it is converted.
+- **`depConvertExtended` only sets the `dep-popup` attributes the dialog has.** A missing `data-dep-dialog-modal` became `modal=""`, which `dep-popup` reads as modal, and a missing width or height became `0`.
+
 ## 0.8.0
 
 ### Added

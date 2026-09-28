@@ -1,47 +1,44 @@
 import * as cheerio from 'cheerio';
 
+// Maps the DEP dialog settings onto the matching <dep-popup> attributes.
+const dialogAttributes: [string, string][] = [
+  ['data-dep-dialog-caption', 'caption'],
+  ['data-dep-dialog-width', 'width'],
+  ['data-dep-dialog-height', 'height'],
+  ['data-dep-dialog-resizemode', 'resizemode'],
+  ['data-dep-dialog-modal', 'modal']
+];
+
 export const depConvertExtended = ($: cheerio.CheerioAPI) => {
   // Find all triggers that reference a dialog
   const dialogTriggers = $('.dep-dialogTrigger');
 
   for (const trigger of dialogTriggers) {
-    const ref = $(trigger).attr('data-stimulus-idref');
+    const $trigger = $(trigger);
+    const ref = $trigger.attr('data-stimulus-idref');
     if (!ref) continue;
 
-    const dialog = $(`#${ref}`);
+    const dialog = $(`[id="${ref}"]`);
     if (!dialog.length) continue;
 
-    // Extract attributes from the dialog
-    const caption = dialog.attr('data-dep-dialog-caption') || '';
-    const width = dialog.attr('data-dep-dialog-width') || '';
-    const height = dialog.attr('data-dep-dialog-height') || '';
-    const resizemode = dialog.attr('data-dep-dialog-resizemode') || '';
-    const modal = dialog.attr('data-dep-dialog-modal') || '';
+    // Only copy settings that are present: an empty attribute is not "unset" for dep-popup
+    // (modal="" means modal, width="" becomes 0).
+    const depPopup = $('<dep-popup></dep-popup>');
+    for (const [dialogAttribute, popupAttribute] of dialogAttributes) {
+      const value = dialog.attr(dialogAttribute);
+      if (value) depPopup.attr(popupAttribute, value);
+    }
 
-    // Extract inner HTML
-    const triggerHtml = $.html(trigger);
-    const popupHtml = dialog.html();
+    // data-stimulus-idref is also the shared-stimulus hook of qti-components, which empties every
+    // element carrying it; left on the trigger, the thumbnail would be wiped before it is shown.
+    $trigger.removeAttr('data-stimulus-idref');
 
-    // Create dep-popup element
-    const depPopup = `
-      <dep-popup
-        caption="${caption}"
-        width="${width}"
-        height="${height}"
-        resizemode="${resizemode}"
-        modal="${modal}">
-        ${triggerHtml}
-        <div slot="popup">${popupHtml}</div>
-      </dep-popup>
-    `;
-
-    // Replace the trigger + dialog with the dep-popup
-    // We assume they are siblings or close in DOM structure
-    // Remove original dialog first
+    const popupContent = $('<div slot="popup"></div>').append(dialog.contents());
     dialog.remove();
 
-    // Replace trigger with dep-popup
-    $(trigger).replaceWith(depPopup);
+    // Replace the trigger with the dep-popup, which then wraps the trigger and the dialog content
+    $trigger.before(depPopup);
+    depPopup.append($trigger, popupContent);
   }
 };
 
