@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+### Changed
+
+- **`depConvert`: an image that opens a dialog no longer looks like a button.** The `<button popovertarget>` around a trigger with only an image gets no background, border or padding, and a `zoom-in` cursor. A trigger with text keeps the button look, with a `pointer` cursor. The button is `type="button"`, so it never submits a form.
+
 ## 0.8.1
 
 ### Fixed

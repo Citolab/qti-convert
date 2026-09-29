@@ -65,3 +65,35 @@ test('convert dep dialog to html popover', async () => {
   const dialog = $newQti(`#${id}[popover]`);
   expect(dialog).length(1);
 });
+
+const itemWithTrigger = (triggerContent: string) => xml`<qti-assessment-item
+	xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
+	identifier="ITM-enlarge" title="enlarge" time-dependent="false">
+	<qti-item-body>
+		<div class="dep-dialogTrigger" data-stimulus-idref="WIN_kaart1">${triggerContent}</div>
+		<div id="WIN_kaart1" class="dep-dialog hide-dialog" data-dep-dialog-caption="Kaart 1">
+			<img src="../img/kaart1-groot.jpg" width="425" alt="Kaart 1 (groot)" />
+		</div>
+	</qti-item-body>
+</qti-assessment-item>`;
+
+test('image trigger button has no button look, only a zoom-in cursor', async () => {
+  const result = qtiTransform(itemWithTrigger('<img src="../img/kaart1-klein.jpg" width="150" alt="" />'))
+    .depConvert()
+    .xml();
+  const $ = cheerio.load(result, { xmlMode: true, xml: true });
+
+  const button = $('button[popovertarget="WIN_kaart1"]');
+  expect(button.attr('type')).toEqual('button');
+  expect(button.attr('style')).toContain('border: 0');
+  expect(button.attr('style')).toContain('background: none');
+  expect(button.attr('style')).toContain('cursor: zoom-in');
+});
+
+test('text trigger button keeps the button look, with a pointer cursor', async () => {
+  const result = qtiTransform(itemWithTrigger('<p>Bekijk de kaart</p>')).depConvert().xml();
+  const $ = cheerio.load(result, { xmlMode: true, xml: true });
+
+  const button = $('button[popovertarget="WIN_kaart1"]');
+  expect(button.attr('style')).toEqual('cursor: pointer;');
+});

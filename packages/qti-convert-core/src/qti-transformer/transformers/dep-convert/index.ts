@@ -14,9 +14,16 @@ export const depConvert = ($: cheerio.CheerioAPI) => {
         // data-stimulus-idref is also the shared-stimulus hook of qti-components, which empties
         // every element carrying it; the button's popovertarget takes over the reference.
         $(dialogTrigger).removeAttr('data-stimulus-idref');
+        // An image that opens an enlargement should look like the image, not like a button; the
+        // cursor shows it can be clicked. A text trigger keeps the button look.
+        const isImageOnly =
+          $(dialogTrigger).text().trim() === '' && $(dialogTrigger).find('img, picture, svg').length > 0;
+        const style = isImageOnly ? 'background: none; border: 0; padding: 0; cursor: zoom-in;' : 'cursor: pointer;';
         // wrap ref in button
         const triggerContent = $.html(dialogTrigger);
-        const button = $(`<button popovertarget="${ref}">${triggerContent}</button>`);
+        const button = $(
+          `<button type="button" popovertarget="${ref}" style="${style}">${triggerContent}</button>`
+        );
         $(dialogTrigger).replaceWith(button);
         const dialog = $(`#${ref}`);
         dialog.attr('popover', '');
