@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3
+
+### Fixed
+
+- **`qbCleanup` leaves adaptive items' outcomes alone.** It put a reset of every outcome the response processing writes (`set … = 0`) at the top of the response processing. An adaptive item (`adaptive="true"`) is answered in attempts and its outcomes carry over from one attempt to the next, so the reset undid what the previous attempt did (a follow-up step, a hint, a score already given) and even overwrote `completionStatus`. Adaptive items now get no reset; other items keep it.
+
 ## 0.8.2
 
 ### Changed

@@ -321,8 +321,12 @@ export function qbCleanup($: cheerio.CheerioAPI) {
       </qti-set-outcome-value>`;
     };
 
+    // An adaptive item is answered in attempts and its outcomes carry over from one attempt to the next (QTI 3
+    // impl guide 3.7.2): resetting them would undo what the previous attempt did (a follow-up step, a hint, a score
+    // already given). Its response processing manages its own outcomes.
+    const adaptive = ($('qti-assessment-item').first().attr('adaptive') ?? '').trim().toLowerCase() === 'true';
     const responseProcessing = $('qti-response-processing');
-    if (responseProcessing) {
+    if (responseProcessing && !adaptive) {
       for (const variableId of variableIds) {
         const resetCode = resetTemplate(variableId);
         responseProcessing.prepend(resetCode);

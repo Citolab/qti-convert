@@ -507,3 +507,34 @@ test('cleanup UserSRVet bold nesting', async () => {
   const areEqual = await areXmlEqual(result, expectedOutput);
   expect(areEqual).toEqual(true);
 });
+
+test('adaptive items keep their outcomes between attempts: no resets', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-assessment-item adaptive="true">
+  <qti-item-body><p>x</p></qti-item-body>
+  <qti-response-processing>
+    <qti-response-condition>
+      <qti-response-if>
+        <qti-match><qti-variable identifier="STEP" /><qti-base-value base-type="integer">1</qti-base-value></qti-match>
+        <qti-set-outcome-value identifier="STEP"><qti-base-value base-type="integer">2</qti-base-value></qti-set-outcome-value>
+      </qti-response-if>
+    </qti-response-condition>
+  </qti-response-processing>
+  </qti-assessment-item>`;
+  const result = await qtiTransform(input).qbCleanup().xml();
+  const processing = result.slice(result.indexOf('<qti-response-processing>'));
+  expect(processing.indexOf('<qti-response-condition>')).toBeLessThan(processing.indexOf('<qti-set-outcome-value'));
+  expect(processing.match(/<qti-set-outcome-value/g)).toHaveLength(1);
+});
+
+test('an item that is not adaptive still gets its resets', async () => {
+  const input = xml`<?xml version="1.0" encoding="UTF-8"?>
+  <qti-assessment-item adaptive="false">
+  <qti-item-body><p>x</p></qti-item-body>
+  <qti-response-processing>
+    <qti-set-outcome-value identifier="SCORE"><qti-base-value base-type="integer">1</qti-base-value></qti-set-outcome-value>
+  </qti-response-processing>
+  </qti-assessment-item>`;
+  const result = await qtiTransform(input).qbCleanup().xml();
+  expect(result.match(/<qti-set-outcome-value identifier="SCORE">/g)).toHaveLength(2);
+});
