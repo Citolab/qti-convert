@@ -25,10 +25,7 @@ function withInferredFileNameBase<T extends ExportOptions>(source: PackageSource
   }
   // File extends Blob; also accept duck-typed { name } (cross-realm File can fail instanceof)
   const named =
-    source &&
-    typeof source === 'object' &&
-    'name' in source &&
-    typeof (source as { name?: unknown }).name === 'string'
+    source && typeof source === 'object' && 'name' in source && typeof (source as { name?: unknown }).name === 'string'
       ? String((source as { name: string }).name)
       : '';
   if (named) {
@@ -67,7 +64,13 @@ export async function renderPaperZip(
   options: ZipExportOptions = {}
 ): Promise<Omit<ZipExportResult, 'paper'>> {
   const formats: PaperFormat[] = options.formats?.length ? options.formats : ['docx'];
-  const documents = options.documents?.length ? options.documents : DEFAULT_DOCUMENTS;
+  // Shared texts get their own booklet when the package has them
+  const documents = options.documents?.length
+    ? options.documents
+    : paper.stimuli.size
+      ? (['questions', 'sources', 'answerSheet', 'answerKey'] as PaperDocumentKind[])
+      : DEFAULT_DOCUMENTS;
+  const renderOptions = { ...options, separateSources: options.separateSources ?? documents.includes('sources') };
   const base = resolveFileNameBase(options.fileNameBase, paper.title);
   const locale = options.locale || 'en';
 
@@ -76,8 +79,8 @@ export async function renderPaperZip(
     for (const kind of documents) {
       const bytes =
         format === 'docx'
-          ? await renderDocxDocument(paper, kind, options)
-          : await renderPdfDocument(paper, kind, options);
+          ? await renderDocxDocument(paper, kind, renderOptions)
+          : await renderPdfDocument(paper, kind, renderOptions);
       files.push({ name: paperDocumentFileName(base, kind, format, locale), kind, format, bytes });
     }
   }

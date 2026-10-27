@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+
+### Added
+
+- **Sources document for shared stimuli** (`@citolab/qti-convert-export`). When a package has shared stimuli (`qti-assessment-stimulus-ref`), the zip export adds a `sources` booklet (bronnen) with the texts numbered "Bron 1", "Bron 2" in order of first use, and each question that uses one says "Gebruik bron 1 (De vos) uit het bronnenboekje" instead of repeating the text. `separateSources` and `documents: [..., 'sources']` control it; the single workbook document keeps the texts in place.
+
 ## 0.9.0
 
 ### Added

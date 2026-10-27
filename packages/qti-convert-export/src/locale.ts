@@ -26,6 +26,8 @@ export type LocaleStrings = {
   fileSuffix: Record<PaperDocumentKind, string>;
   zipSuffix: string;
   bookletInstruction: string;
+  sourceLabel: (n: number) => string;
+  useSource: (n: number, title?: string) => string;
   answerSheetInstruction: string;
   keyColumns: { question: string; answer: string; points: string };
   total: string;
@@ -86,17 +88,21 @@ const nl: LocaleStrings = {
   documentTitle: {
     workbook: 'Toets',
     questions: 'Opgaven',
+    sources: 'Bronnen',
     answerSheet: 'Antwoordblad',
     answerKey: 'Antwoordmodel'
   },
   fileSuffix: {
     workbook: 'toets',
     questions: 'opgaven',
+    sources: 'bronnen',
     answerSheet: 'antwoordblad',
     answerKey: 'antwoordmodel'
   },
   zipSuffix: 'papier',
   bookletInstruction: 'Schrijf je antwoorden op het antwoordblad.',
+  sourceLabel: n => `Bron ${n}`,
+  useSource: (n, title) => `Gebruik bron ${n}${title ? ` (${title})` : ''} uit het bronnenboekje.`,
   answerSheetInstruction: 'Vul je antwoord in bij het juiste vraagnummer.',
   keyColumns: { question: 'Vraag', answer: 'Antwoord', points: 'Punten' },
   total: 'Totaal',
@@ -176,17 +182,21 @@ const en: LocaleStrings = {
   documentTitle: {
     workbook: 'Assessment',
     questions: 'Questions',
+    sources: 'Sources',
     answerSheet: 'Answer sheet',
     answerKey: 'Answer key'
   },
   fileSuffix: {
     workbook: 'assessment',
     questions: 'questions',
+    sources: 'sources',
     answerSheet: 'answer-sheet',
     answerKey: 'answer-key'
   },
   zipSuffix: 'paper',
   bookletInstruction: 'Write your answers on the answer sheet.',
+  sourceLabel: n => `Source ${n}`,
+  useSource: (n, title) => `Use source ${n}${title ? ` (${title})` : ''} in the sources booklet.`,
   answerSheetInstruction: 'Write each answer next to its question number.',
   keyColumns: { question: 'Question', answer: 'Answer', points: 'Points' },
   total: 'Total',

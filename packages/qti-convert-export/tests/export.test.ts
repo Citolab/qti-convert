@@ -499,6 +499,27 @@ describe('paper documents', () => {
   });
 });
 
+describe('sources document', () => {
+  it('moves shared texts to the sources booklet and refers to them from each question', async () => {
+    const paper = await loadPackageFromFiles(await readFixtureFiles(allTypesDir));
+    const sources = await docxText(await renderDocxDocument(paper, 'sources', { locale: 'nl' }));
+    expect(sources).toMatch(/Bron 1: De vos/);
+    expect(sources).toMatch(/De vos is een roofdier/);
+
+    const booklet = await docxText(await renderDocxDocument(paper, 'questions', { locale: 'nl', separateSources: true }));
+    expect(booklet).not.toMatch(/De vos is een roofdier/);
+    // Both questions about the text say where to find it
+    expect(booklet.match(/Gebruik bron 1 \(De vos\) uit het bronnenboekje\./g)).toHaveLength(2);
+  });
+
+  it('keeps shared texts in place when there is no sources document', async () => {
+    const paper = await loadPackageFromFiles(await readFixtureFiles(allTypesDir));
+    const workbook = await docxText(await renderDocxDocument(paper, 'workbook', { locale: 'nl' }));
+    expect(workbook).toMatch(/De vos is een roofdier/);
+    expect(workbook).not.toMatch(/bronnenboekje/);
+  });
+});
+
 describe('convertPackageToZip', () => {
   it('zips a question booklet, answer sheet and answer key', async () => {
     const result = await convertPackageToZip(await zipFixture(), { locale: 'nl', fileNameBase: 'Toets' });
@@ -518,7 +539,17 @@ describe('convertPackageToZip', () => {
       fileNameBase: 'Test',
       formats: ['docx', 'pdf']
     });
-    expect(result.files).toHaveLength(6);
+    // The package has a shared stimulus, so a sources booklet comes along
+    expect(result.files.map(f => f.name)).toEqual([
+      'Test - questions.docx',
+      'Test - sources.docx',
+      'Test - answer-sheet.docx',
+      'Test - answer-key.docx',
+      'Test - questions.pdf',
+      'Test - sources.pdf',
+      'Test - answer-sheet.pdf',
+      'Test - answer-key.pdf',
+    ]);
     const pdf = result.files.find(f => f.name === 'Test - answer-key.pdf')!;
     expect(String.fromCharCode(...pdf.bytes.slice(0, 4))).toBe('%PDF');
   });

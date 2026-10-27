@@ -37,6 +37,8 @@ type Ctx = {
   paper: PaperAssessment;
   locale: LocaleStrings;
   html: HtmlContext;
+  /** Shared stimuli go to the sources document; questions refer to them by number. */
+  separateSources: boolean;
 };
 
 type Mode = 'workbook' | 'questions';
@@ -599,6 +601,18 @@ function questionHeading(ctx: Ctx, number: number, item: PaperItem): LayoutBlock
   );
 }
 
+/** Sources numbered in order of first use. */
+function sourceNumbers(paper: PaperAssessment): Map<string, number> {
+  const numbers = new Map<string, number>();
+  for (const item of paper.items) {
+    for (const href of item.stimulusRefs) {
+      if (paper.stimuli.has(href) && !numbers.has(href)) numbers.set(href, numbers.size + 1);
+    }
+  }
+  return numbers;
+}
+
+/** The shared text in place, before the first question that uses it. */
 function stimulusBlocks(ctx: Ctx, item: PaperItem, printed: Set<string>): LayoutBlock[] {
   const out: LayoutBlock[] = [];
   for (const href of item.stimulusRefs) {
@@ -613,6 +627,34 @@ function stimulusBlocks(ctx: Ctx, item: PaperItem, printed: Set<string>): Layout
       })
     );
     out.push(...htmlToBlocks(stimulus.html, ctx.html));
+  }
+  return out;
+}
+
+/** "Use source 1 (The fox) in the sources booklet", on every question that needs it. */
+function sourceReferences(ctx: Ctx, item: PaperItem, numbers: Map<string, number>): LayoutBlock[] {
+  return item.stimulusRefs
+    .filter(href => numbers.has(href))
+    .map(href => muted(ctx.locale.useSource(numbers.get(href)!, ctx.paper.stimuli.get(href)?.title)));
+}
+
+function sourcesDocument(ctx: Ctx): LayoutBlock[] {
+  const out: LayoutBlock[] = [...titleBlocks(ctx, ctx.locale.documentTitle.sources)];
+  for (const [href, n] of sourceNumbers(ctx.paper)) {
+    const stimulus = ctx.paper.stimuli.get(href)!;
+    const label = ctx.locale.sourceLabel(n);
+    out.push({
+      t: 'group',
+      blocks: [
+        para([text(stimulus.title ? `${label}: ${stimulus.title}` : label, { bold: true })], {
+          style: 'heading',
+          spaceBefore: 16,
+          spaceAfter: 6,
+          keepNext: true
+        }),
+        ...htmlToBlocks(stimulus.html, ctx.html)
+      ]
+    });
   }
   return out;
 }
@@ -676,12 +718,17 @@ function questionDocument(ctx: Ctx, mode: Mode): LayoutBlock[] {
   out.push(...titleBlocks(ctx, mode === 'questions' ? ctx.locale.documentTitle.questions : undefined));
   out.push(...instructionBlocks(ctx));
   if (mode === 'questions') out.push(muted(ctx.locale.bookletInstruction));
+  const sources = sourceNumbers(ctx.paper);
   for (const item of ctx.paper.items) {
-    // A shared text stays on the page with the first question that uses it
-    out.push({
-      t: 'group',
-      blocks: [...stimulusBlocks(ctx, item, printed), ...itemBlocks(ctx, item, numbers.get(item), mode)]
-    });
+    const blocks = itemBlocks(ctx, item, numbers.get(item), mode);
+    if (ctx.separateSources) {
+      // Right under the question heading
+      blocks.splice(1, 0, ...sourceReferences(ctx, item, sources));
+      out.push({ t: 'group', blocks });
+    } else {
+      // A shared text stays on the page with the first question that uses it
+      out.push({ t: 'group', blocks: [...stimulusBlocks(ctx, item, printed), ...blocks] });
+    }
   }
   out.push(para([text(ctx.locale.endOfTest, { italic: true })], { style: 'muted', align: 'center', spaceBefore: 24 }));
   return out;
@@ -796,7 +843,12 @@ export function composeDocument(
   options: ExportOptions & { appendAnswerKey?: boolean } = {}
 ): LayoutDocument {
   const locale = getLocaleStrings(options.locale || 'en');
-  const ctx: Ctx = { paper, locale, html: { assets: paper.assets, locale, maxWidth: PAGE.contentWidth } };
+  const ctx: Ctx = {
+    paper,
+    locale,
+    html: { assets: paper.assets, locale, maxWidth: PAGE.contentWidth },
+    separateSources: options.separateSources === true
+  };
   let blocks: LayoutBlock[];
   switch (kind) {
     case 'workbook':
@@ -804,6 +856,9 @@ export function composeDocument(
       break;
     case 'questions':
       blocks = questionDocument(ctx, 'questions');
+      break;
+    case 'sources':
+      blocks = sourcesDocument(ctx);
       break;
     case 'answerSheet':
       blocks = answerSheetDocument(ctx);

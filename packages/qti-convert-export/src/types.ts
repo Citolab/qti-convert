@@ -268,6 +268,12 @@ export type ExportOptions = ParseOptions & {
    * Defaults to the QTI ZIP filename when converting a File/path, else the assessment title.
    * Paper: `{base}.docx` — answer key: `{base}-correction.docx`
    */
+  /**
+   * Print shared stimuli in a separate sources document and refer to them
+   * from the questions ("use source 1"). Default: false, the texts print in
+   * place. The zip export turns this on when it includes the `sources` document.
+   */
+  separateSources?: boolean;
   fileNameBase?: string;
 };
 
@@ -275,17 +281,18 @@ export type ExportOptions = ParseOptions & {
  * Documents the export can produce.
  * - `workbook`: questions with answer space in place (the classic single document)
  * - `questions`: question booklet without answer space, reusable
+ * - `sources`: the shared stimuli (source texts), numbered, for use next to the booklet
  * - `answerSheet`: answer sheet with an answer area per question
  * - `answerKey`: the answer sheet filled in, with points and scoring rubrics
  */
-export type PaperDocumentKind = 'workbook' | 'questions' | 'answerSheet' | 'answerKey';
+export type PaperDocumentKind = 'workbook' | 'questions' | 'sources' | 'answerSheet' | 'answerKey';
 
 export type PaperFormat = 'docx' | 'pdf';
 
 export type ZipExportOptions = ExportOptions & {
   /** Default: ['docx'] */
   formats?: PaperFormat[];
-  /** Default: ['questions', 'answerSheet', 'answerKey'] */
+  /** Default: ['questions', 'answerSheet', 'answerKey'], plus 'sources' when the package has shared stimuli */
   documents?: PaperDocumentKind[];
 };
 

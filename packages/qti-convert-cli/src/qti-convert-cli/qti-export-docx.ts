@@ -21,7 +21,7 @@ function usage(): never {
 Options:
   -o, --output <file>       Output path (default: <title>.docx / .pdf)
   --pdf                     Export PDF instead of Word
-  --zip                     Write a zip with question booklet, answer sheet and answer key
+  --zip                     Write a zip with question booklet, sources (if any), answer sheet and answer key
   --both                    With --zip: include both Word and PDF
   --keep-order              Print options in source order, ignoring shuffle="true"
   --no-answer-key           Omit answer key section
