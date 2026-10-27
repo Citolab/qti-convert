@@ -24,16 +24,16 @@
     "test": "vitest run tests"
   },
   "dependencies": {
-    "@mlc-ai/web-llm": "^0.2.84",
+    "@mlc-ai/web-llm": "^0.2.86",
     "buffer": "^6.0.3",
-    "csv-parse": "^7.0.2",
+    "csv-parse": "^7.0.3",
     "exceljs": "^4.4.0",
-    "jszip": "^3.10.1",
-    "pdfjs-dist": "^6.3.289"
+    "jszip": "^3.10.2",
+    "pdfjs-dist": "^6.4.299"
   },
   "devDependencies": {
-    "tsup": "^8.5.1",
+    "tsup": "^9.0.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }

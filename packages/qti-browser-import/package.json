@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "cheerio": "^1.2.0",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.2"
   },
   "peerDependencies": {
     "@citolab/qti-convert": "^0.8.3",
@@ -32,8 +32,8 @@
   "devDependencies": {
     "@citolab/qti-convert": "^0.8.3",
     "@citolab/qti-convert-tao-pci": "^0.8.3",
-    "tsup": "^8.5.1",
+    "tsup": "^9.0.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }
