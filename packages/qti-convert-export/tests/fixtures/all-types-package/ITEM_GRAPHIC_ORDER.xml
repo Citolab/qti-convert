@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_GRAPHIC_ORDER" title="Grafische volgorde" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="ordered" base-type="identifier"><qti-correct-response><qti-value>TREE</qti-value><qti-value>HOUSE</qti-value><qti-value>SUN</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-graphic-order-interaction response-identifier="RESPONSE">
+      <qti-prompt>Zet de dingen in volgorde van klein naar groot.</qti-prompt>
+      <img src="resources/scene.png" width="400" height="300" alt="Tekening van een huis"/>
+      <qti-hotspot-choice identifier="SUN" shape="circle" coords="330,60,35"/>
+      <qti-hotspot-choice identifier="HOUSE" shape="rect" coords="60,120,180,200"/>
+      <qti-hotspot-choice identifier="TREE" shape="poly" coords="210,80,290,80,290,160,210,160"/>
+    </qti-graphic-order-interaction>
+  </qti-item-body>
+</qti-assessment-item>

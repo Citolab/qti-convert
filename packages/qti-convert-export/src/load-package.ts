@@ -8,7 +8,7 @@ import {
   textContent,
 } from './xml-utils.js';
 import { parseItemXml } from './parse-item.js';
-import type { PaperAssessment, PaperAsset, PaperContentBlock, PaperItem } from './types.js';
+import type { PaperAssessment, PaperAsset, PaperInteraction, PaperItem, PaperStimulus, ParseOptions } from './types.js';
 
 export type PackageSource = ArrayBuffer | Uint8Array | Blob | string;
 
@@ -248,19 +248,36 @@ function collectPackageImages(files: Map<string, Uint8Array>): Map<string, Paper
   return assets;
 }
 
-function collectImageRefs(items: PaperItem[]): string[] {
+const IMG_SRC = /<img\b[^>]*?\ssrc="([^"]+)"/gi;
+
+function imageRefsInHtml(html: string | undefined, refs: Set<string>): void {
+  for (const m of (html || '').matchAll(IMG_SRC)) refs.add(m[1].replace(/&amp;/g, '&'));
+}
+
+function interactionHtml(ix: PaperInteraction): string[] {
+  const html: string[] = [];
+  if ('options' in ix) html.push(...ix.options.map(o => o.html));
+  if (ix.kind === 'match') html.push(...ix.rows.map(o => o.html), ...ix.columns.map(o => o.html));
+  if (ix.kind === 'inlineChoice') html.push(...ix.gaps.flatMap(g => g.options.map(o => o.html)));
+  if (ix.kind === 'gapMatch' || ix.kind === 'hottext') html.push(ix.passageHtml);
+  if (ix.kind === 'positionObject') html.push(ix.objectHtml);
+  return html;
+}
+
+function collectImageRefs(paper: PaperAssessment): string[] {
   const refs = new Set<string>();
-  const addFromBlocks = (blocks: PaperContentBlock[]) => {
-    for (const block of blocks) {
-      if (block.type === 'image' && block.assetPath) refs.add(block.assetPath);
-    }
-  };
-  for (const item of items) {
-    addFromBlocks(item.stimulus);
-    if (item.interaction.kind === 'selectPoint' && item.interaction.imageAsset) {
-      refs.add(item.interaction.imageAsset);
+  for (const stimulus of paper.stimuli.values()) imageRefsInHtml(stimulus.html, refs);
+  for (const item of paper.items) {
+    for (const node of item.body) if (node.type === 'html') imageRefsInHtml(node.html, refs);
+    imageRefsInHtml(item.rubricHtml, refs);
+    for (const part of item.parts) {
+      imageRefsInHtml(part.promptHtml, refs);
+      for (const html of interactionHtml(part.interaction)) imageRefsInHtml(html, refs);
+      const ix = part.interaction;
+      if ('image' in ix && ix.image?.path) refs.add(ix.image.path);
     }
   }
+  refs.delete('');
   return [...refs];
 }
 
@@ -317,7 +334,7 @@ export async function hydrateImageAssets(
   paper: PaperAssessment,
   packageFiles?: Map<string, Uint8Array>
 ): Promise<void> {
-  const refs = collectImageRefs(paper.items);
+  const refs = collectImageRefs(paper);
   const pending: Promise<void>[] = [];
 
   for (const ref of refs) {
@@ -367,14 +384,32 @@ export async function hydrateImageAssets(
   await Promise.all(pending);
 }
 
+/** Shared stimulus body, with image paths resolved against the stimulus file. */
+function parseStimulus(xml: string, href: string): PaperStimulus | undefined {
+  const $ = loadXml(xml);
+  const root = $('qti-assessment-stimulus').first();
+  const body = $('qti-stimulus-body').first();
+  if (!body.length) return undefined;
+  body.find('img').each((_, img) => {
+    $(img).attr('src', resolveAssetRef($(img).attr('src') || '', href));
+  });
+  return {
+    identifier: root.attr('identifier') || href,
+    title: root.attr('title') || undefined,
+    html: (body.html() || '').trim()
+  };
+}
+
 function buildPaper(
   files: Map<string, Uint8Array>,
   refs: ItemRef[],
   assessmentXml: string | undefined,
-  assessmentHref: string | undefined
+  assessmentHref: string | undefined,
+  options: ParseOptions
 ): PaperAssessment {
   const assets = collectPackageImages(files);
   const items: PaperItem[] = [];
+  const stimuli = new Map<string, PaperStimulus>();
 
   for (const ref of refs) {
     const href = resolveItemHref(files, ref);
@@ -382,11 +417,15 @@ function buildPaper(
       console.warn(`Missing item file: ${ref.href}`);
       continue;
     }
-    const item = parseItemXml(decodeUtf8(files.get(href)!), assets, href);
+    const item = parseItemXml(decodeUtf8(files.get(href)!), assets, href, options);
     if (ref.identifier) item.identifier = ref.identifier;
-    if (item.interaction.kind === 'unsupported' && item.interaction.interactionType === 'none') {
-      continue;
+    for (const stimulusHref of item.stimulusRefs) {
+      if (stimuli.has(stimulusHref) || !files.has(stimulusHref)) continue;
+      const stimulus = parseStimulus(decodeUtf8(files.get(stimulusHref)!), stimulusHref);
+      if (stimulus) stimuli.set(stimulusHref, stimulus);
     }
+    // Nothing to print and nothing to answer
+    if (!item.parts.length && !item.body.length && !item.stimulusRefs.length) continue;
     items.push(item);
   }
 
@@ -396,6 +435,7 @@ function buildPaper(
     instructions: instructionsFromAssessment(assessmentXml),
     author: authorFromFiles(files),
     items,
+    stimuli,
     assets,
   };
 }
@@ -404,7 +444,7 @@ function buildPaper(
  * Load a QTI package (ZIP bytes / Blob / file path) into a PaperAssessment model.
  * Resolves package-relative images and fetches external http(s) image URLs.
  */
-export async function loadPackage(source: PackageSource): Promise<PaperAssessment> {
+export async function loadPackage(source: PackageSource, options: ParseOptions = {}): Promise<PaperAssessment> {
   const files = await loadZipEntries(source);
   const manifestPath = findManifest(files);
   const manifestXml = decodeUtf8(files.get(manifestPath)!);
@@ -415,7 +455,7 @@ export async function loadPackage(source: PackageSource): Promise<PaperAssessmen
 
   const refs = pickItemRefs(files, manifestXml, assessmentXml, assessmentHref);
 
-  const paper = buildPaper(files, refs, assessmentXml, assessmentHref);
+  const paper = buildPaper(files, refs, assessmentXml, assessmentHref, options);
   await hydrateImageAssets(paper, files);
   return paper;
 }
@@ -424,7 +464,10 @@ export async function loadPackage(source: PackageSource): Promise<PaperAssessmen
  * Load a package from an already-extracted folder map (path → bytes).
  * Also hydrates remote images (async).
  */
-export async function loadPackageFromFiles(files: Map<string, Uint8Array>): Promise<PaperAssessment> {
+export async function loadPackageFromFiles(
+  files: Map<string, Uint8Array>,
+  options: ParseOptions = {}
+): Promise<PaperAssessment> {
   const normalized = new Map<string, Uint8Array>();
   for (const [k, v] of files) normalized.set(normalizePath(k), v);
 
@@ -438,7 +481,7 @@ export async function loadPackageFromFiles(files: Map<string, Uint8Array>): Prom
 
   const refs = pickItemRefs(normalized, manifestXml, assessmentXml, assessmentHref);
 
-  const paper = buildPaper(normalized, refs, assessmentXml, assessmentHref);
+  const paper = buildPaper(normalized, refs, assessmentXml, assessmentHref, options);
   await hydrateImageAssets(paper, normalized);
   return paper;
 }

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="all-types" title="Alle vraagtypen">
+  <qti-test-part identifier="P" navigation-mode="linear" submission-mode="individual">
+    <qti-assessment-section identifier="S" title="S" visible="true">
+      <qti-assessment-item-ref identifier="ITEM_INFO" href="ITEM_INFO.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_INLINE_CHOICE" href="ITEM_INLINE_CHOICE.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_ASSOCIATE" href="ITEM_ASSOCIATE.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_MATCH_LARGE" href="ITEM_MATCH_LARGE.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_HOTSPOT" href="ITEM_HOTSPOT.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_GRAPHIC_ORDER" href="ITEM_GRAPHIC_ORDER.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_GRAPHIC_ASSOCIATE" href="ITEM_GRAPHIC_ASSOCIATE.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_GRAPHIC_GAP" href="ITEM_GRAPHIC_GAP.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_SLIDER" href="ITEM_SLIDER.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_POSITION" href="ITEM_POSITION.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_DRAWING" href="ITEM_DRAWING.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_UPLOAD" href="ITEM_UPLOAD.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_PCI" href="ITEM_PCI.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_MULTI_PART" href="ITEM_MULTI_PART.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_RICH" href="ITEM_RICH.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_MEDIA" href="ITEM_MEDIA.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_STIM_A" href="ITEM_STIM_A.xml"/>
+      <qti-assessment-item-ref identifier="ITEM_STIM_B" href="ITEM_STIM_B.xml"/>
+    </qti-assessment-section>
+  </qti-test-part>
+</qti-assessment-test>

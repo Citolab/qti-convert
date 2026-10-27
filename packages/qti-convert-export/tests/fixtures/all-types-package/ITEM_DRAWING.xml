@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_DRAWING" title="Tekenen" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="file"></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-drawing-interaction response-identifier="RESPONSE">
+      <qti-prompt>Teken een driehoek met een rechte hoek.</qti-prompt>
+      <object type="image/png" data="resources/scene.png" width="400" height="200"></object>
+    </qti-drawing-interaction>
+  </qti-item-body>
+</qti-assessment-item>

@@ -4,13 +4,15 @@
  *
  * Usage:
  *   qti-export-docx <package.zip> [-o out.docx] [--no-answer-key] [--separate-answer-key] [--locale nl|en] [--pdf]
+ *   qti-export-docx <package.zip> --zip [--pdf | --both] [-o out.zip]
  */
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   convertPackageToDocx,
   convertPackageToPdf,
-  type ExportOptions,
+  convertPackageToZip,
+  type ZipExportOptions,
 } from '@citolab/qti-convert-export';
 
 function usage(): never {
@@ -19,6 +21,9 @@ function usage(): never {
 Options:
   -o, --output <file>       Output path (default: <title>.docx / .pdf)
   --pdf                     Export PDF instead of Word
+  --zip                     Write a zip with question booklet, answer sheet and answer key
+  --both                    With --zip: include both Word and PDF
+  --keep-order              Print options in source order, ignoring shuffle="true"
   --no-answer-key           Omit answer key section
   --separate-answer-key     Write answer key as a second file
   --locale <nl|en>          Labels language (default: en)
@@ -34,7 +39,9 @@ if (!pkg) usage();
 
 let output: string | undefined;
 let pdf = false;
-const options: ExportOptions = { locale: 'en', includeAnswerKey: true };
+let zip = false;
+let both = false;
+const options: ZipExportOptions = { locale: 'en', includeAnswerKey: true };
 
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -42,6 +49,12 @@ for (let i = 0; i < args.length; i++) {
     output = args[++i];
   } else if (a === '--pdf') {
     pdf = true;
+  } else if (a === '--zip') {
+    zip = true;
+  } else if (a === '--both') {
+    both = true;
+  } else if (a === '--keep-order') {
+    options.keepSourceOrder = true;
   } else if (a === '--no-answer-key') {
     options.includeAnswerKey = false;
   } else if (a === '--separate-answer-key') {
@@ -53,7 +66,15 @@ for (let i = 0; i < args.length; i++) {
 }
 
 try {
-  if (pdf) {
+  if (zip) {
+    const result = await convertPackageToZip(pkg!, {
+      ...options,
+      formats: both ? ['docx', 'pdf'] : pdf ? ['pdf'] : ['docx']
+    });
+    const outPath = output || result.fileName;
+    await writeFile(outPath, result.zip);
+    console.log(`Wrote ${outPath} (${result.paper.items.length} items: ${result.files.map(f => f.name).join(', ')})`);
+  } else if (pdf) {
     const result = await convertPackageToPdf(pkg!, options);
     const outPath = output || result.fileName;
     await writeFile(outPath, result.assessment);

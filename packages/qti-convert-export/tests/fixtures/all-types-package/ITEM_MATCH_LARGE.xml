@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_MATCH_LARGE" title="Grote koppeling" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="directedPair"><qti-correct-response><qti-value>P1 T3</qti-value><qti-value>P2 T7</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-match-interaction response-identifier="RESPONSE" max-associations="2">
+      <qti-prompt>Welke provincie hoort bij welke hoofdstad?</qti-prompt>
+      <qti-simple-match-set>
+        <qti-simple-associable-choice identifier="P1" match-max="1">Groningen</qti-simple-associable-choice>
+        <qti-simple-associable-choice identifier="P2" match-max="1">Limburg</qti-simple-associable-choice>
+      </qti-simple-match-set>
+      <qti-simple-match-set><qti-simple-associable-choice identifier="T1" match-max="1">Assen</qti-simple-associable-choice><qti-simple-associable-choice identifier="T2" match-max="1">Zwolle</qti-simple-associable-choice><qti-simple-associable-choice identifier="T3" match-max="1">Groningen</qti-simple-associable-choice><qti-simple-associable-choice identifier="T4" match-max="1">Arnhem</qti-simple-associable-choice><qti-simple-associable-choice identifier="T5" match-max="1">Utrecht</qti-simple-associable-choice><qti-simple-associable-choice identifier="T6" match-max="1">Haarlem</qti-simple-associable-choice><qti-simple-associable-choice identifier="T7" match-max="1">Maastricht</qti-simple-associable-choice></qti-simple-match-set>
+    </qti-match-interaction>
+  </qti-item-body>
+</qti-assessment-item>

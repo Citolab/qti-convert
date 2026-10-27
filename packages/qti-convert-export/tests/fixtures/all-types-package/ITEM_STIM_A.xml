@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_STIM_A" title="Bij de tekst A" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-assessment-stimulus-ref identifier="STIM" href="stimuli/vos.xml" title="De vos"/>
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="identifier"><qti-correct-response><qti-value>B</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-choice-interaction response-identifier="RESPONSE" max-choices="1">
+      <qti-prompt>Waar woont de vos?</qti-prompt>
+      <qti-simple-choice identifier="A">In een nest</qti-simple-choice>
+      <qti-simple-choice identifier="B">In een hol</qti-simple-choice>
+    </qti-choice-interaction>
+  </qti-item-body>
+</qti-assessment-item>

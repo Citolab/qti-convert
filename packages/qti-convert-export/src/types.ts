@@ -9,95 +9,195 @@ export type PaperAsset = {
   contentType: string;
 };
 
-export type PaperContentBlock =
-  | { type: 'paragraph'; html: string }
-  | { type: 'image'; assetPath: string; alt?: string; width?: number; height?: number };
+/**
+ * A chunk of item content as sanitized HTML.
+ *
+ * Image `src` attributes are already resolved to package paths (or remote/data
+ * URLs). Inline interactions are replaced by placeholders the layout step
+ * understands: `<paper-gap n="1"/>` for a numbered blank and
+ * `<paper-hottext label="A">word</paper-hottext>` for a selectable word.
+ */
+export type PaperContentBlock = { type: 'html'; html: string };
 
-export type PaperChoiceOption = {
+/** A lettered or numbered option as printed on paper. */
+export type PaperOption = {
+  identifier: string;
+  /** Paper label: A, B, C… or 1, 2, 3… */
+  label: string;
+  html: string;
+};
+
+export type PaperImageRef = {
+  path: string;
+  alt?: string;
+  /** Declared size in CSS pixels; QTI coords are expressed against this size. */
+  width?: number;
+  height?: number;
+};
+
+export type PaperShape = 'circle' | 'rect' | 'poly' | 'ellipse' | 'default';
+
+export type PaperHotspot = {
   identifier: string;
   label: string;
-  contentHtml: string;
+  shape: PaperShape;
+  coords: number[];
 };
 
-export type PaperMatchOption = {
-  identifier: string;
-  contentHtml: string;
+export type PaperArea = { shape: PaperShape; coords: number[] };
+
+export type PaperPair = [string, string];
+
+export type PaperTextGap = {
+  label: string;
+  responseId: string;
+  expectedLength?: number;
+  /** Correct answer first, then accepted alternatives from the mapping. */
+  accepted: string[];
 };
 
-export type PaperGapPart =
-  | { type: 'text'; html: string }
-  | { type: 'gap'; identifier: string };
-
-export type PaperHottextPart =
-  | { type: 'text'; text: string }
-  | { type: 'hottext'; identifier: string; text: string };
+export type PaperChoiceGap = {
+  label: string;
+  responseId: string;
+  options: PaperOption[];
+  correct: string[];
+};
 
 export type PaperInteraction =
   | {
       kind: 'choice';
+      responseId: string;
       multi: boolean;
-      choices: PaperChoiceOption[];
+      minChoices: number;
+      /** 0 = unlimited */
+      maxChoices: number;
+      options: PaperOption[];
+      correct: string[];
     }
-  | {
-      kind: 'textEntry';
-      /** Number of blank fields (may be inline in stimulus). */
-      blanks: number;
-      /** When true, blanks are already represented as ____ in stimulusHtml blocks. */
-      inline: boolean;
-    }
-  | {
-      kind: 'extendedText';
-      lines: number;
-    }
+  | { kind: 'textEntry'; gaps: PaperTextGap[] }
+  | { kind: 'inlineChoice'; gaps: PaperChoiceGap[] }
+  | { kind: 'extendedText'; responseId: string; lines: number; correct: string[] }
   | {
       kind: 'match';
-      mode: 'matrix' | 'pairs';
-      /** Kennisnet: top = bank above blanks; answers = bank under ANTWOORDEN (qti-choices-right). */
-      bankPlacement?: 'top' | 'answers';
-      rows: PaperMatchOption[];
-      columns: PaperMatchOption[];
+      responseId: string;
+      /** Source set, numbered 1, 2, 3… */
+      rows: PaperOption[];
+      /** Target set, lettered A, B, C… */
+      columns: PaperOption[];
+      /** 0 = unlimited */
+      maxAssociations: number;
+      correct: PaperPair[];
     }
   | {
-      kind: 'inlineChoice';
-      /** Numbered dropdowns in the passage, with option banks listed below. */
-      slots: {
-        number: number;
-        responseId: string;
-        options: PaperChoiceOption[];
-      }[];
+      kind: 'associate';
+      responseId: string;
+      options: PaperOption[];
+      maxAssociations: number;
+      correct: PaperPair[];
     }
-  | {
-      kind: 'order';
-      items: PaperChoiceOption[];
-      orientation: 'vertical' | 'horizontal';
-    }
+  | { kind: 'order'; responseId: string; options: PaperOption[]; correct: string[] }
   | {
       kind: 'gapMatch';
-      options: PaperMatchOption[];
-      parts: PaperGapPart[];
+      responseId: string;
+      /** Word bank, lettered */
+      options: PaperOption[];
+      /** Passage with `<paper-gap n="…"/>` placeholders */
+      passageHtml: string;
+      gaps: { identifier: string; label: string }[];
+      /** [optionId, gapId] */
+      correct: PaperPair[];
     }
   | {
       kind: 'hottext';
-      parts: PaperHottextPart[];
+      responseId: string;
+      /** Passage with `<paper-hottext label="…">` placeholders */
+      passageHtml: string;
+      options: PaperOption[];
+      maxChoices: number;
+      correct: string[];
+    }
+  | {
+      kind: 'hotspot';
+      responseId: string;
+      image: PaperImageRef;
+      hotspots: PaperHotspot[];
+      maxChoices: number;
+      correct: string[];
+    }
+  | {
+      kind: 'graphicOrder';
+      responseId: string;
+      image: PaperImageRef;
+      hotspots: PaperHotspot[];
+      correct: string[];
+    }
+  | {
+      kind: 'graphicAssociate';
+      responseId: string;
+      image: PaperImageRef;
+      hotspots: PaperHotspot[];
+      maxAssociations: number;
+      correct: PaperPair[];
+    }
+  | {
+      kind: 'graphicGapMatch';
+      responseId: string;
+      image: PaperImageRef;
+      /** Drop zones, numbered */
+      hotspots: PaperHotspot[];
+      /** Labels or images to place, lettered */
+      options: PaperOption[];
+      /** [optionId, hotspotId] */
+      correct: PaperPair[];
     }
   | {
       kind: 'selectPoint';
-      imageAsset: string;
-      instruction: string;
-      alt?: string;
-      width?: number;
-      height?: number;
+      responseId: string;
+      image: PaperImageRef;
+      maxChoices: number;
+      correctAreas: PaperArea[];
     }
   | {
+      kind: 'positionObject';
+      responseId: string;
+      image: PaperImageRef;
+      objectHtml: string;
+      maxChoices: number;
+      correctAreas: PaperArea[];
+    }
+  | {
+      kind: 'slider';
+      responseId: string;
+      min: number;
+      max: number;
+      step?: number;
+      correct?: number;
+    }
+  | { kind: 'drawing'; responseId: string; image?: PaperImageRef }
+  | { kind: 'upload'; responseId: string }
+  | {
       kind: 'unsupported';
+      /** QTI element name, e.g. qti-portable-custom-interaction */
       interactionType: string;
-      fallbackNote: string;
     };
 
+export type PaperInteractionKind = PaperInteraction['kind'];
+
+/** One answerable part of an item; items with several parts label them a, b, c. */
+export type PaperItemPart = {
+  /** '' when the item has a single part */
+  label: string;
+  promptHtml?: string;
+  interaction: PaperInteraction;
+};
+
+export type PaperBodyNode =
+  PaperContentBlock | { type: 'part'; index: number } | { type: 'media'; mediaType: 'audio' | 'video' | 'media' };
+
 export type PaperAnswerKey = {
-  /** Human-readable correct answer summary. */
+  /** Plain-text summary of the correct answers, one line per part. */
   summary: string;
-  /** Raw QTI correct values when available. */
+  /** Raw QTI correct values across all parts. */
   values?: string[];
   /** From qti-rubric-block view=scorer — preferred teacher guidance. */
   rubricHtml?: string;
@@ -108,11 +208,17 @@ export type PaperItem = {
   title: string;
   /** Max score from MAXSCORE / SCORE normal-maximum. */
   points?: number;
-  /** Blocks that appear above / around the interaction (stimulus, prompt). */
-  stimulus: PaperContentBlock[];
-  interaction: PaperInteraction;
+  /** Item content in reading order, with markers where each part goes. */
+  body: PaperBodyNode[];
+  /** Answerable parts. Empty for information-only items (printed without a number). */
+  parts: PaperItemPart[];
+  /** Shared stimuli (package paths) this item refers to. */
+  stimulusRefs: string[];
+  rubricHtml?: string;
   answerKey?: PaperAnswerKey;
 };
+
+export type PaperStimulus = { identifier: string; title?: string; html: string };
 
 export type PaperAssessment = {
   title: string;
@@ -122,11 +228,22 @@ export type PaperAssessment = {
   /** Optional publisher/author from package metadata. */
   author?: string;
   items: PaperItem[];
+  /** Shared stimuli by package path. */
+  stimuli: Map<string, PaperStimulus>;
   /** Asset lookup by relative path. */
   assets: Map<string, PaperAsset>;
 };
 
-export type ExportOptions = {
+export type ParseOptions = {
+  /**
+   * Keep options in source order even when the interaction says shuffle="true".
+   * By default shuffled interactions get a fixed, seeded order on paper so the
+   * source order (often the correct order) is not given away.
+   */
+  keepSourceOrder?: boolean;
+};
+
+export type ExportOptions = ParseOptions & {
   locale?: ExportLocale;
   /**
    * Append the correction sheet at the end of the question document.
@@ -154,18 +271,49 @@ export type ExportOptions = {
   fileNameBase?: string;
 };
 
+/**
+ * Documents the export can produce.
+ * - `workbook`: questions with answer space in place (the classic single document)
+ * - `questions`: question booklet without answer space, reusable
+ * - `answerSheet`: answer sheet with an answer area per question
+ * - `answerKey`: the answer sheet filled in, with points and scoring rubrics
+ */
+export type PaperDocumentKind = 'workbook' | 'questions' | 'answerSheet' | 'answerKey';
+
+export type PaperFormat = 'docx' | 'pdf';
+
+export type ZipExportOptions = ExportOptions & {
+  /** Default: ['docx'] */
+  formats?: PaperFormat[];
+  /** Default: ['questions', 'answerSheet', 'answerKey'] */
+  documents?: PaperDocumentKind[];
+};
+
+export type ZipExportFile = {
+  name: string;
+  kind: PaperDocumentKind;
+  format: PaperFormat;
+  bytes: Uint8Array;
+};
+
+export type ZipExportResult = {
+  zip: Uint8Array;
+  fileName: string;
+  files: ZipExportFile[];
+  paper: PaperAssessment;
+};
+
 /** Resolve where the correction sheet should appear. */
 export function resolveCorrectionPlacement(options: ExportOptions = {}): {
   inDocument: boolean;
   separate: boolean;
 } {
-  const hasNewFlags =
-    options.correctionInDocument !== undefined || options.correctionSeparate !== undefined;
+  const hasNewFlags = options.correctionInDocument !== undefined || options.correctionSeparate !== undefined;
 
   if (hasNewFlags) {
     return {
       inDocument: options.correctionInDocument === true,
-      separate: options.correctionSeparate === true,
+      separate: options.correctionSeparate === true
     };
   }
 
@@ -176,7 +324,7 @@ export function resolveCorrectionPlacement(options: ExportOptions = {}): {
   const separate = options.separateAnswerKey !== false;
   return {
     inDocument: !separate,
-    separate,
+    separate
   };
 }
 

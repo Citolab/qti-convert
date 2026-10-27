@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns="http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1" identifier="all-types-manifest">
+  <resources>
+    <resource identifier="TEST" type="imsqti_test_xmlv3p0" href="AssessmentTest.xml"><file href="AssessmentTest.xml"/></resource>
+    <resource identifier="ITEM_INFO" type="imsqti_item_xmlv3p0" href="ITEM_INFO.xml"><file href="ITEM_INFO.xml"/></resource>
+    <resource identifier="ITEM_INLINE_CHOICE" type="imsqti_item_xmlv3p0" href="ITEM_INLINE_CHOICE.xml"><file href="ITEM_INLINE_CHOICE.xml"/></resource>
+    <resource identifier="ITEM_ASSOCIATE" type="imsqti_item_xmlv3p0" href="ITEM_ASSOCIATE.xml"><file href="ITEM_ASSOCIATE.xml"/></resource>
+    <resource identifier="ITEM_MATCH_LARGE" type="imsqti_item_xmlv3p0" href="ITEM_MATCH_LARGE.xml"><file href="ITEM_MATCH_LARGE.xml"/></resource>
+    <resource identifier="ITEM_HOTSPOT" type="imsqti_item_xmlv3p0" href="ITEM_HOTSPOT.xml"><file href="ITEM_HOTSPOT.xml"/></resource>
+    <resource identifier="ITEM_GRAPHIC_ORDER" type="imsqti_item_xmlv3p0" href="ITEM_GRAPHIC_ORDER.xml"><file href="ITEM_GRAPHIC_ORDER.xml"/></resource>
+    <resource identifier="ITEM_GRAPHIC_ASSOCIATE" type="imsqti_item_xmlv3p0" href="ITEM_GRAPHIC_ASSOCIATE.xml"><file href="ITEM_GRAPHIC_ASSOCIATE.xml"/></resource>
+    <resource identifier="ITEM_GRAPHIC_GAP" type="imsqti_item_xmlv3p0" href="ITEM_GRAPHIC_GAP.xml"><file href="ITEM_GRAPHIC_GAP.xml"/></resource>
+    <resource identifier="ITEM_SLIDER" type="imsqti_item_xmlv3p0" href="ITEM_SLIDER.xml"><file href="ITEM_SLIDER.xml"/></resource>
+    <resource identifier="ITEM_POSITION" type="imsqti_item_xmlv3p0" href="ITEM_POSITION.xml"><file href="ITEM_POSITION.xml"/></resource>
+    <resource identifier="ITEM_DRAWING" type="imsqti_item_xmlv3p0" href="ITEM_DRAWING.xml"><file href="ITEM_DRAWING.xml"/></resource>
+    <resource identifier="ITEM_UPLOAD" type="imsqti_item_xmlv3p0" href="ITEM_UPLOAD.xml"><file href="ITEM_UPLOAD.xml"/></resource>
+    <resource identifier="ITEM_PCI" type="imsqti_item_xmlv3p0" href="ITEM_PCI.xml"><file href="ITEM_PCI.xml"/></resource>
+    <resource identifier="ITEM_MULTI_PART" type="imsqti_item_xmlv3p0" href="ITEM_MULTI_PART.xml"><file href="ITEM_MULTI_PART.xml"/></resource>
+    <resource identifier="ITEM_RICH" type="imsqti_item_xmlv3p0" href="ITEM_RICH.xml"><file href="ITEM_RICH.xml"/></resource>
+    <resource identifier="ITEM_MEDIA" type="imsqti_item_xmlv3p0" href="ITEM_MEDIA.xml"><file href="ITEM_MEDIA.xml"/></resource>
+    <resource identifier="ITEM_STIM_A" type="imsqti_item_xmlv3p0" href="ITEM_STIM_A.xml"><file href="ITEM_STIM_A.xml"/></resource>
+    <resource identifier="ITEM_STIM_B" type="imsqti_item_xmlv3p0" href="ITEM_STIM_B.xml"><file href="ITEM_STIM_B.xml"/></resource>
+    <resource identifier="STIM" type="imsqti_stimulus_xmlv3p0" href="stimuli/vos.xml"><file href="stimuli/vos.xml"/></resource>
+  </resources>
+</manifest>

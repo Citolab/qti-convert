@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.9.0
+
+### Added
+
+- **Paper export as a zip with three documents** (`@citolab/qti-convert-export`: `convertPackageToZip`, `renderPaperZip`; `qti-export-docx --zip`). A question booklet without answer space (reusable), an answer sheet with an answer area per question, and an answer key that is the answer sheet filled in, with points, accepted alternatives, scoring rubrics and a total. Word by default; `formats: ['pdf']` or `['docx', 'pdf']` (`--pdf`, `--both`) for PDF. Single documents via `renderDocxDocument` / `renderPdfDocument` with `'workbook' | 'questions' | 'answerSheet' | 'answerKey'`.
+- **Paper designs for every interaction type.** New: associate, hotspot, graphic order, graphic associate and graphic gap match (letters or numbers drawn on the hotspots), slider, position object, drawing and upload. Media interactions print a note; PCI and custom interactions print "digital only" and keep their question number.
+- **Items with several interactions** keep all of them, labelled a, b, c, in reading order. Before, only the first was exported.
+- **Shared stimuli** (`qti-assessment-stimulus-ref`) print once, before the first question that uses them. Items without interactions (introductions, section texts) print without a question number instead of being dropped.
+- **Tables, lists, headings, sub/superscript and MathML** in item content (x², H₂O, fractions, roots) instead of flattened text.
+- **QTI 2.1 items** are read as well as QTI 3.
+
+### Changed
+
+- **The Word and PDF output share one design.** `compose.ts` builds a format-neutral layout once; `render-docx.ts` and `render-pdf.ts` only draw it, so both formats always match. `convertPackageToDocx` / `convertPackageToPdf` keep their signature and still produce one document with answer space in place (plus the answer key), on the new designs.
+- **Shuffled interactions get a fixed, seeded order on paper** (fixed choices stay put) and an order item never prints in its correct order. `keepSourceOrder: true` (`--keep-order`) prints the source order.
+- **The answer key uses paper letters** ("C") with the option text, instead of only the option text.
+- **Numbered gaps.** Text entries, dropdowns and gap-match gaps are numbered (1), (2) across an item when there is more than one; the word bank is lettered.
+- **Choice questions say how many answers to give** (from `min-choices` / `max-choices`), and single and multiple choice look different (○ vs ☐).
+- **A question is kept on one page** when it fits.
+- **Images keep their aspect ratio** (read from the PNG/JPEG/GIF/SVG header when the item gives no height).
+- **English exports contain no Dutch.** All labels and notes come from the locale.
+- **The `PaperItem` model changed** (`parts`, `body`, `stimulusRefs` instead of `interaction` and `stimulus`). Only code that inspects the model directly is affected.
+- Dependencies updated across the workspace, including vitest 5, tsup 9 and Storybook 10.6.
+
+### Fixed
+
+- Associate interactions exported as an empty question.
+- Hottext and gap-match text kept the line breaks of the XML source, scattering sentences over several lines.
+- Select-point instructions were printed twice, with on-screen wording ("Klik op …").
+
 ## 0.8.3
 
 ### Fixed

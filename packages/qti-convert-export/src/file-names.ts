@@ -1,4 +1,5 @@
-import type { ExportLocale } from './types.js';
+import { getLocaleStrings } from './locale.js';
+import type { ExportLocale, PaperDocumentKind, PaperFormat } from './types.js';
 
 /** Sanitize a base name for download filenames. */
 export function safeFileName(name: string): string {
@@ -44,4 +45,19 @@ export function resolveFileNameBase(
 ): string {
   if (optionsBase?.trim()) return safeFileName(optionsBase.trim());
   return safeFileName(assessmentTitle);
+}
+
+/** File name of one document in the paper zip, e.g. "Toets - antwoordblad.docx". */
+export function paperDocumentFileName(
+  base: string,
+  kind: PaperDocumentKind,
+  format: PaperFormat,
+  locale: ExportLocale = 'en'
+): string {
+  return `${safeFileName(base)} - ${getLocaleStrings(locale).fileSuffix[kind]}.${format}`;
+}
+
+/** Name of the paper zip; distinct from the QTI package zip it came from. */
+export function paperZipFileName(base: string, locale: ExportLocale = 'en'): string {
+  return `${safeFileName(base)}-${getLocaleStrings(locale).zipSuffix}.zip`;
 }

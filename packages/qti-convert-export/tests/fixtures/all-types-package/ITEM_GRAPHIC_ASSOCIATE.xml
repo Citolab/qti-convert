@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_GRAPHIC_ASSOCIATE" title="Grafisch koppelen" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="pair"><qti-correct-response><qti-value>HOUSE TREE</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-graphic-associate-interaction response-identifier="RESPONSE" max-associations="1">
+      <qti-prompt>Welke twee dingen staan op de grond?</qti-prompt>
+      <img src="resources/scene.png" width="400" height="300" alt="Tekening van een huis"/>
+      <qti-associable-hotspot identifier="SUN" shape="circle" coords="330,60,35" match-max="1"/>
+      <qti-associable-hotspot identifier="HOUSE" shape="rect" coords="60,120,180,200" match-max="1"/>
+      <qti-associable-hotspot identifier="TREE" shape="poly" coords="210,80,290,80,290,160,210,160" match-max="1"/>
+    </qti-graphic-associate-interaction>
+  </qti-item-body>
+</qti-assessment-item>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_RICH" title="Rijke inhoud" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"><qti-correct-response><qti-value>Amsterdam</qti-value></qti-correct-response><qti-mapping default-value="0"><qti-map-entry map-key="Amsterdam" mapped-value="1"/><qti-map-entry map-key="A&apos;dam" mapped-value="1"/></qti-mapping></qti-response-declaration>
+
+  <qti-item-body>
+    <table><thead><tr><th>Stad</th><th>Inwoners</th></tr></thead><tbody><tr><td>Amsterdam</td><td>930.000</td></tr><tr><td>Rotterdam</td><td>670.000</td></tr></tbody></table>
+    <ul><li>Let op de <strong>hoofdstad</strong>.</li><li>Gebruik de tabel.</li></ul>
+    <p>Ook geldt: <math xmlns="http://www.w3.org/1998/Math/MathML"><msup><mi>x</mi><mn>2</mn></msup><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac></math> en H<sub>2</sub>O.</p>
+    <p>De hoofdstad van Nederland is <qti-text-entry-interaction response-identifier="RESPONSE" expected-length="15"/>.</p>
+  </qti-item-body>
+</qti-assessment-item>

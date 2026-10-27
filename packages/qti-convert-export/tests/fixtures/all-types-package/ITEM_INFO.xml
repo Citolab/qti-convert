@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_INFO" title="Introductie" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+
+  <qti-item-body>
+    <h2>Deel 2: rekenen</h2>
+    <p>De volgende vragen gaan over rekenen.</p>
+  </qti-item-body>
+</qti-assessment-item>

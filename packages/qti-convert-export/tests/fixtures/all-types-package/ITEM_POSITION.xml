@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_POSITION" title="Plaatsen" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="point"><qti-area-mapping default-value="0"><qti-area-map-entry shape="rect" coords="60,200,180,300" mapped-value="1"/></qti-area-mapping></qti-response-declaration>
+
+  <qti-item-body>
+    <p>Waar parkeer je de fiets?</p>
+    <qti-position-object-stage>
+      <img src="resources/scene.png" width="400" height="300" alt="Tekening van een huis"/>
+      <qti-position-object-interaction response-identifier="RESPONSE" max-choices="1">
+        <img src="resources/scene.png" width="40" height="30" alt="fiets"/>
+      </qti-position-object-interaction>
+    </qti-position-object-stage>
+  </qti-item-body>
+</qti-assessment-item>

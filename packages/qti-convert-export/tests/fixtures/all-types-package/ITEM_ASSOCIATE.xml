@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_ASSOCIATE" title="Paren" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="multiple" base-type="pair"><qti-correct-response><qti-value>appel peer</qti-value><qti-value>fiets auto</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-associate-interaction response-identifier="RESPONSE" max-associations="2" shuffle="false">
+      <qti-prompt>Welke dingen horen bij elkaar?</qti-prompt>
+      <qti-simple-associable-choice identifier="appel" match-max="1">Appel</qti-simple-associable-choice>
+      <qti-simple-associable-choice identifier="fiets" match-max="1">Fiets</qti-simple-associable-choice>
+      <qti-simple-associable-choice identifier="peer" match-max="1">Peer</qti-simple-associable-choice>
+      <qti-simple-associable-choice identifier="auto" match-max="1">Auto</qti-simple-associable-choice>
+    </qti-associate-interaction>
+  </qti-item-body>
+</qti-assessment-item>

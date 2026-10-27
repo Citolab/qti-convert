@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_STIM_B" title="Bij de tekst B" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-assessment-stimulus-ref identifier="STIM" href="stimuli/vos.xml" title="De vos"/>
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="string"><qti-correct-response><qti-value>nacht</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <p>De vos jaagt vooral in de <qti-text-entry-interaction response-identifier="RESPONSE"/>.</p>
+  </qti-item-body>
+</qti-assessment-item>

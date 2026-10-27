@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="ITEM_SLIDER" title="Schuifregelaar" adaptive="false" time-dependent="false" xml:lang="nl-NL">
+  <qti-response-declaration identifier="RESPONSE" cardinality="single" base-type="integer"><qti-correct-response><qti-value>100</qti-value></qti-correct-response></qti-response-declaration>
+
+  <qti-item-body>
+    <qti-slider-interaction response-identifier="RESPONSE" lower-bound="0" upper-bound="150" step="10">
+      <qti-prompt>Bij hoeveel graden Celsius kookt water?</qti-prompt>
+    </qti-slider-interaction>
+  </qti-item-body>
+</qti-assessment-item>

@@ -1,772 +1,763 @@
-import type { CheerioAPI } from 'cheerio';
+import type { Cheerio, CheerioAPI } from 'cheerio';
 import type { AnyNode, Element } from 'domhandler';
-import { innerHtml, labelFromIndex, loadXml, resolveAssetRef, textContent } from './xml-utils.js';
+import {
+  escapeHtml,
+  rawInnerHtml,
+  labelFromIndex,
+  loadXml,
+  normalizeQti2,
+  resolveAssetRef,
+  seededShuffle,
+  stripTags,
+  textContent
+} from './xml-utils.js';
 import type {
-  PaperAnswerKey,
+  PaperArea,
   PaperAsset,
-  PaperChoiceOption,
-  PaperContentBlock,
-  PaperGapPart,
-  PaperHottextPart,
+  PaperBodyNode,
+  PaperHotspot,
+  PaperImageRef,
   PaperInteraction,
   PaperItem,
-  PaperMatchOption,
+  PaperItemPart,
+  PaperOption,
+  PaperPair,
+  PaperShape,
+  ParseOptions
 } from './types.js';
-import { getLocaleStrings } from './locale.js';
 
-function isElement(node: AnyNode): node is Element {
-  return (node as Element).type === 'tag' || (node as Element).tagName !== undefined;
-}
+type Decl = {
+  identifier: string;
+  baseType: string;
+  correct: string[];
+  /** Mapping keys with a positive score, best first. */
+  mapped: string[];
+  areas: PaperArea[];
+};
 
-function nodeName(el: Element): string {
-  return (el.tagName || el.name || '').toLowerCase();
-}
+type Ctx = {
+  $: CheerioAPI;
+  decls: Map<string, Decl>;
+  itemId: string;
+  itemHref: string;
+  options: ParseOptions;
+  body: PaperBodyNode[];
+  parts: PaperItemPart[];
+  gapCount: number;
+  /** Inline parts still collecting gaps from following paragraphs. */
+  open: { textEntry?: number; inlineChoice?: number };
+};
 
-function collectCorrectValues($: CheerioAPI, responseId?: string): string[] {
-  const values: string[] = [];
-  const decls = responseId
-    ? $(`qti-response-declaration[identifier="${responseId}"], responseDeclaration[identifier="${responseId}"]`)
-    : $('qti-response-declaration, responseDeclaration');
-
-  decls.each((_, decl) => {
-    $(decl)
-      .find('qti-correct-response qti-value, correctResponse value, qti-value')
-      .each((__, v) => {
-        // Only direct correct-response values
-        const parent = $(v).parent();
-        const pName = nodeName(parent.get(0) as Element);
-        if (pName === 'qti-correct-response' || pName === 'correctresponse') {
-          const t = textContent($, v);
-          if (t) values.push(t);
-        }
-      });
-  });
-
-  // Fallback: any qti-correct-response under matching declaration
-  if (values.length === 0) {
-    decls.find('qti-correct-response, correctResponse').each((_, cr) => {
-      $(cr)
-        .children('qti-value, value')
-        .each((__, v) => {
-          const t = textContent($, v);
-          if (t) values.push(t);
-        });
-    });
-  }
-  return values;
-}
-
-function choiceOptions($: CheerioAPI, interaction: AnyNode): PaperChoiceOption[] {
-  const choices: PaperChoiceOption[] = [];
-  $(interaction)
-    .children('qti-simple-choice, simpleChoice')
-    .each((i, el) => {
-      const identifier = $(el).attr('identifier') || `C${i + 1}`;
-      // Kennisnet style: always A, B, C by order (not QTI identifier)
-      choices.push({
-        identifier,
-        label: labelFromIndex(i),
-        contentHtml: innerHtml($, el) || textContent($, el),
-      });
-    });
-  return choices;
-}
-
-function matchOptions($: CheerioAPI, set: AnyNode): PaperMatchOption[] {
-  const options: PaperMatchOption[] = [];
-  $(set)
-    .find('qti-simple-associable-choice, simpleAssociableChoice')
-    .each((i, el) => {
-      options.push({
-        identifier: $(el).attr('identifier') || `M${i + 1}`,
-        contentHtml: innerHtml($, el) || textContent($, el),
-      });
-    });
-  return options;
-}
-
-function htmlToBlocks(html: string, itemHref = ''): PaperContentBlock[] {
-  if (!html.trim()) return [];
-  const $ = loadXml(`<root>${html}</root>`);
-  const blocks: PaperContentBlock[] = [];
-
-  const root = $('root').get(0);
-  if (!root) return [{ type: 'paragraph', html }];
-
-  const children = $(root).contents().toArray();
-  let buffer = '';
-
-  const flush = () => {
-    const t = buffer.trim();
-    if (t) blocks.push({ type: 'paragraph', html: t });
-    buffer = '';
-  };
-
-  const pushImage = (imgEl: AnyNode) => {
-    const raw = $(imgEl).attr('src') || '';
-    const src = resolveAssetRef(raw, itemHref);
-    if (!src) return;
-    blocks.push({
-      type: 'image',
-      assetPath: src,
-      alt: $(imgEl).attr('alt') || undefined,
-      width: parseInt($(imgEl).attr('width') || '', 10) || undefined,
-      height: parseInt($(imgEl).attr('height') || '', 10) || undefined,
-    });
-  };
-
-  for (const child of children) {
-    if (child.type === 'text') {
-      buffer += $(child).text();
-      continue;
-    }
-    if (!isElement(child)) continue;
-    const name = nodeName(child);
-    if (name === 'img') {
-      flush();
-      pushImage(child);
-    } else if (name === 'p' || name === 'div' || name === 'blockquote') {
-      flush();
-      $(child)
-        .find('img')
-        .each((_, img) => pushImage(img));
-      const clone = $(child).clone();
-      clone.find('img').remove();
-      const text = (clone.html() || clone.text() || '').trim();
-      if (text) blocks.push({ type: 'paragraph', html: text });
-    } else {
-      buffer += $.html(child) || '';
-    }
-  }
-  flush();
-  if (blocks.length === 0 && html.trim()) {
-    blocks.push({ type: 'paragraph', html });
-  }
-  return blocks;
-}
-
-const BLOCK_INTERACTION_SEL = [
+/** Interactions that occupy their own block in the item body. */
+const BLOCK_INTERACTIONS = new Set([
   'qti-choice-interaction',
   'qti-order-interaction',
   'qti-match-interaction',
   'qti-associate-interaction',
   'qti-gap-match-interaction',
   'qti-hottext-interaction',
-  'qti-select-point-interaction',
-  'qti-extended-text-interaction',
-  'qti-portable-custom-interaction',
-  'qti-media-interaction',
-  'qti-upload-interaction',
   'qti-hotspot-interaction',
-  'qti-graphic-gap-match-interaction',
   'qti-graphic-order-interaction',
   'qti-graphic-associate-interaction',
-  'qti-slider-interaction',
+  'qti-graphic-gap-match-interaction',
+  'qti-select-point-interaction',
+  'qti-position-object-stage',
   'qti-position-object-interaction',
+  'qti-slider-interaction',
+  'qti-drawing-interaction',
+  'qti-upload-interaction',
+  'qti-extended-text-interaction',
+  'qti-portable-custom-interaction',
   'qti-custom-interaction',
-  'choiceInteraction',
-  'orderInteraction',
-  'matchInteraction',
-  'associateInteraction',
-  'gapMatchInteraction',
-  'hottextInteraction',
-  'selectPointInteraction',
-  'extendedTextInteraction',
+  'qti-media-interaction',
+  'qti-end-attempt-interaction'
+]);
+
+const INLINE_SELECTOR = 'qti-text-entry-interaction, qti-inline-choice-interaction';
+const BLOCK_SELECTOR = [...BLOCK_INTERACTIONS].join(', ');
+const DROPPED_SELECTOR = [
+  'qti-feedback-block',
+  'qti-feedback-inline',
+  'qti-modal-feedback',
+  'qti-printed-variable',
+  'qti-end-attempt-interaction',
+  'qti-response-processing'
 ].join(', ');
 
-function bodyStimulusOutsideInteractions($: CheerioAPI, itemHref = ''): PaperContentBlock[] {
-  const body = $('qti-item-body, itemBody').first();
-  if (!body.length) return [];
-  const blocks: PaperContentBlock[] = [];
-  body.contents().each((_, child) => {
-    if (child.type === 'text') {
-      const t = $(child).text().trim();
-      if (t) blocks.push({ type: 'paragraph', html: t });
-      return;
-    }
-    if (!isElement(child)) return;
-    const name = nodeName(child);
-    if (name.startsWith('qti-') && name.includes('interaction')) return;
-    if (name.endsWith('interaction')) return;
-    if (name === 'qti-feedback-block' || name === 'feedbackblock') return;
-    if (name === 'qti-rubric-block' || name === 'rubricblock') return;
-    if (name === 'img') {
-      const src = resolveAssetRef($(child).attr('src') || '', itemHref);
-      if (src) {
-        blocks.push({
-          type: 'image',
-          assetPath: src,
-          alt: $(child).attr('alt') || undefined,
-        });
+function nodeName(node: AnyNode): string {
+  const el = node as Element;
+  return (el.tagName || el.name || '').toLowerCase();
+}
+
+function isElement(node: AnyNode): node is Element {
+  return node.type === 'tag' || node.type === 'script' || node.type === 'style';
+}
+
+function intAttr($el: Cheerio<AnyNode>, name: string, fallback: number): number {
+  const n = parseInt($el.attr(name) || '', 10);
+  return Number.isNaN(n) ? fallback : n;
+}
+
+function numAttr($el: Cheerio<AnyNode>, name: string): number | undefined {
+  const raw = $el.attr(name) || '';
+  if (raw.includes('%')) return undefined;
+  const n = parseFloat(raw);
+  return Number.isNaN(n) ? undefined : n;
+}
+
+function parseShape(raw: string | undefined): PaperShape {
+  const s = (raw || '').toLowerCase();
+  if (s === 'circle' || s === 'poly' || s === 'ellipse' || s === 'default') return s;
+  if (s.startsWith('rect')) return 'rect';
+  return 'default';
+}
+
+function parseCoords(raw: string | undefined): number[] {
+  return (raw || '')
+    .split(/[\s,]+/)
+    .map(v => parseFloat(v))
+    .filter(n => !Number.isNaN(n));
+}
+
+function readDeclarations($: CheerioAPI): Map<string, Decl> {
+  const decls = new Map<string, Decl>();
+  $('qti-response-declaration').each((_, el) => {
+    const $el = $(el);
+    const identifier = $el.attr('identifier') || '';
+    const baseType = ($el.attr('base-type') || '').toLowerCase();
+    const correct = $el
+      .children('qti-correct-response')
+      .children('qti-value')
+      .map((__, v) => textContent($, v))
+      .get()
+      .filter(Boolean);
+    const mapped = $el
+      .find('qti-mapping qti-map-entry')
+      .map((__, e) => ({ key: $(e).attr('map-key') || '', value: parseFloat($(e).attr('mapped-value') || '0') }))
+      .get()
+      .filter(e => e.key && e.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .map(e => e.key);
+    const areas: PaperArea[] = $el
+      .find('qti-area-mapping qti-area-map-entry')
+      .filter((__, e) => parseFloat($(e).attr('mapped-value') || '0') > 0)
+      .map((__, e) => ({ shape: parseShape($(e).attr('shape')), coords: parseCoords($(e).attr('coords')) }))
+      .get();
+    if (baseType === 'point') {
+      for (const value of correct) {
+        const [x, y] = parseCoords(value);
+        if (x !== undefined && y !== undefined) areas.push({ shape: 'circle', coords: [x, y, 6] });
       }
-      return;
     }
-    // Inline text/dropdown items are handled by parseInlineTextEntries
-    if (
-      $(child).find(
-        'qti-text-entry-interaction, textEntryInteraction, qti-inline-choice-interaction, inlineChoiceInteraction'
-      ).length &&
-      !$(child).find(BLOCK_INTERACTION_SEL).length
-    ) {
-      return;
-    }
-    // Nested block interactions: keep surrounding prompt/images, strip the interaction itself
-    if ($(child).find(BLOCK_INTERACTION_SEL).length) {
-      const clone = $(child).clone();
-      clone.find(BLOCK_INTERACTION_SEL).remove();
-      clone.find('qti-rubric-block, rubricBlock, qti-feedback-block, feedbackBlock').remove();
-      const html = (clone.html() || '').trim();
-      if (html) blocks.push(...htmlToBlocks(html, itemHref));
-      return;
-    }
-    blocks.push(...htmlToBlocks($.html(child) || '', itemHref));
+    decls.set(identifier, { identifier, baseType, correct, mapped, areas });
   });
-  return blocks;
+  return decls;
 }
 
-function promptBlocks($: CheerioAPI, interaction: AnyNode, itemHref = ''): PaperContentBlock[] {
-  const prompt = $(interaction).children('qti-prompt, prompt').first();
-  if (!prompt.length) return [];
-  return htmlToBlocks(innerHtml($, prompt.get(0)) || textContent($, prompt.get(0)), itemHref);
+/** Correct values, falling back to positively scored mapping keys. */
+function correctValues(ctx: Ctx, responseId: string): string[] {
+  const decl = ctx.decls.get(responseId);
+  if (!decl) return [];
+  return decl.correct.length ? decl.correct : decl.mapped;
 }
 
-function parseChoice($: CheerioAPI, el: AnyNode): PaperInteraction {
-  const maxChoices = parseInt($(el).attr('max-choices') || $(el).attr('maxChoices') || '1', 10);
-  const multi = maxChoices === 0 || maxChoices > 1;
-  return {
-    kind: 'choice',
-    multi,
-    choices: choiceOptions($, el),
-  };
+function correctPairs(ctx: Ctx, responseId: string): PaperPair[] {
+  return correctValues(ctx, responseId)
+    .map(v => v.split(/\s+/))
+    .filter(p => p.length === 2)
+    .map(([a, b]) => [a, b] as PaperPair);
 }
 
-function parseOrder($: CheerioAPI, el: AnyNode): PaperInteraction {
-  const orientation = (($(el).attr('orientation') || 'vertical') as string).toLowerCase() === 'horizontal'
-    ? 'horizontal'
-    : 'vertical';
-  return {
-    kind: 'order',
-    orientation,
-    items: choiceOptions($, el),
-  };
+function responseIdOf($el: Cheerio<AnyNode>): string {
+  return $el.attr('response-identifier') || '';
 }
 
-function parseMatch($: CheerioAPI, el: AnyNode): PaperInteraction {
-  const sets = $(el).children('qti-simple-match-set, simpleMatchSet').toArray();
-  const rows = sets[0] ? matchOptions($, sets[0]) : [];
-  const columns = sets[1] ? matchOptions($, sets[1]) : [];
-  // Matrix when columns look like judgements (juist/onjuist, true/false)
-  const colTexts = columns.map(c => c.contentHtml.replace(/<[^>]+>/g, '').trim().toLowerCase());
-  const matrixish =
-    columns.length > 0 &&
-    columns.length <= 4 &&
-    colTexts.every(t => /^(juist|onjuist|true|false|yes|no|waar|niet waar)$/i.test(t));
-  const cls = ($(el).attr('class') || '').toLowerCase();
-  // Wikiwijs: qti-choices-right → option bank under ANTWOORDEN; otherwise bank above blanks
-  const bankPlacement: 'top' | 'answers' = cls.includes('qti-choices-right') ? 'answers' : 'top';
-  return {
-    kind: 'match',
-    mode: matrixish ? 'matrix' : 'pairs',
-    bankPlacement: matrixish ? undefined : bankPlacement,
-    rows,
-    columns,
-  };
+function wrap(ctx: Ctx, el: AnyNode): Cheerio<Element> {
+  const { $ } = ctx;
+  const root = $('<paper-root></paper-root>');
+  root.append($(el).clone());
+  return root as Cheerio<Element>;
 }
 
-function parseGapMatch($: CheerioAPI, el: AnyNode): PaperInteraction {
-  const options: PaperMatchOption[] = [];
-  $(el)
-    .children('qti-gap-text, gapText')
-    .each((i, g) => {
-      options.push({
-        identifier: $(g).attr('identifier') || `W${i + 1}`,
-        contentHtml: innerHtml($, g) || textContent($, g),
-      });
-    });
-
-  const parts: PaperGapPart[] = [];
-  const walk = (nodes: AnyNode[]) => {
-    for (const node of nodes) {
-      if (node.type === 'text') {
-        const t = $(node).text();
-        if (t) parts.push({ type: 'text', html: t });
-        continue;
-      }
-      if (!isElement(node)) continue;
-      const name = nodeName(node);
-      if (name === 'qti-gap' || name === 'gap') {
-        parts.push({ type: 'gap', identifier: $(node).attr('identifier') || '' });
-      } else if (name === 'qti-gap-text' || name === 'gaptext' || name === 'qti-prompt' || name === 'prompt') {
-        continue;
-      } else if (name === 'p' || name === 'div') {
-        walk($(node).contents().toArray());
-        parts.push({ type: 'text', html: '\n' });
-      } else {
-        walk($(node).contents().toArray());
-      }
+/**
+ * Turn raw QTI content into the HTML the layout step expects: feedback and
+ * scoring markup removed, image paths resolved, image objects as <img>, and
+ * audio/video replaced by a marker.
+ */
+function cleanContent(ctx: Ctx, root: Cheerio<Element>): void {
+  const { $ } = ctx;
+  root.find(DROPPED_SELECTOR).remove();
+  root.find('qti-rubric-block').each((_, el) => {
+    const view = ($(el).attr('view') || '').toLowerCase();
+    if (view && !view.includes('candidate')) $(el).remove();
+    else $(el).replaceWith($(el).find('qti-content-body').html() ?? $(el).html() ?? '');
+  });
+  root.find('img').each((_, img) => {
+    $(img).attr('src', resolveAssetRef($(img).attr('src') || '', ctx.itemHref));
+  });
+  root.find('object').each((_, obj) => {
+    const $obj = $(obj);
+    const data = $obj.attr('data') || '';
+    const type = ($obj.attr('type') || '').toLowerCase();
+    if (type.startsWith('image/') || /\.(png|jpe?g|gif|svg|webp)$/i.test(data)) {
+      const img = $('<img/>');
+      img.attr('src', resolveAssetRef(data, ctx.itemHref));
+      for (const a of ['width', 'height']) if ($obj.attr(a)) img.attr(a, $obj.attr(a)!);
+      const alt = textContent($, obj);
+      if (alt) img.attr('alt', alt);
+      $obj.replaceWith(img);
+    } else if (type.startsWith('audio/') || type.startsWith('video/')) {
+      $obj.replaceWith(`<paper-media type="${type.startsWith('audio/') ? 'audio' : 'video'}"/>`);
+    } else {
+      $obj.replaceWith(escapeHtml(textContent($, obj)));
     }
-  };
-  walk($(el).contents().toArray());
-  return { kind: 'gapMatch', options, parts };
+  });
+  root.find('audio, video').each((_, el) => {
+    $(el).replaceWith(`<paper-media type="${nodeName(el)}"/>`);
+  });
 }
 
-function parseHottext($: CheerioAPI, el: AnyNode): PaperInteraction {
-  const parts: PaperHottextPart[] = [];
-  const walk = (nodes: AnyNode[]) => {
-    for (const node of nodes) {
-      if (node.type === 'text') {
-        const t = $(node).text();
-        if (t) parts.push({ type: 'text', text: t });
-        continue;
-      }
-      if (!isElement(node)) continue;
-      const name = nodeName(node);
-      if (name === 'qti-hottext' || name === 'hottext') {
-        parts.push({
-          type: 'hottext',
-          identifier: $(node).attr('identifier') || '',
-          text: textContent($, node),
-        });
-      } else if (name === 'qti-prompt' || name === 'prompt') {
-        continue;
-      } else {
-        walk($(node).contents().toArray());
-      }
-    }
-  };
-  walk($(el).contents().toArray());
-  return { kind: 'hottext', parts };
+function innerContent(ctx: Ctx, el: AnyNode | undefined): string {
+  if (!el) return '';
+  const root = wrap(ctx, el);
+  cleanContent(ctx, root);
+  return rawInnerHtml(ctx.$, root.children().get(0));
 }
 
-function parseSelectPoint($: CheerioAPI, el: AnyNode, itemHref = ''): PaperInteraction {
-  const img = $(el).find('img').first();
-  const src = resolveAssetRef(img.attr('src') || '', itemHref);
-  const prompt = textContent($, $(el).children('qti-prompt, prompt').get(0));
+function promptOf(ctx: Ctx, el: AnyNode): string | undefined {
+  const prompt = ctx.$(el).children('qti-prompt').get(0);
+  const html = innerContent(ctx, prompt).trim();
+  return html || undefined;
+}
+
+function shouldShuffle(ctx: Ctx, $el: Cheerio<AnyNode>): boolean {
+  return !ctx.options.keepSourceOrder && ($el.attr('shuffle') || '').toLowerCase() === 'true';
+}
+
+/** Options from child elements, shuffled per the interaction and labelled. */
+function optionsOf(
+  ctx: Ctx,
+  el: AnyNode,
+  selector: string,
+  labels: 'letters' | 'numbers',
+  seedSuffix = '',
+  shuffle = shouldShuffle(ctx, ctx.$(el))
+): PaperOption[] {
+  const { $ } = ctx;
+  const raw = $(el)
+    .find(selector)
+    .toArray()
+    .map((child, i) => ({
+      identifier: $(child).attr('identifier') || `${i + 1}`,
+      html: innerContent(ctx, child),
+      fixed: ($(child).attr('fixed') || '').toLowerCase() === 'true'
+    }));
+  const ordered = shuffle ? seededShuffle(raw, `${ctx.itemId}:${responseIdOf($(el))}${seedSuffix}`, o => o.fixed) : raw;
+  return ordered.map((o, i) => ({
+    identifier: o.identifier,
+    label: labels === 'letters' ? labelFromIndex(i) : String(i + 1),
+    html: o.html
+  }));
+}
+
+function imageOf(ctx: Ctx, el: AnyNode): PaperImageRef | undefined {
+  const { $ } = ctx;
+  const img = $(el)
+    .find('img, object')
+    .filter((_, n) => !$(n).closest('qti-gap-img, qti-gap-text, qti-prompt, qti-position-object-interaction').length)
+    .first();
+  if (!img.length) return undefined;
+  const src = img.attr('src') || img.attr('data') || '';
+  const path = resolveAssetRef(src, ctx.itemHref);
+  if (!path) return undefined;
   return {
-    kind: 'selectPoint',
-    imageAsset: src,
-    instruction: prompt || getLocaleStrings('nl').selectPointInstruction,
-    alt: img.attr('alt') || undefined,
-    width: parseInt(img.attr('width') || '', 10) || undefined,
-    height: parseInt(img.attr('height') || '', 10) || undefined,
+    path,
+    alt: img.attr('alt') || textContent($, img.get(0)) || undefined,
+    width: numAttr(img, 'width'),
+    height: numAttr(img, 'height')
   };
 }
 
-function parseExtendedText($: CheerioAPI, el: AnyNode): PaperInteraction {
-  const expectedLines = parseInt($(el).attr('expected-lines') || $(el).attr('expectedLines') || '6', 10);
-  return { kind: 'extendedText', lines: Math.max(3, expectedLines || 6) };
+function hotspotsOf(ctx: Ctx, el: AnyNode, labels: 'letters' | 'numbers'): PaperHotspot[] {
+  const { $ } = ctx;
+  return $(el)
+    .find('qti-hotspot-choice, qti-associable-hotspot')
+    .toArray()
+    .map((h, i) => ({
+      identifier: $(h).attr('identifier') || `H${i + 1}`,
+      label: labels === 'letters' ? labelFromIndex(i) : String(i + 1),
+      shape: parseShape($(h).attr('shape')),
+      coords: parseCoords($(h).attr('coords'))
+    }));
 }
 
-function replaceTextEntriesInHtml($: CheerioAPI, el: AnyNode): { html: string; blanks: number } {
-  const clone = $(el).clone();
-  let blanks = 0;
-  clone.find('qti-text-entry-interaction, textEntryInteraction').each((_, te) => {
-    blanks += 1;
-    $(te).replaceWith(' ________ ');
-  });
-  clone.find('qti-inline-choice-interaction, inlineChoiceInteraction').each((_, ic) => {
-    blanks += 1;
-    $(ic).replaceWith(' ________ ');
-  });
-  return { html: clone.html() || clone.text() || '', blanks };
-}
-
-function parseInlineChoiceSlots($: CheerioAPI): {
-  slots: Extract<PaperInteraction, { kind: 'inlineChoice' }>['slots'];
-  numberedHtmlByResponse: Map<string, string>;
-} {
-  const slots: Extract<PaperInteraction, { kind: 'inlineChoice' }>['slots'] = [];
-  const numberedHtmlByResponse = new Map<string, string>();
-  let n = 0;
-  $('qti-inline-choice-interaction, inlineChoiceInteraction').each((_, ic) => {
-    n += 1;
-    const responseId = $(ic).attr('response-identifier') || $(ic).attr('responseIdentifier') || `R${n}`;
-    const options: PaperChoiceOption[] = [];
-    $(ic)
-      .children('qti-inline-choice, inlineChoice')
-      .each((i, ch) => {
-        options.push({
-          identifier: $(ch).attr('identifier') || `C${i + 1}`,
-          label: labelFromIndex(i),
-          contentHtml: innerHtml($, ch) || textContent($, ch),
-        });
-      });
-    slots.push({ number: n, responseId, options });
-    numberedHtmlByResponse.set(responseId, `(${n})`);
-  });
-  return { slots, numberedHtmlByResponse };
-}
-
-function parseInlineTextEntries(
-  $: CheerioAPI,
-  itemHref = ''
-): { interaction: PaperInteraction; stimulus: PaperContentBlock[] } | null {
-  const body = $('qti-item-body, itemBody').first();
-  if (!body.length) return null;
-  const entries = body.find(
-    'qti-text-entry-interaction, textEntryInteraction, qti-inline-choice-interaction, inlineChoiceInteraction'
-  );
-  if (!entries.length) return null;
-  if (body.find(BLOCK_INTERACTION_SEL).length) return null;
-
-  const inlineChoices = body.find('qti-inline-choice-interaction, inlineChoiceInteraction');
-  const textEntries = body.find('qti-text-entry-interaction, textEntryInteraction');
-
-  // Pure inline-choice (dropdown) → Kennisnet: (1)/(2) in text + option banks below
-  if (inlineChoices.length && !textEntries.length) {
-    const { slots, numberedHtmlByResponse } = parseInlineChoiceSlots($);
-    const stimulus: PaperContentBlock[] = [];
-    body.contents().each((_, child) => {
-      if (child.type === 'text') {
-        const t = $(child).text().trim();
-        if (t) stimulus.push({ type: 'paragraph', html: t });
-        return;
-      }
-      if (!isElement(child)) return;
-      const name = nodeName(child);
-      if (name === 'qti-feedback-block' || name === 'feedbackblock') return;
-      if (name === 'qti-rubric-block' || name === 'rubricblock') return;
-      const clone = $(child).clone();
-      clone.find('qti-inline-choice-interaction, inlineChoiceInteraction').each((_, ic) => {
-        const rid = $(ic).attr('response-identifier') || $(ic).attr('responseIdentifier') || '';
-        $(ic).replaceWith(` ${numberedHtmlByResponse.get(rid) || '(?)'} `);
-      });
-      const html = (clone.html() || clone.text() || '').trim();
-      if (html) stimulus.push(...htmlToBlocks(html, itemHref));
-    });
-    return { interaction: { kind: 'inlineChoice', slots }, stimulus };
+function parseOrder(ctx: Ctx, el: AnyNode): PaperInteraction {
+  const { $ } = ctx;
+  const responseId = responseIdOf($(el));
+  const correct = correctValues(ctx, responseId);
+  let options = optionsOf(ctx, el, 'qti-simple-choice', 'letters');
+  // A shuffled order item must never print in its correct order.
+  const isCorrectOrder = (opts: PaperOption[]) =>
+    opts.length > 1 && opts.map(o => o.identifier).join(' ') === correct.join(' ');
+  for (let attempt = 1; shouldShuffle(ctx, $(el)) && isCorrectOrder(options) && attempt < 10; attempt++) {
+    options = optionsOf(ctx, el, 'qti-simple-choice', 'letters', `#${attempt}`);
   }
+  if (shouldShuffle(ctx, $(el)) && isCorrectOrder(options)) {
+    options = [...options.slice(1), options[0]].map((o, i) => ({ ...o, label: labelFromIndex(i) }));
+  }
+  return { kind: 'order', responseId, options, correct };
+}
 
-  let blanks = 0;
-  const stimulus: PaperContentBlock[] = [];
-  body.contents().each((_, child) => {
-    if (child.type === 'text') {
-      const t = $(child).text().trim();
-      if (t) stimulus.push({ type: 'paragraph', html: t });
-      return;
+function parseGapMatch(ctx: Ctx, el: AnyNode): PaperInteraction {
+  const { $ } = ctx;
+  const responseId = responseIdOf($(el));
+  const options = optionsOf(ctx, el, 'qti-gap-text, qti-gap-img', 'letters');
+  const root = wrap(ctx, el);
+  root.find('qti-prompt, qti-gap-text, qti-gap-img').remove();
+  cleanContent(ctx, root);
+  const gaps: { identifier: string; label: string }[] = [];
+  root.find('qti-gap').each((_, gap) => {
+    const label = String(++ctx.gapCount);
+    gaps.push({ identifier: $(gap).attr('identifier') || label, label });
+    $(gap).replaceWith(`<paper-gap n="${label}" len="10"/>`);
+  });
+  return {
+    kind: 'gapMatch',
+    responseId,
+    options,
+    passageHtml: rawInnerHtml($, root.children().get(0)),
+    gaps,
+    correct: correctPairs(ctx, responseId)
+  };
+}
+
+function parseHottext(ctx: Ctx, el: AnyNode): PaperInteraction {
+  const { $ } = ctx;
+  const responseId = responseIdOf($(el));
+  const root = wrap(ctx, el);
+  root.find('qti-prompt').remove();
+  cleanContent(ctx, root);
+  const options: PaperOption[] = [];
+  root.find('qti-hottext').each((i, h) => {
+    const label = labelFromIndex(i);
+    const html = $(h).html() || '';
+    options.push({ identifier: $(h).attr('identifier') || label, label, html });
+    $(h).replaceWith(`<paper-hottext label="${label}">${html}</paper-hottext>`);
+  });
+  return {
+    kind: 'hottext',
+    responseId,
+    passageHtml: rawInnerHtml($, root.children().get(0)),
+    options,
+    maxChoices: intAttr($(el), 'max-choices', 1),
+    correct: correctValues(ctx, responseId)
+  };
+}
+
+/** Parse a block-level interaction; undefined for ones that have no paper form at all. */
+function parseBlockInteraction(ctx: Ctx, el: AnyNode, name: string, stage?: AnyNode): PaperInteraction | undefined {
+  const { $ } = ctx;
+  const $el = $(el);
+  const responseId = responseIdOf($el);
+  const image = () => imageOf(ctx, el) ?? { path: '' };
+
+  switch (name) {
+    case 'qti-choice-interaction': {
+      const maxChoices = intAttr($el, 'max-choices', 1);
+      return {
+        kind: 'choice',
+        responseId,
+        multi: maxChoices !== 1,
+        minChoices: intAttr($el, 'min-choices', 0),
+        maxChoices,
+        options: optionsOf(ctx, el, 'qti-simple-choice', 'letters'),
+        correct: correctValues(ctx, responseId)
+      };
     }
-    if (!isElement(child)) return;
-    const name = nodeName(child);
-    if (name === 'qti-feedback-block' || name === 'feedbackblock') return;
-    if (name === 'qti-rubric-block' || name === 'rubricblock') return;
-    const { html, blanks: b } = replaceTextEntriesInHtml($, child);
-    blanks += b;
-    if (html.trim()) stimulus.push(...htmlToBlocks(html, itemHref));
+    case 'qti-order-interaction':
+      return parseOrder(ctx, el);
+    case 'qti-match-interaction': {
+      const sets = $el.children('qti-simple-match-set').toArray();
+      const shuffle = shouldShuffle(ctx, $el);
+      return {
+        kind: 'match',
+        responseId,
+        rows: sets[0] ? optionsOf(ctx, sets[0], 'qti-simple-associable-choice', 'numbers', ':rows', shuffle) : [],
+        columns: sets[1] ? optionsOf(ctx, sets[1], 'qti-simple-associable-choice', 'letters', ':cols', shuffle) : [],
+        maxAssociations: intAttr($el, 'max-associations', 1),
+        correct: correctPairs(ctx, responseId)
+      };
+    }
+    case 'qti-associate-interaction':
+      return {
+        kind: 'associate',
+        responseId,
+        options: optionsOf(ctx, el, 'qti-simple-associable-choice', 'letters'),
+        maxAssociations: intAttr($el, 'max-associations', 1),
+        correct: correctPairs(ctx, responseId)
+      };
+    case 'qti-gap-match-interaction':
+      return parseGapMatch(ctx, el);
+    case 'qti-hottext-interaction':
+      return parseHottext(ctx, el);
+    case 'qti-hotspot-interaction':
+      return {
+        kind: 'hotspot',
+        responseId,
+        image: image(),
+        hotspots: hotspotsOf(ctx, el, 'letters'),
+        maxChoices: intAttr($el, 'max-choices', 1),
+        correct: correctValues(ctx, responseId)
+      };
+    case 'qti-graphic-order-interaction':
+      return {
+        kind: 'graphicOrder',
+        responseId,
+        image: image(),
+        hotspots: hotspotsOf(ctx, el, 'letters'),
+        correct: correctValues(ctx, responseId)
+      };
+    case 'qti-graphic-associate-interaction':
+      return {
+        kind: 'graphicAssociate',
+        responseId,
+        image: image(),
+        hotspots: hotspotsOf(ctx, el, 'letters'),
+        maxAssociations: intAttr($el, 'max-associations', 1),
+        correct: correctPairs(ctx, responseId)
+      };
+    case 'qti-graphic-gap-match-interaction':
+      return {
+        kind: 'graphicGapMatch',
+        responseId,
+        image: image(),
+        hotspots: hotspotsOf(ctx, el, 'numbers'),
+        options: optionsOf(ctx, el, 'qti-gap-img, qti-gap-text', 'letters'),
+        correct: correctPairs(ctx, responseId)
+      };
+    case 'qti-select-point-interaction':
+      return {
+        kind: 'selectPoint',
+        responseId,
+        image: image(),
+        maxChoices: intAttr($el, 'max-choices', 1),
+        correctAreas: ctx.decls.get(responseId)?.areas ?? []
+      };
+    case 'qti-position-object-interaction':
+      return {
+        kind: 'positionObject',
+        responseId,
+        image: (stage && imageOf(ctx, stage)) || { path: '' },
+        objectHtml: innerContent(ctx, el),
+        maxChoices: intAttr($el, 'max-choices', 1),
+        correctAreas: ctx.decls.get(responseId)?.areas ?? []
+      };
+    case 'qti-slider-interaction': {
+      const correct = parseFloat(correctValues(ctx, responseId)[0] ?? '');
+      return {
+        kind: 'slider',
+        responseId,
+        min: numAttr($el, 'lower-bound') ?? 0,
+        max: numAttr($el, 'upper-bound') ?? 100,
+        step: numAttr($el, 'step'),
+        correct: Number.isNaN(correct) ? undefined : correct
+      };
+    }
+    case 'qti-drawing-interaction':
+      return { kind: 'drawing', responseId, image: imageOf(ctx, el) };
+    case 'qti-upload-interaction':
+      return { kind: 'upload', responseId };
+    case 'qti-extended-text-interaction': {
+      const expectedLines = intAttr($el, 'expected-lines', 0);
+      const expectedLength = intAttr($el, 'expected-length', 0);
+      const lines = expectedLines || (expectedLength ? Math.ceil(expectedLength / 60) : 6);
+      return {
+        kind: 'extendedText',
+        responseId,
+        lines: Math.min(20, Math.max(3, lines)),
+        correct: correctValues(ctx, responseId)
+      };
+    }
+    case 'qti-end-attempt-interaction':
+      return undefined;
+    default:
+      return { kind: 'unsupported', interactionType: name };
+  }
+}
+
+function addPart(ctx: Ctx, interaction: PaperInteraction, promptHtml?: string): number {
+  ctx.parts.push({ label: '', promptHtml, interaction });
+  const index = ctx.parts.length - 1;
+  ctx.body.push({ type: 'part', index });
+  return index;
+}
+
+function addBlockInteraction(ctx: Ctx, el: AnyNode, name: string): void {
+  const { $ } = ctx;
+  ctx.open = {};
+  if (name === 'qti-media-interaction') {
+    const prompt = promptOf(ctx, el);
+    if (prompt) ctx.body.push({ type: 'html', html: prompt });
+    const obj = $(el).find('object, audio, video').first();
+    const type = (obj.attr('type') || nodeName(obj.get(0) ?? el)).toLowerCase();
+    ctx.body.push({
+      type: 'media',
+      mediaType: type.includes('audio') ? 'audio' : type.includes('video') ? 'video' : 'media'
+    });
+    return;
+  }
+  if (name === 'qti-position-object-stage') {
+    $(el)
+      .find('qti-position-object-interaction')
+      .each((_, ix) => {
+        const interaction = parseBlockInteraction(ctx, ix, 'qti-position-object-interaction', el);
+        if (interaction) addPart(ctx, interaction, promptOf(ctx, ix));
+      });
+    return;
+  }
+  const interaction = parseBlockInteraction(ctx, el, name);
+  if (interaction) addPart(ctx, interaction, promptOf(ctx, el));
+}
+
+/**
+ * Add a piece of body content. Text entries and dropdowns inside it become
+ * numbered gaps; consecutive paragraphs share one part so the answer sheet
+ * lists all their gaps together.
+ */
+function addContent(ctx: Ctx, el: AnyNode): void {
+  const { $ } = ctx;
+  const root = wrap(ctx, el);
+  cleanContent(ctx, root);
+
+  const added: { textEntry: boolean; inlineChoice: boolean } = { textEntry: false, inlineChoice: false };
+  root.find(INLINE_SELECTOR).each((_, ix) => {
+    const $ix = $(ix);
+    const responseId = responseIdOf($ix);
+    const label = String(++ctx.gapCount);
+    if (nodeName(ix) === 'qti-text-entry-interaction') {
+      const expectedLength = intAttr($ix, 'expected-length', 0) || undefined;
+      const decl = ctx.decls.get(responseId);
+      const accepted = [...new Set([...(decl?.correct ?? []), ...(decl?.mapped ?? [])])];
+      const part = openPart(ctx, 'textEntry');
+      const interaction = ctx.parts[part].interaction as Extract<PaperInteraction, { kind: 'textEntry' }>;
+      interaction.gaps.push({ label, responseId, expectedLength, accepted });
+      added.textEntry = true;
+      $ix.replaceWith(`<paper-gap n="${label}" len="${expectedLength ?? 10}"/>`);
+    } else {
+      const options = optionsOf(ctx, ix, 'qti-inline-choice', 'letters');
+      const part = openPart(ctx, 'inlineChoice');
+      const interaction = ctx.parts[part].interaction as Extract<PaperInteraction, { kind: 'inlineChoice' }>;
+      interaction.gaps.push({ label, responseId, options, correct: correctValues(ctx, responseId) });
+      added.inlineChoice = true;
+      $ix.replaceWith(`<paper-gap n="${label}" len="8"/>`);
+    }
   });
 
-  return {
-    interaction: { kind: 'textEntry', blanks: blanks || 1, inline: true },
-    stimulus,
-  };
+  const html = (root.html() || '').trim();
+  if (html) ctx.body.push({ type: 'html', html });
+
+  // Keep the open inline parts right after the content that feeds them.
+  for (const kind of ['textEntry', 'inlineChoice'] as const) {
+    const index = ctx.open[kind];
+    if (!added[kind] || index === undefined) continue;
+    ctx.body = ctx.body.filter(n => !(n.type === 'part' && n.index === index));
+    ctx.body.push({ type: 'part', index });
+  }
+}
+
+function openPart(ctx: Ctx, kind: 'textEntry' | 'inlineChoice'): number {
+  const existing = ctx.open[kind];
+  if (existing !== undefined) return existing;
+  const index = addPart(ctx, kind === 'textEntry' ? { kind, gaps: [] } : { kind, gaps: [] });
+  ctx.open[kind] = index;
+  return index;
+}
+
+function walkBody(ctx: Ctx, nodes: AnyNode[]): void {
+  const { $ } = ctx;
+  for (const node of nodes) {
+    if (node.type === 'text') {
+      const text = $(node).text().trim();
+      if (text) ctx.body.push({ type: 'html', html: escapeHtml(text) });
+      continue;
+    }
+    if (!isElement(node)) continue;
+    const name = nodeName(node);
+    if ($(node).is(DROPPED_SELECTOR)) continue;
+    if (BLOCK_INTERACTIONS.has(name)) {
+      addBlockInteraction(ctx, node, name);
+    } else if ($(node).find(BLOCK_SELECTOR).length) {
+      // Layout wrappers around interactions: keep the content, drop the wrapper.
+      walkBody(ctx, $(node).contents().toArray());
+    } else {
+      addContent(ctx, node);
+    }
+  }
 }
 
 function extractPoints($: CheerioAPI): number | undefined {
-  const maxScore = $(
-    'qti-outcome-declaration[identifier="MAXSCORE"], outcomeDeclaration[identifier="MAXSCORE"]'
-  ).first();
+  const maxScore = $('qti-outcome-declaration[identifier="MAXSCORE"]').first();
   if (maxScore.length) {
-    const v = textContent($, maxScore.find('qti-value, value').first().get(0));
-    if (v) {
-      const n = parseFloat(v);
-      if (!Number.isNaN(n)) return n;
-    }
-  }
-  const score = $(
-    'qti-outcome-declaration[identifier="SCORE"], outcomeDeclaration[identifier="SCORE"]'
-  ).first();
-  const nm = score.attr('normal-maximum') || score.attr('normalMaximum');
-  if (nm) {
-    const n = parseFloat(nm);
+    const v = textContent($, maxScore.find('qti-value').first().get(0));
+    const n = parseFloat(v);
     if (!Number.isNaN(n)) return n;
   }
-  return undefined;
+  const score = $('qti-outcome-declaration[identifier="SCORE"]').first();
+  const n = parseFloat(score.attr('normal-maximum') || '');
+  return Number.isNaN(n) ? undefined : n;
 }
 
-function extractScorerRubric($: CheerioAPI): string | undefined {
+function extractScorerRubric(ctx: Ctx): string | undefined {
+  const { $ } = ctx;
   const blocks: string[] = [];
-  $('qti-rubric-block, rubricBlock').each((_, el) => {
+  $('qti-rubric-block').each((_, el) => {
     const view = ($(el).attr('view') || '').toLowerCase();
     const use = ($(el).attr('use') || '').toLowerCase();
     if (!view.includes('scorer') && !use.includes('scoring')) return;
-    const body = $(el).find('qti-content-body, contentBody').first();
-    const html = body.length ? innerHtml($, body.get(0)) : innerHtml($, el);
-    if (html.trim()) blocks.push(html.trim());
+    const body = $(el).find('qti-content-body').get(0) ?? el;
+    const html = innerContent(ctx, body).trim();
+    if (html) blocks.push(html);
   });
   return blocks.length ? blocks.join('\n') : undefined;
 }
 
-function plainListFromHtml(html: string): string {
-  return html
-    .replace(/<\/tr>/gi, '\n')
-    .replace(/<\/(td|th)>/gi, '  ')
-    .replace(/<(td|th)[^>]*>/gi, '')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '• ')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
+function optionText(options: PaperOption[], id: string): string {
+  const o = options.find(x => x.identifier === id);
+  return o ? `${o.label} (${stripTags(o.html)})` : id;
 }
 
-function answerKeyFor(
-  kind: PaperInteraction['kind'],
-  $: CheerioAPI,
-  interaction: PaperInteraction,
-  responseId?: string
-): PaperAnswerKey | undefined {
-  const values = collectCorrectValues($, responseId);
-  const rubricHtml = extractScorerRubric($);
+function hotspotLabel(hotspots: PaperHotspot[], id: string): string {
+  return hotspots.find(h => h.identifier === id)?.label ?? id;
+}
 
-  let summary = '';
-  if (kind === 'choice' && interaction.kind === 'choice') {
-    summary = values
-      .map(v => {
-        const c = interaction.choices.find(ch => ch.identifier === v);
-        return c ? c.contentHtml.replace(/<[^>]+>/g, '').trim() : v;
-      })
-      .filter(Boolean)
-      .join(', ');
-  } else if (kind === 'inlineChoice' && interaction.kind === 'inlineChoice') {
-    const parts: string[] = [];
-    for (const slot of interaction.slots) {
-      const vals = collectCorrectValues($, slot.responseId);
-      for (const v of vals) {
-        const opt = slot.options.find(o => o.identifier === v);
-        parts.push(opt ? opt.contentHtml.replace(/<[^>]+>/g, '').trim() : v);
+/** Locale-neutral, one-line summary of a part's correct answer. */
+function summarize(ix: PaperInteraction): string {
+  switch (ix.kind) {
+    case 'choice':
+    case 'order':
+      return ix.correct.map(id => optionText(ix.options, id)).join(ix.kind === 'order' ? ' / ' : ', ');
+    case 'hottext':
+      return ix.correct.map(id => optionText(ix.options, id)).join(', ');
+    case 'textEntry':
+      return ix.gaps.map(g => `${g.label ? `(${g.label}) ` : ''}${g.accepted.join(' | ') || '?'}`).join(' / ');
+    case 'inlineChoice':
+      return ix.gaps
+        .map(g => `${g.label ? `(${g.label}) ` : ''}${g.correct.map(id => optionText(g.options, id)).join(', ')}`)
+        .join(' / ');
+    case 'extendedText':
+      return ix.correct.join(' | ');
+    case 'match':
+      return ix.correct
+        .map(([r, c]) => {
+          const row = ix.rows.find(x => x.identifier === r);
+          const col = ix.columns.find(x => x.identifier === c);
+          return `${row ? `${row.label} ${stripTags(row.html)}` : r} → ${col ? `${col.label} ${stripTags(col.html)}` : c}`;
+        })
+        .join('; ');
+    case 'associate':
+      return ix.correct.map(([a, b]) => `${optionText(ix.options, a)} – ${optionText(ix.options, b)}`).join('; ');
+    case 'gapMatch':
+      return ix.gaps
+        .map(g => {
+          const pair = ix.correct.find(([, gap]) => gap === g.identifier);
+          return `${g.label ? `(${g.label}) ` : ''}${pair ? optionText(ix.options, pair[0]) : '?'}`;
+        })
+        .join(' / ');
+    case 'hotspot':
+      return ix.correct.map(id => hotspotLabel(ix.hotspots, id)).join(', ');
+    case 'graphicOrder':
+      return ix.correct.map(id => hotspotLabel(ix.hotspots, id)).join(' / ');
+    case 'graphicAssociate':
+      return ix.correct.map(([a, b]) => `${hotspotLabel(ix.hotspots, a)} – ${hotspotLabel(ix.hotspots, b)}`).join('; ');
+    case 'graphicGapMatch':
+      return ix.correct
+        .map(([opt, spot]) => `(${hotspotLabel(ix.hotspots, spot)}) ${optionText(ix.options, opt)}`)
+        .join(' / ');
+    case 'slider':
+      return ix.correct !== undefined ? String(ix.correct) : '';
+    default:
+      return '';
+  }
+}
+
+function rawValues(ctx: Ctx): string[] {
+  const values: string[] = [];
+  for (const decl of ctx.decls.values()) values.push(...decl.correct);
+  return values;
+}
+
+/** Number gaps only when an item has more than one; label parts a, b, c when it has several. */
+function finalizeLabels(ctx: Ctx): void {
+  // Inline parts move down as later paragraphs feed them; renumber in reading order.
+  const order = ctx.body.flatMap(n => (n.type === 'part' ? [n.index] : []));
+  ctx.parts = order.map(i => ctx.parts[i]);
+  ctx.body = ctx.body.map(n => (n.type === 'part' ? { ...n, index: order.indexOf(n.index) } : n));
+  const parts = ctx.parts;
+  if (ctx.gapCount === 1) {
+    const unlabel = (html: string) => html.replace(/<paper-gap n="1"/g, '<paper-gap n=""');
+    ctx.body = ctx.body.map(n => (n.type === 'html' ? { ...n, html: unlabel(n.html) } : n));
+    for (const part of parts) {
+      const ix = part.interaction;
+      if (ix.kind === 'textEntry' || ix.kind === 'inlineChoice' || ix.kind === 'gapMatch') {
+        ix.gaps.forEach(g => (g.label = ''));
       }
+      if (ix.kind === 'gapMatch') ix.passageHtml = unlabel(ix.passageHtml);
     }
-    summary = parts.length ? `Antwoord:  ${parts.join('  /  ')}` : '';
-  } else if (kind === 'order' && interaction.kind === 'order') {
-    summary = values
-      .map(v => {
-        const item = interaction.items.find(c => c.identifier === v);
-        return item ? item.contentHtml.replace(/<[^>]+>/g, '').trim() : v;
-      })
-      .join('  /  ');
-  } else if (kind === 'match' && interaction.kind === 'match') {
-    summary = values
-      .map(v => {
-        const [a, b] = v.split(/\s+/);
-        const row = interaction.rows.find(r => r.identifier === a);
-        const col = interaction.columns.find(c => c.identifier === b);
-        const rowT = row ? row.contentHtml.replace(/<[^>]+>/g, '').trim() : a;
-        const colT = col ? col.contentHtml.replace(/<[^>]+>/g, '').trim() : b;
-        return `•  ${rowT} → ${colT}`;
-      })
-      .join('\n');
-  } else if (kind === 'gapMatch' && interaction.kind === 'gapMatch') {
-    summary = values
-      .map(v => {
-        const [wordId] = v.split(/\s+/);
-        const word = interaction.options.find(o => o.identifier === wordId);
-        return word ? word.contentHtml.replace(/<[^>]+>/g, '').trim() : wordId;
-      })
-      .join('  /  ');
-  } else if (kind === 'hottext' && interaction.kind === 'hottext') {
-    summary = values
-      .map(v => interaction.parts.find(p => p.type === 'hottext' && p.identifier === v))
-      .filter((p): p is Extract<PaperHottextPart, { type: 'hottext' }> => !!p && p.type === 'hottext')
-      .map(p => p.text)
-      .join('  /  ');
-  } else if (kind === 'textEntry') {
-    summary = values.join('  /  ');
-  } else if (values.length) {
-    summary = values.join(', ');
   }
-
-  if (rubricHtml) {
-    const fromRubric = plainListFromHtml(rubricHtml);
-    return {
-      summary: fromRubric || summary,
-      values: values.length ? values : undefined,
-      rubricHtml,
-    };
-  }
-
-  if (!summary && kind === 'extendedText') return undefined;
-  if (!summary && !values.length) return undefined;
-  return { summary: summary || values.join(', '), values: values.length ? values : undefined };
+  if (parts.length > 1) parts.forEach((p, i) => (p.label = String.fromCharCode(97 + i)));
 }
 
-const UNSUPPORTED_NOTES: Record<string, string> = {
-  'qti-portable-custom-interaction': 'Portable Custom Interaction (PCI) — alleen digitaal beschikbaar.',
-  'qti-media-interaction': 'Media-interactie — bekijk digitaal.',
-  'qti-upload-interaction': 'Uploadvraag — niet geschikt voor papier.',
-  'qti-drawing-interaction': 'Tekenvraag — niet geschikt voor papier.',
-  'qti-graphic-gap-match-interaction': 'Grafische sleepvraag — markeer op papier of gebruik de digitale versie.',
-  'qti-graphic-order-interaction': 'Grafische volgordevraag — gebruik de digitale versie.',
-  'qti-graphic-associate-interaction': 'Grafische associatie — gebruik de digitale versie.',
-  'qti-hotspot-interaction': 'Hotspotvraag — markeer op de afbeelding of gebruik digitaal.',
-  'qti-position-object-interaction': 'Position-object — gebruik de digitale versie.',
-  'qti-slider-interaction': 'Schuifregelaar — noteer de waarde op papier.',
-};
-
-function firstInteraction($: CheerioAPI): { el: AnyNode; name: string } | null {
-  const body = $('qti-item-body, itemBody').first();
-  if (!body.length) return null;
-  const candidates = body
-    .find(
-      [
-        'qti-choice-interaction',
-        'qti-order-interaction',
-        'qti-match-interaction',
-        'qti-associate-interaction',
-        'qti-gap-match-interaction',
-        'qti-hottext-interaction',
-        'qti-select-point-interaction',
-        'qti-extended-text-interaction',
-        'qti-text-entry-interaction',
-        'qti-inline-choice-interaction',
-        'qti-hotspot-interaction',
-        'qti-graphic-gap-match-interaction',
-        'qti-graphic-order-interaction',
-        'qti-graphic-associate-interaction',
-        'qti-portable-custom-interaction',
-        'qti-media-interaction',
-        'qti-upload-interaction',
-        'qti-slider-interaction',
-        'qti-position-object-interaction',
-        'qti-custom-interaction',
-        'choiceInteraction',
-        'orderInteraction',
-        'matchInteraction',
-        'gapMatchInteraction',
-        'hottextInteraction',
-        'selectPointInteraction',
-        'extendedTextInteraction',
-        'textEntryInteraction',
-      ].join(', ')
-    )
-    .toArray();
-
-  if (!candidates.length) return null;
-  // Prefer block-level over inline text-entry when both exist
-  const preferred = candidates.find(c => {
-    const n = nodeName(c as Element);
-    return !n.includes('text-entry') && !n.includes('textentry') && !n.includes('inline-choice');
-  });
-  const el = preferred || candidates[0];
-  return { el, name: nodeName(el as Element) };
-}
-
-export function parseItemXml(xml: string, _assets: Map<string, PaperAsset>, itemHref = ''): PaperItem {
+export function parseItemXml(
+  xml: string,
+  _assets: Map<string, PaperAsset> = new Map(),
+  itemHref = '',
+  options: ParseOptions = {}
+): PaperItem {
   const $ = loadXml(xml);
-  const root = $('qti-assessment-item, assessmentItem').first();
+  if ($('assessmentItem').length) normalizeQti2($);
+  const root = $('qti-assessment-item').first();
   const identifier = root.attr('identifier') || 'item';
-  const title = root.attr('title') || identifier;
-  const points = extractPoints($);
 
-  const inline = parseInlineTextEntries($, itemHref);
-  if (inline) {
-    if (inline.interaction.kind === 'inlineChoice') {
-      return {
-        identifier,
-        title,
-        points,
-        stimulus: inline.stimulus,
-        interaction: inline.interaction,
-        answerKey: answerKeyFor('inlineChoice', $, inline.interaction),
-      };
-    }
-    const responseIds = $('qti-text-entry-interaction, textEntryInteraction')
-      .map((_, el) => $(el).attr('response-identifier') || $(el).attr('responseIdentifier') || '')
-      .get()
-      .filter(Boolean);
-    const values: string[] = [];
-    for (const id of responseIds) {
-      values.push(...collectCorrectValues($, id));
-    }
-    const rubricHtml = extractScorerRubric($);
-    return {
-      identifier,
-      title,
-      points,
-      stimulus: inline.stimulus,
-      interaction: inline.interaction,
-      answerKey:
-        values.length || rubricHtml
-          ? {
-              summary: rubricHtml ? plainListFromHtml(rubricHtml) : values.join('  /  '),
-              values: values.length ? values : undefined,
-              rubricHtml,
-            }
-          : undefined,
-    };
-  }
+  const ctx: Ctx = {
+    $,
+    decls: readDeclarations($),
+    itemId: identifier,
+    itemHref,
+    options,
+    body: [],
+    parts: [],
+    gapCount: 0,
+    open: {}
+  };
 
-  const found = firstInteraction($);
-  if (!found) {
-    return {
-      identifier,
-      title,
-      points,
-      stimulus: bodyStimulusOutsideInteractions($, itemHref),
-      interaction: {
-        kind: 'unsupported',
-        interactionType: 'none',
-        fallbackNote: 'Geen interactie gevonden in dit item.',
-      },
-      answerKey: (() => {
-        const rubricHtml = extractScorerRubric($);
-        return rubricHtml
-          ? { summary: plainListFromHtml(rubricHtml), rubricHtml }
-          : undefined;
-      })(),
-    };
-  }
+  const body = $('qti-item-body').first();
+  walkBody(ctx, body.contents().toArray());
+  finalizeLabels(ctx);
 
-  const { el, name } = found;
-  const responseId = $(el).attr('response-identifier') || $(el).attr('responseIdentifier') || undefined;
-  let interaction: PaperInteraction;
-  let stimulus = [...bodyStimulusOutsideInteractions($, itemHref), ...promptBlocks($, el, itemHref)];
-
-  if (name.includes('choice-interaction') || name === 'choiceinteraction') {
-    interaction = parseChoice($, el);
-  } else if (name.includes('order-interaction') || name === 'orderinteraction') {
-    interaction = parseOrder($, el);
-  } else if (name.includes('gap-match') || name === 'gapmatchinteraction') {
-    interaction = parseGapMatch($, el);
-  } else if (
-    name === 'qti-match-interaction' ||
-    name === 'matchinteraction' ||
-    name === 'qti-associate-interaction' ||
-    name === 'associateinteraction'
-  ) {
-    interaction = parseMatch($, el);
-  } else if (name.includes('hottext') || name === 'hottextinteraction') {
-    interaction = parseHottext($, el);
-  } else if (name.includes('select-point') || name === 'selectpointinteraction') {
-    interaction = parseSelectPoint($, el, itemHref);
-  } else if (name.includes('extended-text') || name === 'extendedtextinteraction') {
-    interaction = parseExtendedText($, el);
-  } else if (name.includes('text-entry') || name === 'textentryinteraction') {
-    interaction = { kind: 'textEntry', blanks: 1, inline: false };
-  } else {
-    const note = UNSUPPORTED_NOTES[name] || `${getLocaleStrings('en').unsupportedPrefix}: ${name}.`;
-    const img = $(el).find('img').first();
-    if (img.length) {
-      const src = resolveAssetRef(img.attr('src') || '', itemHref);
-      if (src) {
-        stimulus.push({
-          type: 'image',
-          assetPath: src,
-          alt: img.attr('alt') || undefined,
-        });
-      }
-    }
-    interaction = { kind: 'unsupported', interactionType: name, fallbackNote: note };
-  }
+  const rubricHtml = extractScorerRubric(ctx);
+  const summary = ctx.parts
+    .map(p => {
+      const line = summarize(p.interaction);
+      return line && p.label ? `${p.label}) ${line}` : line;
+    })
+    .filter(Boolean)
+    .join('\n');
+  const values = rawValues(ctx);
 
   return {
     identifier,
-    title,
-    points,
-    stimulus,
-    interaction,
-    answerKey: answerKeyFor(interaction.kind, $, interaction, responseId),
+    title: root.attr('title') || identifier,
+    points: extractPoints($),
+    body: ctx.body,
+    parts: ctx.parts,
+    stimulusRefs: $('qti-assessment-stimulus-ref')
+      .map((_, el) => resolveAssetRef($(el).attr('href') || '', itemHref))
+      .get()
+      .filter(Boolean),
+    rubricHtml,
+    answerKey:
+      summary || rubricHtml
+        ? { summary: summary || stripTags(rubricHtml ?? ''), values: values.length ? values : undefined, rubricHtml }
+        : undefined
   };
 }
