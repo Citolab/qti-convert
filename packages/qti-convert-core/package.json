@@ -54,7 +54,8 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "archiver": "^8.0.0",

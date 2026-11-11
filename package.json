@@ -30,6 +30,7 @@
     "test:export": "npm run test --workspace=@citolab/qti-convert-export",
     "test:tao-pci": "npm run test --workspace=@citolab/qti-convert-tao-pci",
     "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "clean": "rimraf packages/*/dist",
     "deploy": "firebase deploy --only hosting:qti-components",
     "list-outdated-dependencies": "npx npm-check-updates --format repo --peer",

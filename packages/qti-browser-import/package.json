@@ -19,7 +19,9 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --target es2022 --dts --outDir dist",
     "build:yalc": "npm run build && yalc publish --push",
-    "test": "vitest run src/*.test.ts"
+    "test": "vitest run src/*.test.ts",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

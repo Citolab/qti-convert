@@ -22,7 +22,8 @@
     "build": "tsup src/index.ts --format esm --target es2022 --dts --outDir dist --clean",
     "build:yalc": "npm run build && yalc publish --push",
     "test": "vitest run tests",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

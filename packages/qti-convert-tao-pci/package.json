@@ -28,7 +28,9 @@
     "test:storybook": "npm run prepare:storybook-assets && vitest --project=storybook --run",
     "prepare:storybook-assets": "node scripts/prepare-storybook-assets.mjs",
     "storybook": "npm run prepare:storybook-assets && storybook dev -p 6010",
-    "build-storybook": "npm run prepare:storybook-assets && storybook build"
+    "build-storybook": "npm run prepare:storybook-assets && storybook build",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@citolab/qti-browser-import": "^0.9.1",
