@@ -83,7 +83,10 @@ Document has 150 text blocks (chunk size: 60, carryover: 8)
 | `pdf-parser.ts` | PDF parsing and LLM-based conversion |
 | `docx-parser.ts` | DOCX parsing and LLM-based conversion |
 | `spreadsheet-parser.ts` | CSV/Excel parsing |
-| `mapping.ts` | WebLLM engine creation and question inference |
+| `mapping.ts` | WebLLM engine creation (model step-down, worker, speed measurement) and question inference |
+| `device-profile.ts` | WebGPU hardware detection, device tiers, model recommendation, performance memory |
+| `webllm-worker.ts` | Web Worker entry (`@citolab/qti-convert-local-ai/webllm-worker`) |
+| `local-server.ts` | OpenAI-compatible localhost backend (Ollama / LM Studio / llama.cpp), server detection |
 | `qti-generator.ts` | QTI 3.0 XML package generation |
 | `converters.ts` | Unified converter interface implementations |
 | `types.ts` | Shared TypeScript types |
@@ -302,9 +305,9 @@ const itemImages = images.filter(image => {
 
 2. **Streaming progress** — Report progress per chunk to improve UX on large documents
 
-3. **Larger model support** — Allow using bigger WebLLM models (14B+) on capable devices for better accuracy
+3. **Larger model support** — Add a 14B+ tier for capable devices in `WEB_LLM_MODEL_TIERS`
 
-4. **Hybrid cloud fallback** — Optional cloud API fallback when local LLM fails repeatedly
+4. **Hybrid cloud fallback** — Optional cloud API fallback when local LLM fails repeatedly (`localServer` with `allowRemoteHost` already allows a remote OpenAI-compatible endpoint)
 
 ## Configuration Options
 
@@ -374,9 +377,11 @@ Key test files:
 
 ## LLM Settings
 
+When `model` is omitted the model is auto-selected per device (see README "Model selection" and `device-profile.ts`): 7B / 3B / 1.5B Qwen2.5 by tier, q4f32 without shader-f16, with automatic step-down on OOM / device-lost.
+
 ```typescript
 {
-  model: 'Qwen2.5-7B-Instruct-q4f16_1-MLC',  // Default model
+  model: 'Qwen2.5-7B-Instruct-q4f16_1-MLC',  // Explicit model (disables auto-selection)
   temperature: 0,                             // Deterministic output
   systemPrompt: string,                       // Optional custom prompt
   instructions: string                        // Additional import instructions

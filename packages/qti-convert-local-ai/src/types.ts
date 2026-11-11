@@ -1,3 +1,5 @@
+import type { WebLlmModelSelection } from './device-profile';
+
 export type SpreadsheetRow = Record<string, string>;
 
 export type SpreadsheetFormat = 'csv' | 'xlsx' | 'xml';
@@ -119,6 +121,60 @@ export type WebLlmSettings = {
   engine?: unknown;
   createEngine?: (settings: WebLlmSettings) => Promise<unknown>;
   initProgressCallback?: (progress: unknown) => void;
+  /**
+   * When `model` is not set, pick a model based on the detected hardware, cached models,
+   * free storage and decode speed measured on earlier runs. Set to `false` to always use
+   * `DEFAULT_WEB_LLM_MODEL`.
+   * @default true
+   */
+  autoSelectModel?: boolean;
+  /**
+   * Models to try, in order, when loading fails with an out-of-memory / device-lost /
+   * shader-f16 error. Filled automatically when the model is auto-selected.
+   */
+  fallbackModels?: string[];
+  /**
+   * Run WebLLM in a Web Worker so model loading and shader compilation don't freeze the page.
+   * Pass a Worker (or a factory) whose script imports `@citolab/qti-convert-local-ai/webllm-worker`.
+   */
+  worker?: Worker | (() => Worker);
+  /** Use an already-downloaded smaller model instead of downloading a larger one. @default true */
+  preferCachedModels?: boolean;
+  /** Models measured slower than this (decode tokens/s) on earlier runs are skipped. @default 4 */
+  minDecodeTokensPerSecond?: number;
+  /** Ask the browser to persist storage so the model cache isn't evicted. @default true */
+  persistStorage?: boolean;
+  /** Measure decode speed and remember it (localStorage) to tune future model selection. @default true */
+  recordPerformance?: boolean;
+  /** Called after auto-selection, e.g. to show the chosen model or a low-accuracy warning. */
+  onModelSelected?: (selection: WebLlmModelSelection) => void;
+  /**
+   * Reuse a loaded WebLLM engine across calls (per model) so the model is loaded once per page.
+   * Call `releaseWebLlmEngines()` to free GPU memory.
+   * @default true
+   */
+  reuseEngine?: boolean;
+  /**
+   * Use a native OpenAI-compatible LLM server on this machine (Ollama, LM Studio, llama.cpp)
+   * instead of in-browser WebLLM. Much faster on typical Windows hardware, still fully local.
+   */
+  localServer?: LocalServerSettings;
+};
+
+export type LocalServerSettings = {
+  /** OpenAI-compatible base URL including `/v1`, e.g. `http://localhost:11434/v1` (Ollama) or `http://localhost:1234/v1` (LM Studio). */
+  baseUrl: string;
+  /** Model name as known to the server, e.g. `qwen2.5:7b`. */
+  model: string;
+  apiKey?: string;
+  /** Per-request timeout. @default 300000 */
+  timeoutMs?: number;
+  /** Fall back to in-browser WebLLM when the server is unreachable. @default true */
+  fallbackToWebLlm?: boolean;
+  /** Allow a non-loopback host. Documents are then sent over the network. @default false */
+  allowRemoteHost?: boolean;
+  /** Custom fetch implementation (testing). */
+  fetch?: typeof fetch;
 };
 
 export type QuestionInferenceFunction = (

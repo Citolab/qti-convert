@@ -75,7 +75,7 @@ describe('generateQtiPackageFromQuestions', () => {
       'parse_completed',
       'mapping_started',
       'mapping_started',
-      'llm_loading_started',
+      // No WebGPU in Node: model auto-selection bails out before loading starts.
       'mapping_started',
       'mapping_completed',
       'generation_started',

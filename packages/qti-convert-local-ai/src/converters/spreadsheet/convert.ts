@@ -128,7 +128,7 @@ const truthy = (value: string): boolean =>
   ['1', 'true', 'yes', 'y', 'ja', 'correct', 'x'].includes(value.trim().toLowerCase());
 
 const parseLetterKeys = (raw: string, optionCount: number): string[] =>
-  orderedUnique((raw.toUpperCase().match(/[A-Z]/g) || []).filter(letter => letter.charCodeAt(0) - 65 < optionCount));
+  orderedUnique((raw.toUpperCase().match(/[A-Z]/g) ?? ([] as string[])).filter(letter => letter.charCodeAt(0) - 65 < optionCount));
 
 const findPresentColumn = (rows: SpreadsheetRow[], candidates: string[]): string | undefined => {
   const available = new Set(rows.flatMap(row => Object.keys(row)));

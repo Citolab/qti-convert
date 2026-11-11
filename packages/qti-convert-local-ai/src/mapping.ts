@@ -6,6 +6,17 @@ import {
   StructuredQuestion,
   WebLlmSettings
 } from './types';
+import {
+  WEB_LLM_MODEL_TIERS,
+  WebLlmModelSelection,
+  detectDeviceProfile,
+  isModelResourceError,
+  isShaderF16Error,
+  recordModelPerformance,
+  selectWebLlmModel,
+  toF32Variant
+} from './device-profile';
+import { createLocalServerEngine } from './local-server';
 
 export type WebLlmLikeEngine = {
   chat: {
@@ -560,24 +571,170 @@ export const createWebLlmEngine = async (
     return asWebLlmEngine(engine);
   }
 
-  reportProgress?.({
-    stage: 'llm_loading_started',
-    message: `Loading WebLLM model ${settings.model || DEFAULT_WEB_LLM_MODEL}.`
+  if (settings.localServer) {
+    try {
+      return await createLocalServerEngine(settings.localServer, reportProgress);
+    } catch (error) {
+      if (settings.localServer.fallbackToWebLlm === false) {
+        throw error;
+      }
+      console.warn('Local LLM server unavailable; falling back to in-browser WebLLM.', error);
+    }
+  }
+
+  if (settings.reuseEngine === false) {
+    return loadWebLlmEngine(settings, reportProgress);
+  }
+  const cacheKey = settings.model || (settings.autoSelectModel === false ? DEFAULT_WEB_LLM_MODEL : 'auto');
+  const cached = webLlmEngineCache.get(cacheKey);
+  if (cached) {
+    reportProgress?.({ stage: 'llm_loading_started', message: 'Reusing loaded WebLLM engine.' });
+    const engine = await cached;
+    reportProgress?.({
+      stage: 'llm_loading_completed',
+      message: 'Reusing loaded WebLLM engine.',
+      data: { reused: true }
+    });
+    return engine;
+  }
+  const pending = loadWebLlmEngine(settings, reportProgress);
+  webLlmEngineCache.set(cacheKey, pending);
+  pending.catch(() => {
+    if (webLlmEngineCache.get(cacheKey) === pending) webLlmEngineCache.delete(cacheKey);
   });
-  const { CreateMLCEngine } = await import('@mlc-ai/web-llm');
-  const engine = await CreateMLCEngine(settings.model || DEFAULT_WEB_LLM_MODEL, {
-    initProgressCallback: progress => {
+  return pending;
+};
+
+/** Engines loaded by `createWebLlmEngine`, reused across conversions so the model is loaded once per page. */
+const webLlmEngineCache = new Map<string, Promise<WebLlmLikeEngine>>();
+
+/** Unloads cached WebLLM engines (frees GPU memory) and clears the cache. */
+export const releaseWebLlmEngines = async (): Promise<void> => {
+  const engines = [...webLlmEngineCache.values()];
+  webLlmEngineCache.clear();
+  await Promise.all(
+    engines.map(async pending => {
+      const engine = (await pending.catch(() => undefined)) as { unload?: () => Promise<void> } | undefined;
+      await engine?.unload?.().catch(() => undefined);
+    })
+  );
+};
+
+const loadWebLlmEngine = async (
+  settings: WebLlmSettings,
+  reportProgress?: (event: {
+    stage: 'llm_loading_started' | 'llm_loading_completed';
+    message: string;
+    data?: unknown;
+  }) => void
+): Promise<WebLlmLikeEngine> => {
+  let selection: WebLlmModelSelection | undefined;
+  let candidates: string[];
+  let gpuKey: string | undefined;
+  if (settings.model) {
+    candidates = [settings.model, ...(settings.fallbackModels || [])];
+  } else if (settings.autoSelectModel === false) {
+    candidates = [DEFAULT_WEB_LLM_MODEL, ...(settings.fallbackModels || [])];
+  } else {
+    selection = await selectWebLlmModel({
+      preferCachedModels: settings.preferCachedModels,
+      minDecodeTokensPerSecond: settings.minDecodeTokensPerSecond,
+      persistStorage: settings.persistStorage
+    });
+    settings.onModelSelected?.(selection);
+    if (!selection.model) {
+      throw new Error(`Local AI is not available on this device: ${selection.reasons.join(' ')}`);
+    }
+    candidates = [selection.model, ...(settings.fallbackModels || selection.fallbackModels)];
+    gpuKey = selection.profile.gpuKey;
+  }
+
+  const webllm = await import('@mlc-ai/web-llm');
+  const engineConfig = {
+    initProgressCallback: (progress: unknown) => {
       settings.initProgressCallback?.(progress);
     }
-  });
-  reportProgress?.({
-    stage: 'llm_loading_completed',
-    message: `Loaded WebLLM model ${settings.model || DEFAULT_WEB_LLM_MODEL}.`,
-    data: {
-      model: settings.model || DEFAULT_WEB_LLM_MODEL
+  };
+
+  let lastError: unknown;
+  for (let index = 0; index < candidates.length; index++) {
+    const model = candidates[index];
+    reportProgress?.({
+      stage: 'llm_loading_started',
+      message:
+        index === 0
+          ? `Loading WebLLM model ${model}${selection ? ` (${selection.tier} tier${selection.cached ? ', cached' : ''})` : ''}.`
+          : `Retrying with smaller WebLLM model ${model}.`
+    });
+    const ownsWorker = typeof settings.worker === 'function';
+    const worker = typeof settings.worker === 'function' ? settings.worker() : settings.worker;
+    try {
+      const engine = worker
+        ? await webllm.CreateWebWorkerMLCEngine(worker, model, engineConfig)
+        : await webllm.CreateMLCEngine(model, engineConfig);
+      if (settings.recordPerformance !== false) {
+        instrumentDecodeSpeed(asWebLlmEngine(engine), model, gpuKey ?? (await detectDeviceProfile()).gpuKey);
+      }
+      reportProgress?.({
+        stage: 'llm_loading_completed',
+        message: `Loaded WebLLM model ${model}.`,
+        data: {
+          model,
+          tier: selection?.tier,
+          detectedTier: selection?.detectedTier,
+          lowAccuracy: Object.values(WEB_LLM_MODEL_TIERS.low).some(entry => entry.model === model),
+          failedModels: candidates.slice(0, index),
+          reasons: selection?.reasons
+        }
+      });
+      return asWebLlmEngine(engine);
+    } catch (error) {
+      lastError = error;
+      if (ownsWorker) worker?.terminate();
+      if (!isModelResourceError(error)) {
+        throw error;
+      }
+      // Without shader-f16 the same size may still fit as q4f32; try that before going smaller.
+      if (isShaderF16Error(error) && toF32Variant(model) !== model) {
+        const remaining = [toF32Variant(model), ...candidates.slice(index + 1).map(toF32Variant)];
+        candidates = [
+          ...candidates.slice(0, index + 1),
+          ...remaining.filter((candidate, position) => remaining.indexOf(candidate) === position)
+        ];
+      }
+      console.warn(`WebLLM failed to load ${model}; trying a smaller model if available.`, error);
     }
-  });
-  return asWebLlmEngine(engine);
+  }
+  throw lastError;
+};
+
+type CompletionUsage = {
+  completion_tokens?: number;
+  extra?: { decode_tokens_per_s?: number };
+};
+
+/** Wraps chat.completions.create to record decode speed for future model selection. */
+const instrumentDecodeSpeed = (engine: WebLlmLikeEngine, model: string, gpuKey: string): void => {
+  const completions = engine.chat?.completions;
+  if (!completions?.create) return;
+  const original = completions.create.bind(completions);
+  completions.create = async request => {
+    const startedAt = Date.now();
+    const response = await original(request);
+    try {
+      const usage = (response as { usage?: CompletionUsage }).usage;
+      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+      const tokensPerSecond =
+        usage?.extra?.decode_tokens_per_s ??
+        (usage?.completion_tokens && elapsedSeconds > 0 ? usage.completion_tokens / elapsedSeconds : undefined);
+      if (tokensPerSecond && (usage?.completion_tokens ?? 0) >= 16) {
+        recordModelPerformance(gpuKey, model, tokensPerSecond);
+      }
+    } catch {
+      // Measuring is best effort.
+    }
+    return response;
+  };
 };
 
 export const createWebLlmQuestionInferer =
