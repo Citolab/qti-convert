@@ -16,18 +16,15 @@ npm install @citolab/qti-convert-export
 import { convertPackageToDocx, convertPackageToPdf } from '@citolab/qti-convert-export';
 
 // `file` can be a File/Blob (browser), ArrayBuffer/Uint8Array, or a filesystem path (Node)
-const { assessment, fileName, paper, answerKey, answerKeyFileName } = await convertPackageToDocx(
-  file,
-  {
-    locale: 'nl',
-    includeAnswerKey: true,
-    // default separateAnswerKey: true → Vragenblad + Antwoordmodel (Kennisnet style)
-  }
-);
+const { assessment, fileName, paper, answerKey, answerKeyFileName } = await convertPackageToDocx(file, {
+  locale: 'nl',
+  includeAnswerKey: true
+  // default separateAnswerKey: true → Vragenblad + Antwoordmodel (Kennisnet style)
+});
 
 // Browser download
 const blob = new Blob([assessment], {
-  type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 });
 const url = URL.createObjectURL(blob);
 const a = document.createElement('a');
@@ -46,20 +43,20 @@ import { convertPackageToZip } from '@citolab/qti-convert-export';
 
 const { zip, fileName, files } = await convertPackageToZip(file, {
   locale: 'nl',
-  formats: ['docx', 'pdf'], // default ['docx']
+  formats: ['docx', 'pdf'] // default ['docx']
 });
 // fileName: "Toets-papier.zip"
 // files:    "Toets - opgaven.docx", "Toets - bronnen.docx" (only with shared stimuli),
 //           "Toets - antwoordblad.docx", "Toets - antwoordmodel.docx", (+ .pdf)
 ```
 
-| Document | Contents |
-|----------|----------|
-| `questions` (opgaven) | Questions and options only, no answer space — reusable |
-| `sources` (bronnen) | The shared stimuli, numbered "Bron 1", "Bron 2" in order of first use; questions say "Gebruik bron 1 (…) uit het bronnenboekje" instead of repeating the text |
-| `answerSheet` (antwoordblad) | Name/class/date, then an answer area per question number |
-| `answerKey` (antwoordmodel) | The answer sheet filled in, with points, accepted alternatives, scoring rubric and total |
-| `workbook` | Questions with answer space in place (what `convertPackageToDocx` produces) |
+| Document                     | Contents                                                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `questions` (opgaven)        | Questions and options only, no answer space — reusable                                                                                                        |
+| `sources` (bronnen)          | The shared stimuli, numbered "Bron 1", "Bron 2" in order of first use; questions say "Gebruik bron 1 (…) uit het bronnenboekje" instead of repeating the text |
+| `answerSheet` (antwoordblad) | Name/class/date, then an answer area per question number                                                                                                      |
+| `answerKey` (antwoordmodel)  | The answer sheet filled in, with points, accepted alternatives, scoring rubric and total                                                                      |
+| `workbook`                   | Questions with answer space in place (what `convertPackageToDocx` produces)                                                                                   |
 
 The zip includes `sources` automatically when the package has shared stimuli (`qti-assessment-stimulus-ref`). Pick documents with `documents: ['questions', 'answerSheet', 'answerKey']` (without `sources`, shared texts print in the booklet), or render one with `renderDocxDocument(paper, kind, options)` / `renderPdfDocument(...)`.
 
@@ -77,10 +74,10 @@ async function downloadWord(packageUrl: string) {
   const zip = await res.blob();
   const { assessment, fileName } = await convertPackageToDocx(zip, {
     locale: 'nl',
-    includeAnswerKey: true,
+    includeAnswerKey: true
   });
   const blob = new Blob([assessment], {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -107,28 +104,28 @@ npx --package=@citolab/qti-convert-cli qti-export-docx package.zip --zip --both 
 
 Each interaction has content (what the student reads), an answer area (answer sheet / workbook) and a filled answer area (answer key).
 
-| QTI interaction | Question | Answer area | Answer key |
-|-----------------|----------|-------------|------------|
-| choice | `A.  text` (+ "choose 2" from min/max-choices) | `○A ○B ○C` (☐ for multiple) | filled bubble |
-| text-entry | numbered gap `(1) ____` in the text | `(1) ________` | answer + accepted alternatives |
-| inline-choice | numbered gap + options per number | `(1) ○A ○B` | filled bubble |
-| extended-text | prompt | ruled lines (`expected-lines`) | correct value or scoring rubric |
-| match (≤ 6 columns) | numbered and lettered lists | grid of bubbles (column text when short) | filled grid |
-| match (> 6 columns) | numbered and lettered lists | `1 [  ]` per row | letters |
-| associate | lettered list | `[ ]–[ ]` pairs | pairs |
-| order | lettered list (never in the correct order) | `1 [ ] 2 [ ] 3 [ ]` | letters in order |
-| gap-match | lettered word bank + numbered gaps | `(1) [ ] (2) [ ]` | letter + word |
-| hottext | words underlined with a letter | `○A ○B ○C` | filled + the words |
-| hotspot | image with letters on the hotspots | `○A ○B ○C` | filled bubble |
-| graphic-order | image with letters | `1 [ ] 2 [ ] 3 [ ]` | letters in order |
-| graphic-associate | image with letters | `[ ]–[ ]` pairs | pairs |
-| graphic-gap-match | image with numbers + lettered bank | `(1) [ ] (2) [ ]` | letter + label |
-| select-point / position-object | image + "mark with a cross" | image | correct area outlined |
-| slider | "choose a value from … to …" | `Answer: ____` | value |
-| drawing | prompt (+ image) | image or empty box | rubric |
-| upload | "hand in separately" | note | rubric |
-| media | note that a fragment belongs to the question | — | — |
-| PCI / custom | "digital only" (question keeps its number) | "digital only" | — |
+| QTI interaction                | Question                                       | Answer area                              | Answer key                      |
+| ------------------------------ | ---------------------------------------------- | ---------------------------------------- | ------------------------------- |
+| choice                         | `A.  text` (+ "choose 2" from min/max-choices) | `○A ○B ○C` (☐ for multiple)              | filled bubble                   |
+| text-entry                     | numbered gap `(1) ____` in the text            | `(1) ________`                           | answer + accepted alternatives  |
+| inline-choice                  | numbered gap + options per number              | `(1) ○A ○B`                              | filled bubble                   |
+| extended-text                  | prompt                                         | ruled lines (`expected-lines`)           | correct value or scoring rubric |
+| match (≤ 6 columns)            | numbered and lettered lists                    | grid of bubbles (column text when short) | filled grid                     |
+| match (> 6 columns)            | numbered and lettered lists                    | `1 [  ]` per row                         | letters                         |
+| associate                      | lettered list                                  | `[ ]–[ ]` pairs                          | pairs                           |
+| order                          | lettered list (never in the correct order)     | `1 [ ] 2 [ ] 3 [ ]`                      | letters in order                |
+| gap-match                      | lettered word bank + numbered gaps             | `(1) [ ] (2) [ ]`                        | letter + word                   |
+| hottext                        | words underlined with a letter                 | `○A ○B ○C`                               | filled + the words              |
+| hotspot                        | image with letters on the hotspots             | `○A ○B ○C`                               | filled bubble                   |
+| graphic-order                  | image with letters                             | `1 [ ] 2 [ ] 3 [ ]`                      | letters in order                |
+| graphic-associate              | image with letters                             | `[ ]–[ ]` pairs                          | pairs                           |
+| graphic-gap-match              | image with numbers + lettered bank             | `(1) [ ] (2) [ ]`                        | letter + label                  |
+| select-point / position-object | image + "mark with a cross"                    | image                                    | correct area outlined           |
+| slider                         | "choose a value from … to …"                   | `Answer: ____`                           | value                           |
+| drawing                        | prompt (+ image)                               | image or empty box                       | rubric                          |
+| upload                         | "hand in separately"                           | note                                     | rubric                          |
+| media                          | note that a fragment belongs to the question   | —                                        | —                               |
+| PCI / custom                   | "digital only" (question keeps its number)     | "digital only"                           | —                               |
 
 Items with several interactions get parts a, b, c. Shared stimuli print once, before the first question that uses them — or in the separate sources document (`separateSources: true`, on by default in the zip). Items without interactions print without a number. Tables, lists, headings, sub/superscript and MathML are kept.
 
@@ -136,15 +133,15 @@ Shuffled interactions (`shuffle="true"`) get a fixed, seeded order on paper; pas
 
 ## API surface
 
-| Function | Role |
-|----------|------|
-| `loadPackage(source, options)` | ZIP → `PaperAssessment` |
-| `parseItemXml(xml, assets, href, options)` | single item XML → `PaperItem` |
-| `composeDocument(paper, kind, options)` | model → format-neutral layout (the designs) |
-| `renderDocxDocument` / `renderPdfDocument` | one document → bytes |
-| `renderDocx(assessment, options)` / `renderPdf` | workbook + answer key → bytes |
-| `convertPackageToDocx` / `convertPackageToPdf` | one-shot workbook + answer key |
-| `convertPackageToZip` | one-shot booklet + answer sheet + answer key zip |
+| Function                                        | Role                                             |
+| ----------------------------------------------- | ------------------------------------------------ |
+| `loadPackage(source, options)`                  | ZIP → `PaperAssessment`                          |
+| `parseItemXml(xml, assets, href, options)`      | single item XML → `PaperItem`                    |
+| `composeDocument(paper, kind, options)`         | model → format-neutral layout (the designs)      |
+| `renderDocxDocument` / `renderPdfDocument`      | one document → bytes                             |
+| `renderDocx(assessment, options)` / `renderPdf` | workbook + answer key → bytes                    |
+| `convertPackageToDocx` / `convertPackageToPdf`  | one-shot workbook + answer key                   |
+| `convertPackageToZip`                           | one-shot booklet + answer sheet + answer key zip |
 
 ## Images
 
@@ -154,19 +151,18 @@ Shuffled interactions (`shuffle="true"`) get a fixed, seeded order on paper; pas
 - Word gets PNG, JPEG, GIF and SVG; PDF gets PNG and JPEG (other formats print a placeholder).
 - Letters and answer areas on images are an SVG layer in Word (Word 2016+ / Microsoft 365; older versions show the plain image) and drawn directly in PDF.
 
-
 ```ts
 type ExportOptions = {
-  locale?: 'en' | 'nl';              // default: en
-  correctionInDocument?: boolean;  // append correction to question doc (default false)
-  correctionSeparate?: boolean;    // separate …-correction file (default true if unset)
-  fileNameBase?: string;           // default: QTI ZIP name (File/path) or assessment title
-  keepSourceOrder?: boolean;       // ignore shuffle="true" (default false)
-  separateSources?: boolean;       // shared stimuli in the sources document, questions refer to them
+  locale?: 'en' | 'nl'; // default: en
+  correctionInDocument?: boolean; // append correction to question doc (default false)
+  correctionSeparate?: boolean; // separate …-correction file (default true if unset)
+  fileNameBase?: string; // default: QTI ZIP name (File/path) or assessment title
+  keepSourceOrder?: boolean; // ignore shuffle="true" (default false)
+  separateSources?: boolean; // shared stimuli in the sources document, questions refer to them
 };
 
 type ZipExportOptions = ExportOptions & {
-  formats?: ('docx' | 'pdf')[];                                        // default ['docx']
+  formats?: ('docx' | 'pdf')[]; // default ['docx']
   documents?: ('workbook' | 'questions' | 'sources' | 'answerSheet' | 'answerKey')[]; // default questions, (sources), answerSheet, answerKey
 };
 ```

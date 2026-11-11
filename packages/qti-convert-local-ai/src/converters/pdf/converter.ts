@@ -18,7 +18,10 @@ export const pdfConverter: DocumentConverter<BinaryInput, PdfDocumentData, PdfPr
     return buildPdfPreview(document);
   },
 
-  async extractQuestions(_document: PdfDocumentData, _options?: GenerateQtiPackageOptions): Promise<StructuredQuestion[]> {
+  async extractQuestions(
+    _document: PdfDocumentData,
+    _options?: GenerateQtiPackageOptions
+  ): Promise<StructuredQuestion[]> {
     throw new Error('PDF extractQuestions requires the full conversion pipeline. Use convert() instead.');
   },
 

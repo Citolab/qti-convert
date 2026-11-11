@@ -47,6 +47,7 @@ For production use, consider:
 ## Free Tier Limits
 
 Cloudflare Workers free tier includes:
+
 - 100,000 requests/day
 - 10ms CPU time per request
 - No cold starts

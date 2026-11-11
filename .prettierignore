@@ -4,3 +4,6 @@ dist
 node_modules
 package-lock.json
 tsconfig.json
+# Vendored third-party assets and the generated bundle of them
+packages/qti-convert-tao-pci/assets
+packages/qti-convert-tao-pci/src/bundled-assets.ts

@@ -11,6 +11,7 @@ const convertedFiles = await convert(processedFilesMap);
 ```
 
 `convert(...)`:
+
 - expects input XML to be already upgraded to QTI 3 and PCI-upgraded upstream
 - applies TAO class/style conversion previously handled by `convert-tao-styles`
 - injects TAO PCI metadata (`data-require-paths`, `data-legacy-pci-proxy`, `data-legacy-pci-config`)
@@ -29,12 +30,14 @@ npm run storybook --workspace=@citolab/qti-convert-tao-pci
 Story: `TAO PCI/Converted ZIP Preview`
 
 What it does:
+
 - fetches ZIP input (default `/external-pci/PCI.zip`)
 - converts QTI 2.x -> QTI 3
 - applies `@citolab/qti-convert-tao-pci`
 - renders using qti-components loaded via configurable module/CSS URLs
 
 Default local ZIP mapping:
+
 - before Storybook starts, `prepare:storybook-assets` copies:
   `QTI_PCI_ZIP_PATH` (or `/Users/marcelhoekstra/Downloads/PCI.zip`)
   to `storybook-assets/PCI.zip`
@@ -49,5 +52,6 @@ npm run storybook --workspace=@citolab/qti-convert-tao-pci
 ```
 
 Then set story args to:
+
 - `componentsCdnUrl`: `/local-qti-components-cdn/index.js`
 - `componentsCssUrl`: `/local-qti-components-dist/item.css`

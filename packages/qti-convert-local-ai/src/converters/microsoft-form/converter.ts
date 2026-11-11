@@ -51,7 +51,10 @@ export const microsoftFormConverter: DocumentConverter<
     };
   },
 
-  async extractQuestions(_document: MicrosoftFormDocumentData, _options?: GenerateQtiPackageOptions): Promise<StructuredQuestion[]> {
+  async extractQuestions(
+    _document: MicrosoftFormDocumentData,
+    _options?: GenerateQtiPackageOptions
+  ): Promise<StructuredQuestion[]> {
     throw new Error('Microsoft Forms extractQuestions requires the URL. Use convert() instead.');
   },
 

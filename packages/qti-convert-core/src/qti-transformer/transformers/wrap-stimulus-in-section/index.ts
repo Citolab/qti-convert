@@ -19,10 +19,7 @@ export interface WrapStimulusInSectionResolver {
    * null/undefined when nothing is known about the item (it is then treated as a single-item
    * section).
    */
-  getItemMeta: (
-    href: string,
-    identifier: string
-  ) => Promise<WrapStimulusInSectionItemMeta | null | undefined>;
+  getItemMeta: (href: string, identifier: string) => Promise<WrapStimulusInSectionItemMeta | null | undefined>;
 }
 
 export interface WrapStimulusInSectionOptions {
@@ -80,9 +77,7 @@ export async function wrapStimulusInSection(
   resolver: WrapStimulusInSectionResolver,
   options?: WrapStimulusInSectionOptions
 ): Promise<boolean> {
-  const infoCategories = (options?.infoCategories ?? ['dep-informational', 'dep-info']).map(c =>
-    c.toLowerCase()
-  );
+  const infoCategories = (options?.infoCategories ?? ['dep-informational', 'dep-info']).map(c => c.toLowerCase());
 
   const testEl = $('*')
     .toArray()

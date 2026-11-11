@@ -1,11 +1,6 @@
 import * as cheerio from 'cheerio';
 
-export async function customInteraction(
-  $: cheerio.CheerioAPI,
-  baseRef: string,
-  baseItem: string,
-  force = false
-) {
+export async function customInteraction($: cheerio.CheerioAPI, baseRef: string, baseItem: string, force = false) {
   const qtiCustomInteraction = $('qti-custom-interaction');
   const qtiCustomInteractionObject = qtiCustomInteraction.find('object');
 

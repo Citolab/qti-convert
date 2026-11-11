@@ -8,15 +8,18 @@ export function qbCleanup($: cheerio.CheerioAPI) {
 
       const html = itemBody.html();
       if (typeof html === 'string') {
-        itemBody.html(html.replace(/\u00A0/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#xa0;/g, ' '));
+        itemBody.html(
+          html
+            .replace(/\u00A0/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&#xa0;/g, ' ')
+        );
       }
 
-      const directContentWrappers = itemBody
-        .children('div.content, div.container')
-        .filter((_, el) => {
-          const classValue = ($(el).attr('class') || '').trim();
-          return classValue === 'content' || classValue === 'container';
-        });
+      const directContentWrappers = itemBody.children('div.content, div.container').filter((_, el) => {
+        const classValue = ($(el).attr('class') || '').trim();
+        return classValue === 'content' || classValue === 'container';
+      });
 
       if (directContentWrappers.length > 0) {
         directContentWrappers.contents().unwrap();
@@ -233,14 +236,17 @@ export function qbCleanup($: cheerio.CheerioAPI) {
     const columnElements = $('.qti-layout-col6');
     for (const column of columnElements) {
       const $column = $(column);
-      const text = $column.text().replace(/\u00A0/g, '').trim();
+      const text = $column
+        .text()
+        .replace(/\u00A0/g, '')
+        .trim();
       if (text !== '') continue;
 
       // Some columns contain non-text content (e.g. video/media interactions) and should not be replaced by &nbsp;.
       const hasNonTextContent = $column
         .find('*')
         .toArray()
-        .some((el) => {
+        .some(el => {
           const tagName = (el as unknown as { tagName?: string }).tagName?.toLowerCase();
           if (!tagName) return false;
 

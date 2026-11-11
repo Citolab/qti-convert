@@ -40,7 +40,9 @@ const internalPackageNames = new Set(packages.map(pkg => pkg.name));
 const packageByName = new Map(packages.map(pkg => [pkg.name, pkg]));
 
 function printUsage() {
-  console.error('Usage: npm run publish:all -- <version> [--dry-run] [--skip-tests] [--skip-build] [--allow-dirty] [--skip-github-release]');
+  console.error(
+    'Usage: npm run publish:all -- <version> [--dry-run] [--skip-tests] [--skip-build] [--allow-dirty] [--skip-github-release]'
+  );
 }
 
 function isValidVersion(version) {
@@ -244,9 +246,7 @@ if (!dryRun && !skipGitHubRelease) {
   const releaseFiles = [
     'package-lock.json',
     ...packages.map(pkg => `${pkg.dir}/package.json`),
-    ...packages
-      .map(pkg => `${pkg.dir}/package-lock.json`)
-      .filter(file => existsSync(resolve(repoRoot, file)))
+    ...packages.map(pkg => `${pkg.dir}/package-lock.json`).filter(file => existsSync(resolve(repoRoot, file)))
   ];
 
   stageReleaseFiles(releaseFiles);

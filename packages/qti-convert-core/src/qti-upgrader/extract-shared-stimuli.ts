@@ -45,7 +45,9 @@ export interface SharedStimuliPackageOptions {
 }
 
 const BLOCK_ELEMENTS = new Set(
-  'p div table img figure blockquote h1 h2 h3 h4 h5 h6 ul ol dl pre object audio video picture section article aside hr'.split(' ')
+  'p div table img figure blockquote h1 h2 h3 h4 h5 h6 ul ol dl pre object audio video picture section article aside hr'.split(
+    ' '
+  )
 );
 const RICH_ELEMENTS = new Set(['img', 'table', 'figure', 'object', 'audio', 'video', 'picture', 'svg', 'math']);
 const ASSET_ATTRIBUTES = ['src', 'href', 'data', 'poster'];
@@ -60,7 +62,8 @@ const descendants = (el: Element): Element[] =>
   el.children.filter(isElement).flatMap(child => [child, ...descendants(child)]);
 const isQti = (el: Element) => localName(el.name).startsWith('qti-');
 const containsQti = (el: Element) => isQti(el) || descendants(el).some(isQti);
-const isRich = (el: Element) => RICH_ELEMENTS.has(localName(el.name)) || descendants(el).some(d => RICH_ELEMENTS.has(localName(d.name)));
+const isRich = (el: Element) =>
+  RICH_ELEMENTS.has(localName(el.name)) || descendants(el).some(d => RICH_ELEMENTS.has(localName(d.name)));
 
 /** FNV-1a, for short stable identifiers without a crypto dependency. */
 const hash = (text: string) => {
@@ -92,7 +95,9 @@ const canonical = (node: AnyNode, itemDir: string): string => {
   const attrs = Object.entries(node.attribs)
     .filter(([name]) => !IGNORED_ATTRIBUTES.has(name) && !name.startsWith('xmlns'))
     .map(([name, value]) =>
-      ASSET_ATTRIBUTES.includes(name) && isRelativeUrl(value) ? [name, normalizePath(joinPath(itemDir, value))] : [name, value]
+      ASSET_ATTRIBUTES.includes(name) && isRelativeUrl(value)
+        ? [name, normalizePath(joinPath(itemDir, value))]
+        : [name, value]
     )
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, value]) => ` ${name}="${value}"`)
@@ -111,7 +116,9 @@ const findCandidate = (path: string, xml: string): Candidate | null => {
 
   const row = itemBody.children.find((node): node is Element => isElement(node) && hasClass(node, /^qti-layout-row$/));
   if (row) {
-    const columns = row.children.filter((node): node is Element => isElement(node) && hasClass(node, /^qti-layout-col/));
+    const columns = row.children.filter(
+      (node): node is Element => isElement(node) && hasClass(node, /^qti-layout-col/)
+    );
     const column = columns.find(col => !containsQti(col));
     if (column && columns.some(col => col !== column && containsQti(col))) {
       return make(column.children.filter(isElement), column);
@@ -158,7 +165,8 @@ const rebaseAssets = ($: cheerio.CheerioAPI, el: Element, fromDir: string, toDir
   for (const node of [el, ...descendants(el)]) {
     for (const attr of ASSET_ATTRIBUTES) {
       const value = node.attribs[attr];
-      if (!value || !isRelativeUrl(value) || (attr === 'href' && localName(node.name) === 'a' && !/\.\w+$/.test(value))) continue;
+      if (!value || !isRelativeUrl(value) || (attr === 'href' && localName(node.name) === 'a' && !/\.\w+$/.test(value)))
+        continue;
       const absolute = normalizePath(joinPath(fromDir, value));
       assets.add(absolute);
       $(node).attr(attr, relativePath(toDir, absolute));
@@ -191,17 +199,25 @@ export const extractSharedStimuli = (
 ): { files: SharedStimulusPackageFiles; report: SharedStimuliReport } => {
   const candidates: Candidate[] = [];
   for (const [path, file] of files) {
-    if (file.type !== 'item' && !(path.endsWith('.xml') && /<qti-assessment-item[\s>]/.test(decode(file.content)))) continue;
+    if (file.type !== 'item' && !(path.endsWith('.xml') && /<qti-assessment-item[\s>]/.test(decode(file.content))))
+      continue;
     const candidate = findCandidate(path, decode(file.content));
     if (candidate) candidates.push(candidate);
   }
 
   const runText = (candidate: Candidate, start: number, length: number) =>
-    collapse(candidate.blocks.slice(start, start + length).map(block => candidate.$(block).text()).join(' '));
+    collapse(
+      candidate.blocks
+        .slice(start, start + length)
+        .map(block => candidate.$(block).text())
+        .join(' ')
+    );
   // Enough text, or rich content (image, table, ...) with at least some text; a lone shared logo is not a stimulus
   const isWorthSharing = (candidate: Candidate, start: number, length: number) => {
     const textLength = runText(candidate, start, length).length;
-    return textLength >= minTextLength || (textLength >= 40 && candidate.blocks.slice(start, start + length).some(isRich));
+    return (
+      textLength >= minTextLength || (textLength >= 40 && candidate.blocks.slice(start, start + length).some(isRich))
+    );
   };
 
   // Shared runs of blocks, longest (by text) first
@@ -221,7 +237,9 @@ export const extractSharedStimuli = (
   const extractedText = new Map<Candidate, string>();
   const stimulusAssets = new Map<string, Set<string>>();
 
-  for (const { keys } of [...runs.values()].sort((a, b) => b.textLength - a.textLength || b.keys.length - a.keys.length)) {
+  for (const { keys } of [...runs.values()].sort(
+    (a, b) => b.textLength - a.textLength || b.keys.length - a.keys.length
+  )) {
     const members = candidates
       .filter(candidate => !assigned.has(candidate))
       .map(candidate => ({ candidate, start: indexOfRun(candidate.keys, keys) }))
@@ -241,7 +259,11 @@ export const extractSharedStimuli = (
     const blocks = first.candidate.blocks.slice(first.start, first.start + keys.length);
     const heading = blocks.map(block => $first(block)).find($b => /^h[1-6]$/.test(($b.get(0) as Element).name));
     const text = collapse(blocks.map(block => $first(block).text()).join(' '));
-    const title = heading ? collapse(heading.text()) : text.length > 60 ? `${text.slice(0, 57)}...` : text || identifier;
+    const title = heading
+      ? collapse(heading.text())
+      : text.length > 60
+        ? `${text.slice(0, 57)}...`
+        : text || identifier;
 
     const cloneRebased = (el: Element) => {
       const $clone = $first(el).clone();
@@ -272,7 +294,10 @@ export const extractSharedStimuli = (
       const { $, path } = candidate;
       extractedText.set(candidate, runText(candidate, start, keys.length));
       for (const block of candidate.blocks.slice(start, start + keys.length)) removeWithLeadingWhitespace($, block);
-      if (candidate.column && !candidate.column.children.some(node => isElement(node) || (node.type === 'text' && node.data.trim()))) {
+      if (
+        candidate.column &&
+        !candidate.column.children.some(node => isElement(node) || (node.type === 'text' && node.data.trim()))
+      ) {
         const row = candidate.column.parent as Element;
         removeWithLeadingWhitespace($, candidate.column);
         const remaining = row.children.filter(isElement);
@@ -330,7 +355,10 @@ const updateManifest = (
   const relative = (packagePath: string) => relativePath(manifestDir, packagePath);
 
   for (const stimulus of report.stimuli) {
-    const fileEntries = [stimulus.path, ...[...stimulusAssets.get(stimulus.identifier)!].filter(asset => files.has(asset))]
+    const fileEntries = [
+      stimulus.path,
+      ...[...stimulusAssets.get(stimulus.identifier)!].filter(asset => files.has(asset))
+    ]
       .map(path => `<${prefix}file href="${relative(path)}"/>`)
       .join('');
     $(resources).append(

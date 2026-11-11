@@ -24,7 +24,7 @@ describe('import-qti-package helpers', () => {
     const rootDir = __test__.detectPackageRootDir([
       'PCI-Conformance/imsmanifest.xml',
       'PCI-Conformance/items/item-1/qti.xml',
-      'PCI-Conformance/items/item-1/modules/module_resolution.js',
+      'PCI-Conformance/items/item-1/modules/module_resolution.js'
     ]);
 
     expect(rootDir).toBe('PCI-Conformance/');
@@ -33,7 +33,7 @@ describe('import-qti-package helpers', () => {
   test('rebases zip paths relative to the detected package root', () => {
     const rebased = __test__.rebaseToPackageRoot(
       'PCI-Conformance/items/item-5/modules/lib/raphael-2.3.0-min.js',
-      'PCI-Conformance/',
+      'PCI-Conformance/'
     );
 
     expect(rebased).toBe('items/item-5/modules/lib/raphael-2.3.0-min.js');
@@ -48,11 +48,8 @@ describe('import-qti-package helpers', () => {
 
   test('selects a single nested module_resolution file for root aliasing', () => {
     const pick = __test__.pickAliasedModuleResolutionPath(
-      [
-        'items/item-1/modules/module_resolution.js',
-        'items/item-1/qti.xml',
-      ],
-      'module_resolution',
+      ['items/item-1/modules/module_resolution.js', 'items/item-1/qti.xml'],
+      'module_resolution'
     );
 
     expect(pick).toBe('items/item-1/modules/module_resolution.js');
@@ -60,11 +57,8 @@ describe('import-qti-package helpers', () => {
 
   test('does not alias module_resolution when multiple nested candidates exist', () => {
     const pick = __test__.pickAliasedModuleResolutionPath(
-      [
-        'items/item-1/modules/module_resolution.js',
-        'items/item-2/modules/module_resolution.js',
-      ],
-      'module_resolution',
+      ['items/item-1/modules/module_resolution.js', 'items/item-2/modules/module_resolution.js'],
+      'module_resolution'
     );
 
     expect(pick).toBeNull();

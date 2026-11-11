@@ -3,7 +3,13 @@ import type { ExportLocale, PaperDocumentKind, PaperFormat } from './types.js';
 
 /** Sanitize a base name for download filenames. */
 export function safeFileName(name: string): string {
-  return name.replace(/[^\w\-+.() ]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'assessment';
+  return (
+    name
+      .replace(/[^\w\-+.() ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 120) || 'assessment'
+  );
 }
 
 /**
@@ -34,15 +40,12 @@ export function exportDownloadNames(
   const safe = safeFileName(base);
   return {
     fileName: `${safe}.${ext}`,
-    answerKeyFileName: `${safe}-correction.${ext}`,
+    answerKeyFileName: `${safe}-correction.${ext}`
   };
 }
 
 /** Prefer explicit option, else fall back to assessment title. */
-export function resolveFileNameBase(
-  optionsBase: string | undefined,
-  assessmentTitle: string
-): string {
+export function resolveFileNameBase(optionsBase: string | undefined, assessmentTitle: string): string {
   if (optionsBase?.trim()) return safeFileName(optionsBase.trim());
   return safeFileName(assessmentTitle);
 }

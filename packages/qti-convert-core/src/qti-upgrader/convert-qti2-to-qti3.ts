@@ -25,7 +25,13 @@ const XML_MODEL_PI =
   '<?xml-model href="https://purl.imsglobal.org/spec/qti/v3p0/schema/xsd/imsqti_asiv3p0_v1p0.xsd" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>';
 
 const ROOT_ELEMENTS = new Set(['assessmentItem', 'assessmentStimulus', 'assessmentTest']);
-const CONTENT_BODY_ELEMENTS = new Set(['feedbackBlock', 'modalFeedback', 'rubricBlock', 'templateBlock', 'testFeedback']);
+const CONTENT_BODY_ELEMENTS = new Set([
+  'feedbackBlock',
+  'modalFeedback',
+  'rubricBlock',
+  'templateBlock',
+  'testFeedback'
+]);
 
 const isElement = (node: AnyNode): node is Element => node.type === 'tag';
 const splitName = (name: string) => {
@@ -136,12 +142,36 @@ class Upgrader {
     const type = el.attribs.type || '';
     if (local === 'object' && type.startsWith('image')) {
       const others = copyAttributes(el).filter(([name]) => name !== 'data' && name !== 'type');
-      return this.element(el, 'img', QTI3_NAMESPACE, [['src', el.attribs.data ?? ''], ['alt', $(el).text()], ...others], scope, () => '');
+      return this.element(
+        el,
+        'img',
+        QTI3_NAMESPACE,
+        [['src', el.attribs.data ?? ''], ['alt', $(el).text()], ...others],
+        scope,
+        () => ''
+      );
     }
     if (local === 'object' && type.startsWith('video')) {
       const others = copyAttributes(el).filter(([name]) => name !== 'data' && name !== 'type');
-      return this.element(el, 'video', QTI3_NAMESPACE, [['src', el.attribs.data ?? ''], ...others], scope, s =>
-        this.children(el.children, s) + this.element(el, 'source', QTI3_NAMESPACE, [['type', type], ['src', el.attribs.data ?? '']], s, () => '')
+      return this.element(
+        el,
+        'video',
+        QTI3_NAMESPACE,
+        [['src', el.attribs.data ?? ''], ...others],
+        scope,
+        s =>
+          this.children(el.children, s) +
+          this.element(
+            el,
+            'source',
+            QTI3_NAMESPACE,
+            [
+              ['type', type],
+              ['src', el.attribs.data ?? '']
+            ],
+            s,
+            () => ''
+          )
       );
     }
 
@@ -150,7 +180,9 @@ class Upgrader {
         ['xsi:schemaLocation', QTI3_SCHEMA_LOCATION],
         ...kabobAttributes(el, name => name === 'xsi:schemaLocation')
       ];
-      return this.element(el, qtiKabobify(local), QTI3_NAMESPACE, attributes, scope, s => this.children(el.children, s));
+      return this.element(el, qtiKabobify(local), QTI3_NAMESPACE, attributes, scope, s =>
+        this.children(el.children, s)
+      );
     }
 
     if (CONTENT_BODY_ELEMENTS.has(local)) {
@@ -163,7 +195,10 @@ class Upgrader {
       }
       return this.element(el, qtiKabobify(local), QTI3_NAMESPACE, attributes, scope, s => {
         const stylesheets = this.children(el.children.filter(isStylesheet), s);
-        const body = this.children(el.children.filter(node => !isStylesheet(node)), s);
+        const body = this.children(
+          el.children.filter(node => !isStylesheet(node)),
+          s
+        );
         return stylesheets + this.element(el, 'qti-content-body', QTI3_NAMESPACE, [], s, () => body);
       });
     }

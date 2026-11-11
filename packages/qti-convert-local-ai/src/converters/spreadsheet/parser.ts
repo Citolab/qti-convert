@@ -261,7 +261,11 @@ const firstDescendant = (parent: XmlElementContainer, localName: string): Elemen
 
 const textContent = (element: Element | null | undefined): string => (element?.textContent || '').trim();
 
-const normalizeQuestestText = (value: string): string => value.replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+const normalizeQuestestText = (value: string): string =>
+  value
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
 const isQuestestInteropRow = (
   row: SpreadsheetRow | null
@@ -277,9 +281,7 @@ const isQuestestInteropRow = (
   expectedLength: string;
 } => Boolean(row);
 
-const isNonNullRow = (
-  row: SpreadsheetRow | null
-): row is SpreadsheetRow & Record<string, string> => Boolean(row);
+const isNonNullRow = (row: SpreadsheetRow | null): row is SpreadsheetRow & Record<string, string> => Boolean(row);
 
 const uniqueNonEmpty = (values: string[]): string[] => {
   const seen = new Set<string>();
@@ -407,7 +409,10 @@ const parseMoodleQuiz = (xmlText: string): SpreadsheetData => {
         fraction: answer.fraction
       }));
 
-      const correctResponse = choiceOptions.filter(answer => answer.fraction > 0).map(answer => answer.id).join(',');
+      const correctResponse = choiceOptions
+        .filter(answer => answer.fraction > 0)
+        .map(answer => answer.id)
+        .join(',');
 
       return {
         identifier: `moodle-item-${multichoiceIndex}`,
@@ -422,7 +427,9 @@ const parseMoodleQuiz = (xmlText: string): SpreadsheetData => {
             .map((answer, index) => ({
               id: String.fromCharCode(65 + index),
               text: normalizeQuestestText(textContent(firstDescendant(answer, 'text'))),
-              feedback: normalizeQuestestText(textContent(firstDescendant(firstDescendant(answer, 'feedback') || answer, 'text'))),
+              feedback: normalizeQuestestText(
+                textContent(firstDescendant(firstDescendant(answer, 'feedback') || answer, 'text'))
+              ),
               fraction: Number.parseFloat((answer.getAttribute('fraction') || '').trim() || '0')
             }))
             .filter(answer => answer.text)
@@ -470,8 +477,19 @@ const parseQuestestInterop = (xmlText: string): SpreadsheetData => {
       const fibMaxChars = Number.parseInt((renderFib?.getAttribute('maxchars') || '').trim(), 10);
       const fibColumns = Number.parseInt((renderFib?.getAttribute('columns') || '').trim(), 10);
       const isEssayLike = Number.isFinite(fibRows) && fibRows > 1;
-      const expectedLength = Number.isFinite(fibMaxChars) && fibMaxChars > 0 ? fibMaxChars : Number.isFinite(fibColumns) && fibColumns > 0 ? fibColumns : '';
-      const questionType = responseLid ? 'multiple_choice' : responseStr ? (isEssayLike || correctResponses.length === 0 ? 'extended_text' : 'short_text') : 'extended_text';
+      const expectedLength =
+        Number.isFinite(fibMaxChars) && fibMaxChars > 0
+          ? fibMaxChars
+          : Number.isFinite(fibColumns) && fibColumns > 0
+            ? fibColumns
+            : '';
+      const questionType = responseLid
+        ? 'multiple_choice'
+        : responseStr
+          ? isEssayLike || correctResponses.length === 0
+            ? 'extended_text'
+            : 'short_text'
+          : 'extended_text';
 
       return {
         identifier,
@@ -481,8 +499,7 @@ const parseQuestestInterop = (xmlText: string): SpreadsheetData => {
         questionType,
         selectionMode,
         correctResponse: correctResponses.join(','),
-        optionsJson: JSON.stringify(choices)
-        ,
+        optionsJson: JSON.stringify(choices),
         expectedLength: String(expectedLength || '')
       };
     })
@@ -506,7 +523,7 @@ export const parseSpreadsheet = async (
     const buffer = await toArrayBuffer(input);
     const text = new TextDecoder().decode(buffer);
     return {
-      ...await parseCsv(text),
+      ...(await parseCsv(text)),
       fileName
     };
   }
@@ -522,7 +539,7 @@ export const parseSpreadsheet = async (
 
   const buffer = await toArrayBuffer(input);
   return {
-    ...await parseWorkbook(buffer, options.sheetName),
+    ...(await parseWorkbook(buffer, options.sheetName)),
     fileName
   };
 };

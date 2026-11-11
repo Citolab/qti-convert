@@ -19,7 +19,9 @@ const printReport = (report: SharedStimuliReport) => {
     console.log(`  shared stimulus ${stimulus.path} ("${stimulus.title}") used by: ${stimulus.items.join(', ')}`);
   }
   for (const duplicate of report.nearDuplicates) {
-    console.log(`  similar but not identical (${duplicate.similarity}), not extracted: ${duplicate.items.join(' <> ')}`);
+    console.log(
+      `  similar but not identical (${duplicate.similarity}), not extracted: ${duplicate.items.join(' <> ')}`
+    );
   }
 };
 const options = { extractSharedStimuli, onSharedStimuliReport: printReport };

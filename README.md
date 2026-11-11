@@ -159,14 +159,14 @@ const fromPackage = (
 only a fallback, since a delivery engine is not expected to resolve that URI over the web.
 Options:
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `baseUrl` | – | Base used to resolve relative template references. |
-| `includeStandardTemplates` | `false` | Also inline `match_correct`, `map_response` and `map_response_point`. |
-| `standardTemplates` | the three above | Template names treated as natively supported. |
-| `overwriteExistingRules` | `false` | Inline even when the element already contains response rules. |
-| `keepTemplateAttributes` | `false` | Keep `template` / `template-location` after inlining. |
-| `cache` | `true` | Cache resolved templates in `sessionStorage` when available. |
+| Option                     | Default         | Description                                                           |
+| -------------------------- | --------------- | --------------------------------------------------------------------- |
+| `baseUrl`                  | –               | Base used to resolve relative template references.                    |
+| `includeStandardTemplates` | `false`         | Also inline `match_correct`, `map_response` and `map_response_point`. |
+| `standardTemplates`        | the three above | Template names treated as natively supported.                         |
+| `overwriteExistingRules`   | `false`         | Inline even when the element already contains response rules.         |
+| `keepTemplateAttributes`   | `false`         | Keep `template` / `template-location` after inlining.                 |
+| `cache`                    | `true`          | Cache resolved templates in `sessionStorage` when available.          |
 
 After inlining, the `template` and `template-location` attributes are removed — otherwise a player
 that recognises the attribute would clear the rules again.

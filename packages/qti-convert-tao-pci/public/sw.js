@@ -7,7 +7,7 @@
 //   qti-pkg-<packageId>
 //
 // This lets requirejs, images, stylesheets, and module_resolution.* be fetched as if they were on a server.
-const PKG_PREFIX = "/__qti_pkg__/";
+const PKG_PREFIX = '/__qti_pkg__/';
 const cacheIndexByName = new Map();
 
 function getPathnameKey(urlString) {
@@ -30,7 +30,7 @@ function buildCanonicalUrl(requestUrl, packageId) {
   if (pathInPkg.startsWith(doublePrefix)) {
     pathInPkg = pathInPkg.slice(doublePrefix.length);
   }
-  pathInPkg = pathInPkg.replace(/^\/+/, "");
+  pathInPkg = pathInPkg.replace(/^\/+/, '');
 
   url.pathname = `${PKG_PREFIX}${packageId}/${pathInPkg}`;
   return url.toString();
@@ -47,7 +47,7 @@ async function getCacheIndex(cacheName) {
     if (!pathname) continue;
     const pathLower = pathname.toLowerCase();
     if (!byPathLower.has(pathLower)) byPathLower.set(pathLower, req.url);
-    const fileLower = pathname.split("/").pop()?.toLowerCase() || "";
+    const fileLower = pathname.split('/').pop()?.toLowerCase() || '';
     if (fileLower) {
       const arr = byFileLower.get(fileLower) || [];
       arr.push(req.url);
@@ -59,16 +59,16 @@ async function getCacheIndex(cacheName) {
   return idx;
 }
 
-self.addEventListener("install", (event) => {
+self.addEventListener('install', event => {
   // Take over as soon as possible; package caches are managed by the app.
   event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (!url.pathname.startsWith(PKG_PREFIX)) return;
@@ -76,7 +76,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const rest = url.pathname.slice(PKG_PREFIX.length);
-      const [packageId] = rest.split("/", 1);
+      const [packageId] = rest.split('/', 1);
       const cacheName = `qti-pkg-${packageId}`;
 
       const cache = await caches.open(cacheName);
@@ -87,17 +87,17 @@ self.addEventListener("fetch", (event) => {
       let cached = await cache.match(canonicalUrl, {
         ignoreSearch: true,
         ignoreMethod: true,
-        ignoreVary: true,
+        ignoreVary: true
       });
       if (cached) {
-        if (request.method === "HEAD") {
+        if (request.method === 'HEAD') {
           const headers = new Headers(cached.headers);
           // Ensure a sane content-length for HEAD (body is empty).
-          headers.set("content-length", "0");
+          headers.set('content-length', '0');
           return new Response(null, {
             status: cached.status,
             statusText: cached.statusText,
-            headers,
+            headers
           });
         }
         return cached;
@@ -106,32 +106,31 @@ self.addEventListener("fetch", (event) => {
       // 2) Case-insensitive pathname match (common in zips).
       const idx = await getCacheIndex(cacheName);
       const canonicalPathname = getPathnameKey(canonicalUrl);
-      const lower = canonicalPathname?.toLowerCase() || "";
+      const lower = canonicalPathname?.toLowerCase() || '';
       const matchedUrl = lower ? idx.byPathLower.get(lower) : null;
       if (matchedUrl) {
         cached = await cache.match(matchedUrl, {
           ignoreSearch: true,
           ignoreMethod: true,
-          ignoreVary: true,
+          ignoreVary: true
         });
         if (cached) return cached;
       }
 
       // 3) Fallback by filename if unique (helps with case/different folder layouts).
-      const filenameLower =
-        (canonicalPathname || "").split("/").pop()?.toLowerCase() || "";
+      const filenameLower = (canonicalPathname || '').split('/').pop()?.toLowerCase() || '';
       const candidates = filenameLower ? idx.byFileLower.get(filenameLower) : null;
       if (candidates && candidates.length === 1) {
         cached = await cache.match(candidates[0], {
           ignoreSearch: true,
           ignoreMethod: true,
-          ignoreVary: true,
+          ignoreVary: true
         });
         if (cached) return cached;
       }
 
       // Not found in package cache.
-      return new Response("Not found", { status: 404 });
-    })(),
+      return new Response('Not found', { status: 404 });
+    })()
   );
 });

@@ -370,8 +370,7 @@ export const processPackage = async (
     skipValidation?: boolean;
   } = {},
   processItemCallback?:
-    | ((itemData: { identifier: string; content: string; originalContent: string; relativePath: string }) => void)
-    | null,
+    ((itemData: { identifier: string; content: string; originalContent: string; relativePath: string }) => void) | null,
   processTestCallback?:
     | ((testData: {
         identifier: string;

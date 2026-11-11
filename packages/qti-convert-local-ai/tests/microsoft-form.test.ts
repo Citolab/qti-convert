@@ -2,10 +2,7 @@
 
 import JSZip from 'jszip';
 import { describe, expect, test } from 'vitest';
-import {
-  convertMicrosoftFormToQtiPackage,
-  extractMicrosoftFormPrefetchRequest
-} from '../src/converters';
+import { convertMicrosoftFormToQtiPackage, extractMicrosoftFormPrefetchRequest } from '../src/converters';
 
 const MICROSOFT_FORM_HTML = `<!DOCTYPE html>
 <html>
@@ -44,7 +41,11 @@ const MICROSOFT_RUNTIME_FORM_JSON = JSON.stringify({
       type: 'Question.Choice',
       allowMultipleValues: true,
       questionInfo: JSON.stringify({
-        Choices: [{ Description: '2', IsAnswerKey: true }, { Description: '3', IsAnswerKey: true }, { Description: '4' }]
+        Choices: [
+          { Description: '2', IsAnswerKey: true },
+          { Description: '3', IsAnswerKey: true },
+          { Description: '4' }
+        ]
       })
     },
     {

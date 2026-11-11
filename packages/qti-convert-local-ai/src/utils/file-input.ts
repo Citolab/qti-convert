@@ -1,10 +1,7 @@
 export type BinaryInput = File | Blob | ArrayBuffer | Uint8Array;
 export type SpreadsheetInput = BinaryInput | string;
 
-export const getInputFileName = (
-  input: BinaryInput | SpreadsheetInput,
-  fallback?: string
-): string | undefined => {
+export const getInputFileName = (input: BinaryInput | SpreadsheetInput, fallback?: string): string | undefined => {
   if (fallback) {
     return fallback;
   }

@@ -41,10 +41,7 @@ function hasClass($: cheerio.CheerioAPI, el: El, cls: string): boolean {
 
 /** Collapse insignificant whitespace so two serializations of equal content compare equal. */
 function normalizeContent(html: string): string {
-  return html
-    .replace(/>\s+</g, '><')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return html.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
 }
 
 /** Deterministic, dependency-free FNV-1a hash rendered as base36 (browser + node safe). */
@@ -119,7 +116,12 @@ export async function convertToStimulus(
 
     // Skip items that already reference a stimulus.
     if ($('qti-assessment-stimulus-ref').length > 0) continue;
-    if ($('div').toArray().some(e => hasClass($, e, 'qti-shared-stimulus'))) continue;
+    if (
+      $('div')
+        .toArray()
+        .some(e => hasClass($, e, 'qti-shared-stimulus'))
+    )
+      continue;
 
     const leftColumn = findLeftColumn($);
     if (!leftColumn) continue;
@@ -156,9 +158,7 @@ export async function convertToStimulus(
       const { $, leftColumn, path } = candidate;
       const href = relativeHref(path, stimulusPath);
 
-      $(leftColumn)
-        .empty()
-        .append(`<div class="qti-shared-stimulus" data-stimulus-idref="${identifier}" />`);
+      $(leftColumn).empty().append(`<div class="qti-shared-stimulus" data-stimulus-idref="${identifier}" />`);
 
       const ref = `<qti-assessment-stimulus-ref identifier="${identifier}" href="${href}" />`;
       const body = $('qti-item-body').first();

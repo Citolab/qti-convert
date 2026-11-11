@@ -21,9 +21,7 @@ export const depConvert = ($: cheerio.CheerioAPI) => {
         const style = isImageOnly ? 'background: none; border: 0; padding: 0; cursor: zoom-in;' : 'cursor: pointer;';
         // wrap ref in button
         const triggerContent = $.html(dialogTrigger);
-        const button = $(
-          `<button type="button" popovertarget="${ref}" style="${style}">${triggerContent}</button>`
-        );
+        const button = $(`<button type="button" popovertarget="${ref}" style="${style}">${triggerContent}</button>`);
         $(dialogTrigger).replaceWith(button);
         const dialog = $(`#${ref}`);
         dialog.attr('popover', '');

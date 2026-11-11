@@ -94,11 +94,7 @@ export type ProgressEvent =
     }
   | {
       stage:
-        | 'parse_completed'
-        | 'llm_loading_completed'
-        | 'mapping_completed'
-        | 'package_completed'
-        | 'chunk_completed';
+        'parse_completed' | 'llm_loading_completed' | 'mapping_completed' | 'package_completed' | 'chunk_completed';
       message: string;
       data?: unknown;
     }

@@ -77,22 +77,15 @@ interface QtiTransformAPI {
   ): Promise<QtiTransformAPI>;
   upgradePci(): QtiTransformAPI;
   stylesheetsInline(
-    getStylesheetContentOrOptions?:
-      | ((href: string) => Promise<string | null | undefined>)
-      | StylesheetsInlineOptions,
+    getStylesheetContentOrOptions?: ((href: string) => Promise<string | null | undefined>) | StylesheetsInlineOptions,
     options?: StylesheetsInlineOptions
   ): Promise<QtiTransformAPI>;
   inlineResponseProcessingTemplate(
-    getTemplateContentOrOptions?:
-      | ResponseProcessingTemplateResolver
-      | InlineResponseProcessingTemplateOptions,
+    getTemplateContentOrOptions?: ResponseProcessingTemplateResolver | InlineResponseProcessingTemplateOptions,
     options?: InlineResponseProcessingTemplateOptions
   ): Promise<QtiTransformAPI>;
   stripStylesheets(options?: StripStylesheetsOptions): QtiTransformAPI;
-  stripStylesheets(
-    options: StripStylesheetsOptions | undefined,
-    resolver: StimulusResolver
-  ): Promise<QtiTransformAPI>;
+  stripStylesheets(options: StripStylesheetsOptions | undefined, resolver: StimulusResolver): Promise<QtiTransformAPI>;
   wrapStimulusInSection(
     resolver: WrapStimulusInSectionResolver,
     options?: WrapStimulusInSectionOptions
@@ -205,9 +198,7 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       return api;
     },
     async stylesheetsInline(
-      getStylesheetContentOrOptions?:
-        | ((href: string) => Promise<string | null | undefined>)
-        | StylesheetsInlineOptions,
+      getStylesheetContentOrOptions?: ((href: string) => Promise<string | null | undefined>) | StylesheetsInlineOptions,
       options?: StylesheetsInlineOptions
     ) {
       const getStylesheetContent =
@@ -218,15 +209,12 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       return api;
     },
     async inlineResponseProcessingTemplate(
-      getTemplateContentOrOptions?:
-        | ResponseProcessingTemplateResolver
-        | InlineResponseProcessingTemplateOptions,
+      getTemplateContentOrOptions?: ResponseProcessingTemplateResolver | InlineResponseProcessingTemplateOptions,
       options?: InlineResponseProcessingTemplateOptions
     ) {
       const getTemplateContent =
         typeof getTemplateContentOrOptions === 'function' ? getTemplateContentOrOptions : undefined;
-      const inlineOptions =
-        typeof getTemplateContentOrOptions === 'function' ? options : getTemplateContentOrOptions;
+      const inlineOptions = typeof getTemplateContentOrOptions === 'function' ? options : getTemplateContentOrOptions;
       await inlineResponseProcessingTemplate($, getTemplateContent, inlineOptions);
       return api;
     },
@@ -237,10 +225,7 @@ export const qtiTransform = (xmlValue: string): QtiTransformAPI => {
       stripStylesheets($, options);
       return api;
     }) as QtiTransformAPI['stripStylesheets'],
-    async wrapStimulusInSection(
-      resolver: WrapStimulusInSectionResolver,
-      options?: WrapStimulusInSectionOptions
-    ) {
+    async wrapStimulusInSection(resolver: WrapStimulusInSectionResolver, options?: WrapStimulusInSectionOptions) {
       await wrapStimulusInSection($, resolver, options);
       return api;
     },

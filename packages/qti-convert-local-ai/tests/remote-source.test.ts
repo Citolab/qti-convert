@@ -73,7 +73,9 @@ describe('remote source routing', () => {
       }
     });
 
-    expect(requestedUrl).toBe('https://corsproxy.io/?url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSf%2Fviewform');
+    expect(requestedUrl).toBe(
+      'https://corsproxy.io/?url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSf%2Fviewform'
+    );
     expect(DEFAULT_REMOTE_SOURCE_PROXY_URL).toBe('https://corsproxy.io/?url={url}');
   });
 

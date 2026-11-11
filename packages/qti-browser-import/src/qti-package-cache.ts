@@ -13,7 +13,7 @@ export function makePackageUrl(packageId: string, zipPath: string): string {
   const normalized = normalizeZipPath(zipPath);
   const encoded = normalized
     .split('/')
-    .map((segment) => encodeURIComponent(segment))
+    .map(segment => encodeURIComponent(segment))
     .join('/');
   return `${QTI_PKG_URL_PREFIX}/${encodeURIComponent(packageId)}/${encoded}`;
 }
@@ -40,7 +40,7 @@ function getMimeTypeFromFileName(filename: string): string {
     js: 'application/javascript',
     mjs: 'application/javascript',
     html: 'text/html',
-    txt: 'text/plain',
+    txt: 'text/plain'
   };
   return mimeTypes[extension] || 'application/octet-stream';
 }
@@ -49,7 +49,7 @@ export async function putTextFileInPackageCache(
   packageId: string,
   zipPath: string,
   content: string,
-  contentType = 'application/xml',
+  contentType = 'application/xml'
 ): Promise<void> {
   const url = makePackageUrl(packageId, zipPath);
   const cache = await caches.open(getPackageCacheName(packageId));
@@ -57,17 +57,13 @@ export async function putTextFileInPackageCache(
     url,
     new Response(content, {
       headers: {
-        'Content-Type': contentType,
-      },
-    }),
+        'Content-Type': contentType
+      }
+    })
   );
 }
 
-export async function putBlobFileInPackageCache(
-  packageId: string,
-  zipPath: string,
-  blob: Blob,
-): Promise<void> {
+export async function putBlobFileInPackageCache(packageId: string, zipPath: string, blob: Blob): Promise<void> {
   const url = makePackageUrl(packageId, zipPath);
   const cache = await caches.open(getPackageCacheName(packageId));
   const contentType = getMimeTypeFromFileName(zipPath);
@@ -76,9 +72,9 @@ export async function putBlobFileInPackageCache(
     url,
     new Response(typedBlob, {
       headers: {
-        'Content-Type': typedBlob.type || contentType,
-      },
-    }),
+        'Content-Type': typedBlob.type || contentType
+      }
+    })
   );
 }
 
@@ -86,16 +82,13 @@ export async function deletePackageCache(packageId: string): Promise<boolean> {
   return await caches.delete(getPackageCacheName(packageId));
 }
 
-export async function ensurePackageServiceWorkerReady(
-  scriptUrl = '/sw.js',
-  scope = '/',
-): Promise<void> {
+export async function ensurePackageServiceWorkerReady(scriptUrl = '/sw.js', scope = '/'): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
   try {
     await navigator.serviceWorker.register(scriptUrl, { scope });
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         let settled = false;
         const done = () => {
           if (settled) return;

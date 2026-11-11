@@ -153,9 +153,7 @@ function toStructuredValue(input: unknown): unknown {
   const isNumericMap = keys.length > 0 && keys.every(key => /^\d+$/.test(key));
 
   if (isNumericMap) {
-    return keys
-      .sort((a, b) => Number(a) - Number(b))
-      .map(key => toStructuredValue(object[key]));
+    return keys.sort((a, b) => Number(a) - Number(b)).map(key => toStructuredValue(object[key]));
   }
 
   return keys.reduce<Record<string, unknown>>((acc, key) => {
@@ -188,14 +186,11 @@ type PropertyRehydrationMap = Record<string, string>;
 function collectRootPropertyRehydrationMaps(xml: string): PropertyRehydrationMap[] {
   const $ = cheerio.load(xml, { xmlMode: true, xml: true });
   const maps: PropertyRehydrationMap[] = [];
-  const pciNodes = $('qti-custom-interaction > qti-portable-custom-interaction, customInteraction > portableCustomInteraction');
+  const pciNodes = $(
+    'qti-custom-interaction > qti-portable-custom-interaction, customInteraction > portableCustomInteraction'
+  );
 
-  const collectMappings = (
-    element: any,
-    rootPath: string,
-    relativePath: string[],
-    output: PropertyRehydrationMap
-  ) => {
+  const collectMappings = (element: any, rootPath: string, relativePath: string[], output: PropertyRehydrationMap) => {
     $(element)
       .children()
       .each((_, child) => {
@@ -271,10 +266,7 @@ function buildLegacyConfigFromDataAttributes(attributes: Record<string, string>)
     if (name === 'data-legacy-pci-proxy') return;
 
     const key = name.slice('data-'.length);
-    const path = key
-      .split('__')
-      .filter(Boolean)
-      .map(normalizeLegacyConfigKeySegment);
+    const path = key.split('__').filter(Boolean).map(normalizeLegacyConfigKeySegment);
     if (path.length === 0) return;
     setNestedValue(root, path, decodeHtmlEntities(value));
   });
@@ -299,7 +291,9 @@ function mapTaoClassToQtiClass(token: string): string | null {
 }
 
 function normalizeLegacyBootstrapButtonClasses(tokens: string[]): string[] {
-  const hasBootstrapVariant = tokens.some(token => /^btn-[a-z0-9-]+$/i.test(token) && token !== 'btn-group' && token !== 'btn-toolbar');
+  const hasBootstrapVariant = tokens.some(
+    token => /^btn-[a-z0-9-]+$/i.test(token) && token !== 'btn-group' && token !== 'btn-toolbar'
+  );
   if (!hasBootstrapVariant) return tokens;
 
   const nextTokens = tokens.filter(token => token !== 'small');
@@ -512,7 +506,10 @@ function createLegacyProxyModuleSource(originalModuleId: string): string {
 });`;
 }
 
-function injectLegacyProxyIntoItemXml(itemPath: string, xml: string): { xml: string; proxies: Array<{ path: string; content: string }> } {
+function injectLegacyProxyIntoItemXml(
+  itemPath: string,
+  xml: string
+): { xml: string; proxies: Array<{ path: string; content: string }> } {
   const $ = cheerio.load(xml, { xmlMode: true, xml: true });
   const proxies: Array<{ path: string; content: string }> = [];
   let changed = false;
@@ -536,7 +533,9 @@ function injectLegacyProxyIntoItemXml(itemPath: string, xml: string): { xml: str
     const proxyFileName = `${itemBase}.legacy-pci-proxy.${idx}.js`;
     const proxyPath = `${itemDir}${proxyFileName}`;
 
-    modulesRoot.append(`<qti-interaction-module id="${proxyModuleId}" primary-path="${proxyFileName}"></qti-interaction-module>`);
+    modulesRoot.append(
+      `<qti-interaction-module id="${proxyModuleId}" primary-path="${proxyFileName}"></qti-interaction-module>`
+    );
     pci.attr('module', proxyModuleId);
     pci.attr('data-legacy-pci-source-module', originalModuleId);
 
@@ -583,7 +582,8 @@ function applyTaoPciEnhancements(itemPath: string, xml: string): { xml: string; 
   applyTaoStyleConversion($);
 
   const assessmentItem = $('qti-assessment-item, assessmentItem').first();
-  const isTao = ((assessmentItem.attr('tool-name') || assessmentItem.attr('toolName') || '') as string).toUpperCase() === 'TAO';
+  const isTao =
+    ((assessmentItem.attr('tool-name') || assessmentItem.attr('toolName') || '') as string).toUpperCase() === 'TAO';
   if (!isTao) {
     return { xml: $.xml(), isTao: false, hasPci: false };
   }

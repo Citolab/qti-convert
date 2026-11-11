@@ -72,22 +72,22 @@ Only proceed if **all** of the following are true:
 
 ## File map
 
-| File | Purpose |
-|------|---------|
-| `src/index.ts` | Main `convert()` function and all conversion helpers |
-| `src/bundled-assets.ts` | Inlined TAO runtime assets (RequireJS, Bootstrap, portableLib, etc.) |
-| `src/index.test.ts` | Unit tests for the conversion pipeline |
-| `src/stories/TaoPciConversion.stories.ts` | Storybook story for end-to-end visual testing |
+| File                                      | Purpose                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| `src/index.ts`                            | Main `convert()` function and all conversion helpers                 |
+| `src/bundled-assets.ts`                   | Inlined TAO runtime assets (RequireJS, Bootstrap, portableLib, etc.) |
+| `src/index.test.ts`                       | Unit tests for the conversion pipeline                               |
+| `src/stories/TaoPciConversion.stories.ts` | Storybook story for end-to-end visual testing                        |
 
 ## Key data-* attributes used on `<qti-portable-custom-interaction>`
 
 These are set by this package during conversion and consumed by `qti-portable-custom-interaction` at runtime:
 
-| Attribute | Meaning |
-|-----------|---------|
-| `data-legacy-pci-proxy` | `"1"` when the legacy proxy module has been injected |
+| Attribute                | Meaning                                                                     |
+| ------------------------ | --------------------------------------------------------------------------- |
+| `data-legacy-pci-proxy`  | `"1"` when the legacy proxy module has been injected                        |
 | `data-legacy-pci-config` | JSON-serialised config built from the original `data-*` property attributes |
-| `data-require-paths` | JSON map of AMD module IDs → relative paths |
-| `data-use-default-shims` | `"true"` to apply RequireJS shim defaults in the renderer |
+| `data-require-paths`     | JSON map of AMD module IDs → relative paths                                 |
+| `data-use-default-shims` | `"true"` to apply RequireJS shim defaults in the renderer                   |
 
 If `qti-portable-custom-interaction` does not yet support one of these attributes, add support for it in a generic, spec-aligned way — and only after confirmation (see above).

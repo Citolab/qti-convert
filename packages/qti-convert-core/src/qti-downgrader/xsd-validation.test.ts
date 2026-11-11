@@ -37,8 +37,10 @@ const cases: Record<string, string> = {
     ${choice}`),
   'graphic interaction image': qti3(`
     <qti-select-point-interaction response-identifier="RESPONSE" max-choices="1"><qti-prompt>Click</qti-prompt><img src="map.png" width="60" height="40" alt="Map"/></qti-select-point-interaction>`),
-  'SSML': qti3(`<p xmlns:ssml="http://www.w3.org/2001/10/synthesis">Say <ssml:sub alias="hello">hi</ssml:sub></p>${choice}`),
-  'PCI': qti3(`
+  SSML: qti3(
+    `<p xmlns:ssml="http://www.w3.org/2001/10/synthesis">Say <ssml:sub alias="hello">hi</ssml:sub></p>${choice}`
+  ),
+  PCI: qti3(`
     <qti-portable-custom-interaction response-identifier="RESPONSE" custom-interaction-type-identifier="likert" module="likert">
       <qti-interaction-markup><div>markup</div></qti-interaction-markup>
     </qti-portable-custom-interaction>`)
@@ -51,7 +53,9 @@ describe.skipIf(!hasXmllint)('QTI 2.1 output validates against imsqti_v2p1p2.xsd
 
   test.each(Object.entries(cases))('%s', (_name, input) => {
     if (!schema) return;
-    expect(validate(convertQti3toQti21(input, { sharedVocabularyStylesheetHref: 'qti3-shared-vocabulary.css' }).xml)).toBe('');
+    expect(
+      validate(convertQti3toQti21(input, { sharedVocabularyStylesheetHref: 'qti3-shared-vocabulary.css' }).xml)
+    ).toBe('');
   });
 
   test('inlined shared stimulus', () => {

@@ -51,7 +51,10 @@ export const googleFormConverter: DocumentConverter<
     };
   },
 
-  async extractQuestions(_document: GoogleFormDocumentData, _options?: GenerateQtiPackageOptions): Promise<StructuredQuestion[]> {
+  async extractQuestions(
+    _document: GoogleFormDocumentData,
+    _options?: GenerateQtiPackageOptions
+  ): Promise<StructuredQuestion[]> {
     throw new Error('Google Forms extractQuestions requires the URL. Use convert() instead.');
   },
 

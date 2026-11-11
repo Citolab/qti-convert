@@ -67,13 +67,9 @@ const pdfResult = await convertPdfToQtiPackage(pdfFile, {
   testTitle: 'Imported PDF Test'
 });
 
-const googleFormResult = await convertGoogleFormToQtiPackage(
-  'https://docs.google.com/forms/d/e/.../viewform'
-);
+const googleFormResult = await convertGoogleFormToQtiPackage('https://docs.google.com/forms/d/e/.../viewform');
 
-const remoteResult = await convertRemoteSourceToQtiPackage(
-  'https://docs.google.com/spreadsheets/d/.../edit'
-);
+const remoteResult = await convertRemoteSourceToQtiPackage('https://docs.google.com/spreadsheets/d/.../edit');
 
 console.log(spreadsheetResult.summary);
 console.log(docxResult.summary);
@@ -85,10 +81,7 @@ console.log(remoteResult.summary);
 If you want to provide your own inference function instead of letting the package create one from `llmSettings`, that is still supported:
 
 ```ts
-import {
-  convertSpreadsheetToQtiPackage,
-  createWebLlmQuestionInferer
-} from '@citolab/qti-convert-local-ai';
+import { convertSpreadsheetToQtiPackage, createWebLlmQuestionInferer } from '@citolab/qti-convert-local-ai';
 
 const inferQuestions = createWebLlmQuestionInferer(engine);
 
@@ -102,12 +95,12 @@ const result = await convertSpreadsheetToQtiPackage(file, inferQuestions, {
 
 When `llmSettings.model` is not set, the package picks a model for the device:
 
-| Tier | Typical hardware | Model (q4f16 / q4f32 without `shader-f16`) |
-|------|------------------|---------------------------------------------|
-| high | Apple Silicon, NVIDIA, discrete AMD | `Qwen2.5-7B-Instruct` |
-| mid | Intel Arc, integrated AMD, Safari on macOS | `Qwen2.5-3B-Instruct` |
-| low | Intel integrated (Iris Xe, UHD), mobile, ≤4 GB RAM | `Qwen2.5-1.5B-Instruct` (lower accuracy) |
-| none | No WebGPU or software adapter | LLM skipped, heuristic fallback |
+| Tier | Typical hardware                                   | Model (q4f16 / q4f32 without `shader-f16`) |
+| ---- | -------------------------------------------------- | ------------------------------------------ |
+| high | Apple Silicon, NVIDIA, discrete AMD                | `Qwen2.5-7B-Instruct`                      |
+| mid  | Intel Arc, integrated AMD, Safari on macOS         | `Qwen2.5-3B-Instruct`                      |
+| low  | Intel integrated (Iris Xe, UHD), mobile, ≤4 GB RAM | `Qwen2.5-1.5B-Instruct` (lower accuracy)   |
+| none | No WebGPU or software adapter                      | LLM skipped, heuristic fallback            |
 
 The detected tier is then adjusted:
 
@@ -131,7 +124,7 @@ and pass it in:
 
 ```ts
 llmSettings: {
-  worker: () => new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' })
+  worker: () => new Worker(new URL('./llm.worker.ts', import.meta.url), { type: 'module' });
 }
 ```
 

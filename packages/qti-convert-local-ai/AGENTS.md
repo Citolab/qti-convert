@@ -6,14 +6,14 @@ This package provides browser-side document-to-QTI conversion. It parses various
 
 ## Supported Input Formats
 
-| Format | Parser | File Types |
-|--------|--------|------------|
-| PDF | `pdf-parser.ts` | `.pdf` |
-| DOCX | `docx-parser.ts` | `.docx` |
-| Spreadsheet | `spreadsheet-parser.ts` | `.csv`, `.xlsx`, `.xls` |
-| Google Forms | `google-form.ts` | Google Forms URLs |
-| Microsoft Forms | `microsoft-form.ts` | Microsoft Forms URLs |
-| Remote sources | `converters/remote-source/index.ts` | URLs to any supported format |
+| Format          | Parser                              | File Types                   |
+| --------------- | ----------------------------------- | ---------------------------- |
+| PDF             | `pdf-parser.ts`                     | `.pdf`                       |
+| DOCX            | `docx-parser.ts`                    | `.docx`                      |
+| Spreadsheet     | `spreadsheet-parser.ts`             | `.csv`, `.xlsx`, `.xls`      |
+| Google Forms    | `google-form.ts`                    | Google Forms URLs            |
+| Microsoft Forms | `microsoft-form.ts`                 | Microsoft Forms URLs         |
+| Remote sources  | `converters/remote-source/index.ts` | URLs to any supported format |
 
 ## Core Processing Pipeline (Two-Phase LLM Approach)
 
@@ -49,11 +49,13 @@ Input Document
 ## Why Two-Phase LLM?
 
 **Previous approach had issues:**
-- Hardcoded regex patterns (e.g., Dutch exam format "2p   1   ") only worked for specific formats
+
+- Hardcoded regex patterns (e.g., Dutch exam format "2p 1 ") only worked for specific formats
 - Fixed chunk boundaries could split items mid-question
 - Context blocks (like "Opgave" headers) might be separated from their questions
 
 **New approach benefits:**
+
 - LLM learns the pattern from the document itself
 - Context carryover between chunks prevents orphaned items
 - Works with any exam format, not just Dutch national exams
@@ -77,35 +79,37 @@ Document has 150 text blocks (chunk size: 60, carryover: 8)
 
 ## Key Files
 
-| File | Responsibility |
-|------|----------------|
-| `shared-prompts.ts` | **LLM prompt templates** — boundary detection & normalization examples |
-| `pdf-parser.ts` | PDF parsing and LLM-based conversion |
-| `docx-parser.ts` | DOCX parsing and LLM-based conversion |
-| `spreadsheet-parser.ts` | CSV/Excel parsing |
-| `mapping.ts` | WebLLM engine creation (model step-down, worker, speed measurement) and question inference |
-| `device-profile.ts` | WebGPU hardware detection, device tiers, model recommendation, performance memory |
-| `webllm-worker.ts` | Web Worker entry (`@citolab/qti-convert-local-ai/webllm-worker`) |
-| `local-server.ts` | OpenAI-compatible localhost backend (Ollama / LM Studio / llama.cpp), server detection |
-| `qti-generator.ts` | QTI 3.0 XML package generation |
-| `converters.ts` | Unified converter interface implementations |
-| `types.ts` | Shared TypeScript types |
+| File                    | Responsibility                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `shared-prompts.ts`     | **LLM prompt templates** — boundary detection & normalization examples                     |
+| `pdf-parser.ts`         | PDF parsing and LLM-based conversion                                                       |
+| `docx-parser.ts`        | DOCX parsing and LLM-based conversion                                                      |
+| `spreadsheet-parser.ts` | CSV/Excel parsing                                                                          |
+| `mapping.ts`            | WebLLM engine creation (model step-down, worker, speed measurement) and question inference |
+| `device-profile.ts`     | WebGPU hardware detection, device tiers, model recommendation, performance memory          |
+| `webllm-worker.ts`      | Web Worker entry (`@citolab/qti-convert-local-ai/webllm-worker`)                           |
+| `local-server.ts`       | OpenAI-compatible localhost backend (Ollama / LM Studio / llama.cpp), server detection     |
+| `qti-generator.ts`      | QTI 3.0 XML package generation                                                             |
+| `converters.ts`         | Unified converter interface implementations                                                |
+| `types.ts`              | Shared TypeScript types                                                                    |
 
 ## Shared Prompts Architecture (`shared-prompts.ts`)
 
 The prompts teach the LLM by example, not by hardcoded patterns:
 
 ### Boundary Detection Prompts
+
 - `buildBoundaryDetectionPrompt` — Main prompt for Phase 1
 - `buildBoundaryDetectionPromptWithContext` — Includes context from previous chunk
 - `BOUNDARY_DETECTION_EXAMPLES` — English examples showing structural patterns that work in any language:
-  - Points-prefixed format ("2p   1   ") — Common in standardized exams
+  - Points-prefixed format ("2p 1 ") — Common in standardized exams
   - Standard numbered ("1.", "2.") — Universal
   - Lettered with passage ("Question A:", "Question B:")
   - Exercise sections with sub-numbering ("Exercise 1", "1)")
   - Parenthetical letter format ("Problem 1", "(a)")
 
 ### Normalization Prompts
+
 - `buildBatchedNormalizationPrompt` — Converts item blocks to structured JSON
 - `buildSingleItemNormalizationPrompt` — Single item fallback
 - `NORMALIZATION_EXAMPLES` — Examples showing:
@@ -136,14 +140,14 @@ The LLM generalizes from structural patterns to handle documents in any language
 
 Some regex patterns remain for the **heuristic fallback** when LLM completely fails:
 
-| Pattern | Purpose | Used In |
-|---------|---------|---------|
-| `isQuestionStart` | Detect question begins | Fallback extraction |
-| `isSubQuestionStart` | Detect "a)", "b)" | Fallback extraction |
-| `optionMatch` | Detect "A)", "B)" options | Fallback extraction |
-| `scorePattern` | Extract points | Text cleanup |
-| `blankPlaceholderPattern` | Detect "___" blanks | Fill-in-blank detection |
-| `isLikelyBoilerplate` | Filter headers/footers | Fallback extraction |
+| Pattern                   | Purpose                   | Used In                 |
+| ------------------------- | ------------------------- | ----------------------- |
+| `isQuestionStart`         | Detect question begins    | Fallback extraction     |
+| `isSubQuestionStart`      | Detect "a)", "b)"         | Fallback extraction     |
+| `optionMatch`             | Detect "A)", "B)" options | Fallback extraction     |
+| `scorePattern`            | Extract points            | Text cleanup            |
+| `blankPlaceholderPattern` | Detect "___" blanks       | Fill-in-blank detection |
+| `isLikelyBoilerplate`     | Filter headers/footers    | Fallback extraction     |
 
 These are **only used when LLM fails** — the primary path is all LLM-based.
 
@@ -168,6 +172,7 @@ These are **only used when LLM fails** — the primary path is all LLM-based.
 To support a new exam format, **add examples to the prompts** in `shared-prompts.ts`:
 
 1. Add boundary detection example to `BOUNDARY_DETECTION_EXAMPLES`:
+
 ```typescript
 EXAMPLE N: Format name (e.g., "Bracketed sub-questions format")
 
@@ -188,6 +193,7 @@ Output: {"itemStartIndexes": [...], "contextIndexes": [...], "ignoredIndexes": [
 2. Add normalization example to `NORMALIZATION_EXAMPLES` if the format has unique metadata patterns
 
 **Key principles:**
+
 - Write examples in English, describe the STRUCTURAL pattern
 - Include "Reasoning:" to help the LLM generalize
 - Focus on numbering, punctuation, and formatting patterns
@@ -254,6 +260,7 @@ PDF images are processed **separately from text** and attached to items via Y-po
 ### Implementation Details (`pdf-parser.ts`)
 
 **Image Extraction (`extractPdfPageImages`):**
+
 1. Parse PDF operator list for `paintImageXObject`, `paintInlineImageXObject`, `paintImageMaskXObject`
 2. Track transform matrix to compute bounding boxes
 3. Render full page to canvas at 2x scale (`PDF_RENDER_SCALE = 2`)
@@ -261,6 +268,7 @@ PDF images are processed **separately from text** and attached to items via Y-po
 5. Store with `pageNumber`, `top` (PDF Y), `bottom` (PDF Y)
 
 **Image Association (in `normalizePdfItemsWithLlm`):**
+
 ```typescript
 // Now configurable via options.imageAssociation
 const topTolerance = options.imageAssociation?.topTolerance ?? 60;
@@ -274,22 +282,22 @@ const itemImages = images.filter(image => {
 
 ### Why This Approach?
 
-| Benefit | Explanation |
-|---------|-------------|
-| **LLM-efficient** | Images don't waste context tokens; small models can't interpret images anyway |
-| **Deterministic** | Y-position matching is reliable and fast |
-| **Privacy** | Images never leave the browser |
-| **Simple fallback** | If Y-matching fails, images just go to first item on that page |
+| Benefit             | Explanation                                                                   |
+| ------------------- | ----------------------------------------------------------------------------- |
+| **LLM-efficient**   | Images don't waste context tokens; small models can't interpret images anyway |
+| **Deterministic**   | Y-position matching is reliable and fast                                      |
+| **Privacy**         | Images never leave the browser                                                |
+| **Simple fallback** | If Y-matching fails, images just go to first item on that page                |
 
 ## Known Limitations & Future Improvements
 
 ### Current Limitations
 
-| Issue | Impact | Mitigation |
-|-------|--------|------------|
-| **Small context window (~4K)** | Can't see full document structure at once | Adaptive chunking with natural breaks |
-| **No multi-column awareness** | Y-position matching assumes single column | Would need column detection |
-| **Batch failures lose structure** | If normalization batch fails, creates flat text items | Could retry with smaller batches |
+| Issue                             | Impact                                                | Mitigation                            |
+| --------------------------------- | ----------------------------------------------------- | ------------------------------------- |
+| **Small context window (~4K)**    | Can't see full document structure at once             | Adaptive chunking with natural breaks |
+| **No multi-column awareness**     | Y-position matching assumes single column             | Would need column detection           |
+| **Batch failures lose structure** | If normalization batch fails, creates flat text items | Could retry with smaller batches      |
 
 ### Recently Implemented ✅
 
@@ -313,19 +321,19 @@ const itemImages = images.filter(image => {
 
 ### PdfChunkingOptions
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `adaptiveChunking` | boolean | `true` | Use natural breaks (page, Y-gap) instead of fixed chunks |
-| `minYGapForBreak` | number | `50` | Min Y-gap (PDF units) to consider as section break |
-| `maxChunkSize` | number | `80` | Hard limit on blocks per chunk |
-| `minChunkSize` | number | `20` | Minimum blocks per chunk |
+| Option             | Type    | Default | Description                                              |
+| ------------------ | ------- | ------- | -------------------------------------------------------- |
+| `adaptiveChunking` | boolean | `true`  | Use natural breaks (page, Y-gap) instead of fixed chunks |
+| `minYGapForBreak`  | number  | `50`    | Min Y-gap (PDF units) to consider as section break       |
+| `maxChunkSize`     | number  | `80`    | Hard limit on blocks per chunk                           |
+| `minChunkSize`     | number  | `20`    | Minimum blocks per chunk                                 |
 
 ### ImageAssociationOptions
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `topTolerance` | number | `60` | Y-tolerance above item top (PDF units) |
-| `bottomTolerance` | number | `220` | Y-tolerance below item bottom (PDF units) |
+| Option            | Type   | Default | Description                               |
+| ----------------- | ------ | ------- | ----------------------------------------- |
+| `topTolerance`    | number | `60`    | Y-tolerance above item top (PDF units)    |
+| `bottomTolerance` | number | `220`   | Y-tolerance below item bottom (PDF units) |
 
 ### Usage Example
 
@@ -349,27 +357,29 @@ const result = await convertPdfToQtiPackage(pdfFile, {
 
 ## Constants (`pdf-parser.ts`)
 
-| Constant | Value | Purpose |
-|----------|-------|---------|
-| `PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS` | 100 | Max blocks for single LLM call |
-| `PDF_MAX_CHUNK_SIZE` | 80 | Default max blocks per chunk |
-| `PDF_MIN_CHUNK_SIZE` | 20 | Default min blocks per chunk |
-| `PDF_MIN_Y_GAP_FOR_BREAK` | 50 | Default Y-gap threshold for section break |
-| `PDF_NORMALIZATION_BATCH_SIZE` | 3 | Items per normalization batch |
-| `PDF_CONTEXT_CARRYOVER` | 10 | Blocks from previous chunk |
-| `PDF_Y_TOLERANCE` | 3 | Line grouping tolerance |
-| `PDF_RENDER_SCALE` | 2 | Canvas render scale for images |
-| `PDF_IMAGE_TOP_TOLERANCE` | 60 | Default image association top tolerance |
-| `PDF_IMAGE_BOTTOM_TOLERANCE` | 220 | Default image association bottom tolerance |
+| Constant                                 | Value | Purpose                                    |
+| ---------------------------------------- | ----- | ------------------------------------------ |
+| `PDF_BOUNDARY_DETECTION_MAX_SINGLE_PASS` | 100   | Max blocks for single LLM call             |
+| `PDF_MAX_CHUNK_SIZE`                     | 80    | Default max blocks per chunk               |
+| `PDF_MIN_CHUNK_SIZE`                     | 20    | Default min blocks per chunk               |
+| `PDF_MIN_Y_GAP_FOR_BREAK`                | 50    | Default Y-gap threshold for section break  |
+| `PDF_NORMALIZATION_BATCH_SIZE`           | 3     | Items per normalization batch              |
+| `PDF_CONTEXT_CARRYOVER`                  | 10    | Blocks from previous chunk                 |
+| `PDF_Y_TOLERANCE`                        | 3     | Line grouping tolerance                    |
+| `PDF_RENDER_SCALE`                       | 2     | Canvas render scale for images             |
+| `PDF_IMAGE_TOP_TOLERANCE`                | 60    | Default image association top tolerance    |
+| `PDF_IMAGE_BOTTOM_TOLERANCE`             | 220   | Default image association bottom tolerance |
 
 ## Testing
 
 Run tests with:
+
 ```sh
 npm test
 ```
 
 Key test files:
+
 - `docx-parser.test.ts`
 - `pdf-parser.test.ts` (if exists)
 - `mapping.test.ts`
@@ -391,6 +401,7 @@ When `model` is omitted the model is auto-selected per device (see README "Model
 ## Error Handling
 
 If LLM processing fails:
+
 1. Parser logs a warning with diagnostic info
 2. Falls back to heuristic extraction (regex-based)
 3. Continues with reduced accuracy rather than failing completely

@@ -5,7 +5,10 @@ import { extractSharedStimuli, type SharedStimulusPackageFiles } from './extract
 
 const load = (xml: string) => cheerio.load(xml, { xml: true });
 
-const passage = (imgSrc: string, text = 'De Waddenzee is een ondiepe zee tussen de Waddeneilanden en het vasteland.') => `
+const passage = (
+  imgSrc: string,
+  text = 'De Waddenzee is een ondiepe zee tussen de Waddeneilanden en het vasteland.'
+) => `
     <h2>De Waddenzee</h2>
     <p>${text} Twee keer per dag valt een groot deel droog. Dan kun je over de bodem lopen, maar alleen met een gids, want het water komt snel terug.</p>
     <p><img src="${imgSrc}" alt="Wad"/></p>`;
@@ -40,16 +43,34 @@ ${items.map(path => `    <resource identifier="${path.replace(/\W/g, '_')}" type
 
 const buildPackage = (): SharedStimulusPackageFiles => {
   const items: Record<string, string> = {
-    'items/i1.xml': item('i1', `\n    <p>Lees de tekst en beantwoord de vraag.</p>${passage('../img/wad.png')}${choice('1')}`),
+    'items/i1.xml': item(
+      'i1',
+      `\n    <p>Lees de tekst en beantwoord de vraag.</p>${passage('../img/wad.png')}${choice('1')}`
+    ),
     'items/i2.xml': item('i2', `${passage('../img/wad.png')}${choice('2')}`),
     'items/sub/i3.xml': item('i3', `${passage('../../img/wad.png')}${choice('3')}`),
     // near-duplicate: one word differs
-    'items/i4.xml': item('i4', `${passage('../img/wad.png', 'De Waddenzee is een ondiepe zee tussen de eilanden en het vasteland.')}${choice('4')}`),
+    'items/i4.xml': item(
+      'i4',
+      `${passage('../img/wad.png', 'De Waddenzee is een ondiepe zee tussen de eilanden en het vasteland.')}${choice('4')}`
+    ),
     // nothing shared
     'items/i5.xml': item('i5', `<p>Hoeveel is 3 + 4?</p>${choice('5')}`),
     // passage in the left column of a two-column layout
-    'items/i6.xml': item('i6', columns('<p>Een andere tekst over vogels die in de winter naar het zuiden trekken en in het voorjaar terugkomen om te broeden in de duinen en de polders. Sommige soorten vliegen duizenden kilometers.</p>', choice('6'))),
-    'items/i7.xml': item('i7', columns('<p>Een andere tekst over vogels die in de winter naar het zuiden trekken en in het voorjaar terugkomen om te broeden in de duinen en de polders. Sommige soorten vliegen duizenden kilometers.</p>', choice('7'))),
+    'items/i6.xml': item(
+      'i6',
+      columns(
+        '<p>Een andere tekst over vogels die in de winter naar het zuiden trekken en in het voorjaar terugkomen om te broeden in de duinen en de polders. Sommige soorten vliegen duizenden kilometers.</p>',
+        choice('6')
+      )
+    ),
+    'items/i7.xml': item(
+      'i7',
+      columns(
+        '<p>Een andere tekst over vogels die in de winter naar het zuiden trekken en in het voorjaar terugkomen om te broeden in de duinen en de polders. Sommige soorten vliegen duizenden kilometers.</p>',
+        choice('7')
+      )
+    ),
     // only a short shared instruction: not worth a stimulus
     'items/i8.xml': item('i8', `<p>Kies het juiste antwoord.</p>${choice('8')}`),
     'items/i9.xml': item('i9', `<p>Kies het juiste antwoord.</p>${choice('9')}`)
@@ -96,7 +117,9 @@ describe('extractSharedStimuli', () => {
     expect($i1('qti-item-body > p').text()).toBe('Lees de tekst en beantwoord de vraag.');
     expect($i1('qti-choice-interaction')).toHaveLength(1);
 
-    expect(load(xml('items/sub/i3.xml'))('qti-assessment-stimulus-ref').attr('href')).toBe(`../../${passageStimulus.path}`);
+    expect(load(xml('items/sub/i3.xml'))('qti-assessment-stimulus-ref').attr('href')).toBe(
+      `../../${passageStimulus.path}`
+    );
   });
 
   test('removes an emptied layout column and unwraps a single remaining column', () => {
@@ -110,7 +133,12 @@ describe('extractSharedStimuli', () => {
     const $ = load(xml('imsmanifest.xml'));
     const resource = $(`resource[identifier="${passageStimulus.identifier}"]`);
     expect(resource.attr('type')).toBe('imsqti_stimulus_xmlv3p0');
-    expect(resource.find('file').toArray().map(f => f.attribs.href)).toEqual([passageStimulus.path, 'img/wad.png']);
+    expect(
+      resource
+        .find('file')
+        .toArray()
+        .map(f => f.attribs.href)
+    ).toEqual([passageStimulus.path, 'img/wad.png']);
     for (const id of ['items_i1_xml', 'items_i2_xml', 'items_sub_i3_xml']) {
       expect($(`resource[identifier="${id}"] > dependency`).attr('identifierref'), id).toBe(passageStimulus.identifier);
     }
@@ -119,7 +147,10 @@ describe('extractSharedStimuli', () => {
 
   test('only reports near-duplicates and leaves other items untouched', () => {
     expect(report.nearDuplicates.map(d => d.items.sort())).toEqual(
-      expect.arrayContaining([['items/i1.xml', 'items/i4.xml'], ['items/i2.xml', 'items/i4.xml']])
+      expect.arrayContaining([
+        ['items/i1.xml', 'items/i4.xml'],
+        ['items/i2.xml', 'items/i4.xml']
+      ])
     );
     expect(report.nearDuplicates.every(d => d.items.includes('items/i4.xml'))).toBe(true);
     for (const path of ['items/i4.xml', 'items/i5.xml', 'items/i8.xml', 'items/i9.xml']) {

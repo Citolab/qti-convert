@@ -78,7 +78,9 @@ class WarningCollector {
 }
 
 const loadXml = (xml: string) =>
-  cheerio.load(xml.replace(/<\?xml-model[^?]*\?>/g, '').replace(/^﻿/, ''), { xml: { xmlMode: true, decodeEntities: false } });
+  cheerio.load(xml.replace(/<\?xml-model[^?]*\?>/g, '').replace(/^﻿/, ''), {
+    xml: { xmlMode: true, decodeEntities: false }
+  });
 
 const findRoot = ($: cheerio.CheerioAPI): Element | undefined => $.root().children().toArray().find(isElement);
 
@@ -233,7 +235,10 @@ const convertPci = ($: cheerio.CheerioAPI, warnings: WarningCollector) => {
     $el.replaceWith(
       `<customInteraction responseIdentifier="${responseIdentifier}"><pci:portableCustomInteraction xmlns:pci="${PCI_NAMESPACE}"${pciAttrs}>${inner}</pci:portableCustomInteraction></customInteraction>`
     );
-    warnings.add('pci', 'Portable custom interaction was wrapped in a customInteraction; check it in the target player.');
+    warnings.add(
+      'pci',
+      'Portable custom interaction was wrapped in a customInteraction; check it in the target player.'
+    );
   });
   // Children of the PCI are renamed into the PCI namespace (qti-interaction-markup -> pci:interactionMarkup).
   $('pci\\:portableCustomInteraction *').each((_, el: Element) => {
@@ -274,7 +279,10 @@ const renameTree = ($: cheerio.CheerioAPI, el: Element, warnings: WarningCollect
       continue;
     }
     if (name.startsWith('aria-') || name === 'role' || name === 'dir') {
-      warnings.add('accessibility-attributes-removed', 'aria-*, role and dir attributes are not allowed in QTI 2.1 and were removed.');
+      warnings.add(
+        'accessibility-attributes-removed',
+        'aria-*, role and dir attributes are not allowed in QTI 2.1 and were removed.'
+      );
       continue;
     }
     if (!qti21Name || name.startsWith('xmlns')) {

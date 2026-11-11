@@ -44,14 +44,15 @@ const escapeXml = (value: string): string =>
 const padNumber = (index: number) => String(index).padStart(3, '0');
 
 const sanitizeIdentifier = (value: string, fallback: string): string => {
-  const sanitized = value.trim().replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '');
+  const sanitized = value
+    .trim()
+    .replace(/[^A-Za-z0-9_.-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   return sanitized || fallback;
 };
 
 const dedupeAdjacentTextLines = (value: string): string => {
-  const lines = value
-    .split(/\r?\n/)
-    .map(line => line.trimEnd());
+  const lines = value.split(/\r?\n/).map(line => line.trimEnd());
   const deduped: string[] = [];
   for (const line of lines) {
     if (deduped.length === 0 || deduped[deduped.length - 1].trim() !== line.trim()) {
@@ -68,8 +69,7 @@ const ensureUniqueItems = (items: NormalizedItem[]): NormalizedItem[] => {
   return items.map(item => {
     const nextIdentifierCount = (identifierCounts.get(item.identifier) || 0) + 1;
     identifierCounts.set(item.identifier, nextIdentifierCount);
-    const identifier =
-      nextIdentifierCount === 1 ? item.identifier : `${item.identifier}-${nextIdentifierCount}`;
+    const identifier = nextIdentifierCount === 1 ? item.identifier : `${item.identifier}-${nextIdentifierCount}`;
 
     const stimulusImages = item.stimulusImages.map(image => {
       const nextFileCount = (fileNameCounts.get(image.fileName) || 0) + 1;
@@ -144,15 +144,17 @@ const resolveCorrectIdentifiers = (
     .filter((option, index) => {
       const numericId = String(index + 1);
       return (
-        tokenSet.has(option.id.toLowerCase()) ||
-        tokenSet.has(option.text.toLowerCase()) ||
-        tokenSet.has(numericId)
+        tokenSet.has(option.id.toLowerCase()) || tokenSet.has(option.text.toLowerCase()) || tokenSet.has(numericId)
       );
     })
     .map(option => option.id);
 };
 
-const normalizeQuestion = (question: StructuredQuestion, index: number, options: GenerateQtiPackageOptions): NormalizedQuestionResult => {
+const normalizeQuestion = (
+  question: StructuredQuestion,
+  index: number,
+  options: GenerateQtiPackageOptions
+): NormalizedQuestionResult => {
   const prompt = dedupeAdjacentTextLines((question.prompt || '').trim());
   if (!prompt) {
     return {
@@ -169,7 +171,11 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
   }
 
   const type =
-    question.type === 'extended_text' ? 'extended_text' : question.type === 'short_text' ? 'short_text' : 'multiple_choice';
+    question.type === 'extended_text'
+      ? 'extended_text'
+      : question.type === 'short_text'
+        ? 'short_text'
+        : 'multiple_choice';
   const rawStimulus = dedupeAdjacentTextLines((question.stimulus || '').trim());
   const stimulus = rawStimulus === prompt ? '' : rawStimulus;
   const generalFeedback = dedupeAdjacentTextLines((question.generalFeedback || '').trim());
@@ -195,7 +201,11 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
         stimulusImages,
         prompt,
         expectedLength:
-          question.expectedLength && question.expectedLength > 0 ? question.expectedLength : type === 'short_text' ? 64 : 200,
+          question.expectedLength && question.expectedLength > 0
+            ? question.expectedLength
+            : type === 'short_text'
+              ? 64
+              : 200,
         layout,
         maxScore,
         options: [],
@@ -231,7 +241,8 @@ const normalizeQuestion = (question: StructuredQuestion, index: number, options:
             severity: 'warning',
             questionIndex: index + 1,
             identifier,
-            message: 'Question does not contain a resolved correct response. Generated item without qti-correct-response.'
+            message:
+              'Question does not contain a resolved correct response. Generated item without qti-correct-response.'
           }
         ]
       : [];
@@ -297,7 +308,10 @@ const renderInteraction = (item: NormalizedItem): string => {
   return `<qti-choice-interaction xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" response-identifier="RESPONSE" max-choices="${item.selectionMode === 'multiple' ? Math.max(item.correctIdentifiers.length, 2) : 1}">
         <qti-prompt>${escapeXml(item.prompt)}</qti-prompt>
 ${item.options
-  .map(option => `        <qti-simple-choice identifier="${escapeXml(option.id)}">${escapeXml(option.text)}</qti-simple-choice>`)
+  .map(
+    option =>
+      `        <qti-simple-choice identifier="${escapeXml(option.id)}">${escapeXml(option.text)}</qti-simple-choice>`
+  )
   .join('\n')}
       </qti-choice-interaction>`;
 };
@@ -307,7 +321,9 @@ const renderFeedbackBlocks = (item: NormalizedItem): string => {
     .filter(option => option.feedback)
     .map(option => renderXhtmlTextBlock(`${option.text}: ${option.feedback}`, 'qti-item-option-feedback'))
     .join('\n    ');
-  const generalFeedback = item.generalFeedback ? renderXhtmlTextBlock(item.generalFeedback, 'qti-item-general-feedback') : '';
+  const generalFeedback = item.generalFeedback
+    ? renderXhtmlTextBlock(item.generalFeedback, 'qti-item-general-feedback')
+    : '';
   return [optionFeedback, generalFeedback].filter(Boolean).join('\n    ');
 };
 
@@ -364,7 +380,8 @@ ${item.correctIdentifiers.map(identifier => `      <qti-value>${escapeXml(identi
 };
 
 const renderResponseProcessing = (item: NormalizedItem): string =>
-  ((item.type === 'multiple_choice' && item.correctIdentifiers.length > 0) || (item.type === 'short_text' && item.correctResponse))
+  (item.type === 'multiple_choice' && item.correctIdentifiers.length > 0) ||
+  (item.type === 'short_text' && item.correctResponse)
     ? `  <qti-response-processing template="https://purl.imsglobal.org/spec/qti/v3p0/rptemplates/match_correct.xml"/>`
     : '';
 
@@ -393,7 +410,9 @@ ${renderResponseProcessing(item)}
 
 const renderAssessmentTest = (
   items: NormalizedItem[],
-  options: Required<Pick<GenerateQtiPackageOptions, 'testIdentifier' | 'testTitle' | 'sectionIdentifier' | 'sectionTitle'>>
+  options: Required<
+    Pick<GenerateQtiPackageOptions, 'testIdentifier' | 'testTitle' | 'sectionIdentifier' | 'sectionTitle'>
+  >
 ): string => `<?xml version="1.0" encoding="UTF-8"?>
 <qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -403,7 +422,10 @@ const renderAssessmentTest = (
   <qti-test-part identifier="PART-1" navigation-mode="nonlinear" submission-mode="simultaneous">
     <qti-assessment-section identifier="${escapeXml(options.sectionIdentifier)}" title="${escapeXml(options.sectionTitle)}" visible="true">
 ${items
-  .map(item => `      <qti-assessment-item-ref identifier="${escapeXml(item.identifier)}" href="items/${escapeXml(item.identifier)}.xml"/>`)
+  .map(
+    item =>
+      `      <qti-assessment-item-ref identifier="${escapeXml(item.identifier)}" href="items/${escapeXml(item.identifier)}.xml"/>`
+  )
   .join('\n')}
     </qti-assessment-section>
   </qti-test-part>
@@ -450,10 +472,19 @@ export const generateQtiPackageFromQuestions = async (
     throw new Error('No valid questions were available to generate a QTI package.');
   }
 
-  const packageIdentifier = sanitizeIdentifier(options.packageIdentifier || 'spreadsheet-qti-package', 'spreadsheet-qti-package');
-  const testIdentifier = sanitizeIdentifier(options.testIdentifier || `${packageIdentifier}-test`, `${packageIdentifier}-test`);
+  const packageIdentifier = sanitizeIdentifier(
+    options.packageIdentifier || 'spreadsheet-qti-package',
+    'spreadsheet-qti-package'
+  );
+  const testIdentifier = sanitizeIdentifier(
+    options.testIdentifier || `${packageIdentifier}-test`,
+    `${packageIdentifier}-test`
+  );
   const sectionIdentifier = sanitizeIdentifier(options.sectionIdentifier || 'section-1', 'section-1');
-  const manifestIdentifier = sanitizeIdentifier(options.manifestIdentifier || `${packageIdentifier}-manifest`, `${packageIdentifier}-manifest`);
+  const manifestIdentifier = sanitizeIdentifier(
+    options.manifestIdentifier || `${packageIdentifier}-manifest`,
+    `${packageIdentifier}-manifest`
+  );
   const testTitle = options.testTitle || 'Imported Test';
   const sectionTitle = options.sectionTitle || 'Questions';
 

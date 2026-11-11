@@ -12,16 +12,16 @@ QTI ZIP → loadPackage → PaperAssessment → composeDocument → LayoutDocume
 
 Key files:
 
-| File | Role |
-|------|------|
-| `src/load-package.ts` | ZIP / file map → assessment model, shared stimuli, image hydration |
-| `src/parse-item.ts` | Item XML → `PaperItem` (parts in reading order, correct answers in paper labels) |
-| `src/compose.ts` | **The paper designs**: content, answer area and filled answer area per interaction; the four documents |
-| `src/html-to-layout.ts` | Item HTML (tables, lists, MathML, gaps, hottext) → layout blocks |
-| `src/layout.ts` | Format-neutral layout primitives |
-| `src/render-docx.ts` | Layout → Word (`docx`) |
-| `src/render-pdf.ts` | Layout → PDF (`pdf-lib`), including line breaking and pagination |
-| `src/convert.ts` | One-shot helpers and the zip export |
+| File                    | Role                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `src/load-package.ts`   | ZIP / file map → assessment model, shared stimuli, image hydration                                     |
+| `src/parse-item.ts`     | Item XML → `PaperItem` (parts in reading order, correct answers in paper labels)                       |
+| `src/compose.ts`        | **The paper designs**: content, answer area and filled answer area per interaction; the four documents |
+| `src/html-to-layout.ts` | Item HTML (tables, lists, MathML, gaps, hottext) → layout blocks                                       |
+| `src/layout.ts`         | Format-neutral layout primitives                                                                       |
+| `src/render-docx.ts`    | Layout → Word (`docx`)                                                                                 |
+| `src/render-pdf.ts`     | Layout → PDF (`pdf-lib`), including line breaking and pagination                                       |
+| `src/convert.ts`        | One-shot helpers and the zip export                                                                    |
 
 ## Decision rules
 

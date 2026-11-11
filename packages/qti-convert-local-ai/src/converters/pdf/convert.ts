@@ -1,13 +1,7 @@
 import { createWebLlmEngine } from '../../mapping';
 import { generateQtiPackageFromQuestions } from '../../qti-generator';
 import type { GenerateQtiPackageOptions, StructuredQuestion } from '../../types';
-import {
-  buildPdfPreview,
-  detectBoundariesWithLlm,
-  logPdfDebug,
-  normalizePdfItemsWithLlm,
-  parsePdf
-} from './parse';
+import { buildPdfPreview, detectBoundariesWithLlm, logPdfDebug, normalizePdfItemsWithLlm, parsePdf } from './parse';
 import type { PdfInput, PdfToQtiResult } from './types';
 
 export const convertPdfToQtiPackage = async (

@@ -4,9 +4,9 @@ const preview: Preview = {
   parameters: {
     layout: 'fullscreen',
     controls: {
-      expanded: true,
-    },
-  },
+      expanded: true
+    }
+  }
 };
 
 export default preview;

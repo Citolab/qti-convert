@@ -32,7 +32,8 @@ const OFFICE_FORM_SERVER_INFO_RE = /window\.OfficeFormServerInfo\s*=\s*(\{.*?\})
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const asString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
-const asNumber = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const asNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
 const asBoolean = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
 
 const defaultMicrosoftFormHtmlFetcher: MicrosoftFormHtmlFetcher = async (url: string) => {
@@ -80,7 +81,10 @@ const extractText = (question: MicrosoftFormQuestionRecord, titleKey: string, fa
 const normalizeChoiceOption = (choice: unknown, index: number): StructuredOption | null => {
   const record = isRecord(choice) ? choice : null;
   const text =
-    asString(record?.FormsProDisplayRTText) || asString(record?.description) || asString(record?.Description) || asString(choice);
+    asString(record?.FormsProDisplayRTText) ||
+    asString(record?.description) ||
+    asString(record?.Description) ||
+    asString(choice);
   if (!text) {
     return null;
   }
@@ -96,12 +100,16 @@ const extractChoiceOptions = (
   question: MicrosoftFormQuestionRecord,
   questionInfo: MicrosoftFormQuestionInfo
 ): StructuredOption[] => {
-  const embeddedChoices = asArray(questionInfo.Choices).map(normalizeChoiceOption).filter((choice): choice is StructuredOption => choice !== null);
+  const embeddedChoices = asArray(questionInfo.Choices)
+    .map(normalizeChoiceOption)
+    .filter((choice): choice is StructuredOption => choice !== null);
   if (embeddedChoices.length > 0) {
     return embeddedChoices;
   }
 
-  return asArray(question.choices).map(normalizeChoiceOption).filter((choice): choice is StructuredOption => choice !== null);
+  return asArray(question.choices)
+    .map(normalizeChoiceOption)
+    .filter((choice): choice is StructuredOption => choice !== null);
 };
 
 const buildScaleOptions = (
@@ -147,9 +155,7 @@ const toOpenQuestion = (
 ): StructuredQuestion => {
   const questionInfo = parseQuestionInfo(question);
   const expectedLength =
-    asNumber(questionInfo.ExpectedLength) ??
-    asNumber(questionInfo.MaxLength) ??
-    (type === 'short_text' ? 64 : 200);
+    asNumber(questionInfo.ExpectedLength) ?? asNumber(questionInfo.MaxLength) ?? (type === 'short_text' ? 64 : 200);
 
   return {
     type,
@@ -168,7 +174,9 @@ const extractRows = (questionInfo: MicrosoftFormQuestionInfo): string[] => {
     const rows = asArray(candidate)
       .map(value => {
         if (isRecord(value)) {
-          return asString(value.title) || asString(value.Title) || asString(value.description) || asString(value.Description);
+          return (
+            asString(value.title) || asString(value.Title) || asString(value.description) || asString(value.Description)
+          );
         }
         return asString(value);
       })
@@ -186,7 +194,12 @@ const normalizeQuestion = (question: MicrosoftFormQuestionRecord, index: number)
   const description = extractText(question, 'formsProRTSubtitle', 'subtitle');
   const questionInfo = parseQuestionInfo(question);
 
-  if (type === 'Question.TextField' || type === 'Question.Date' || type === 'Question.Time' || type === 'Question.Number') {
+  if (
+    type === 'Question.TextField' ||
+    type === 'Question.Date' ||
+    type === 'Question.Time' ||
+    type === 'Question.Number'
+  ) {
     const multiline = asBoolean(questionInfo.Multiline) || false;
     return [toOpenQuestion(question, index, multiline ? 'extended_text' : 'short_text', prompt, description)];
   }
@@ -203,7 +216,8 @@ const normalizeQuestion = (question: MicrosoftFormQuestionRecord, index: number)
         title: prompt,
         prompt,
         options,
-        selectionMode: question.allowMultipleValues === true || asNumber(questionInfo.ChoiceType) === 2 ? 'multiple' : 'single',
+        selectionMode:
+          question.allowMultipleValues === true || asNumber(questionInfo.ChoiceType) === 2 ? 'multiple' : 'single',
         generalFeedback: description || undefined
       }
     ];
@@ -285,7 +299,9 @@ export const extractMicrosoftFormPrefetchRequest = (html: string): MicrosoftForm
   const antiForgeryToken = asString(serverInfo.antiForgeryToken);
   const serverSessionId =
     asString(serverInfo.serverSessionId) ||
-    (isRecord(serverInfo.serverInfoFromPageHeaders) ? asString(serverInfo.serverInfoFromPageHeaders.serverSesionId) : '');
+    (isRecord(serverInfo.serverInfoFromPageHeaders)
+      ? asString(serverInfo.serverInfoFromPageHeaders.serverSesionId)
+      : '');
 
   if (antiForgeryToken) {
     headers.__RequestVerificationToken = antiForgeryToken;
@@ -310,14 +326,23 @@ export const parseMicrosoftForm = (input: string): MicrosoftFormParseResult => {
   }
 
   extractMicrosoftFormPrefetchRequest(input);
-  throw new Error('Microsoft Forms HTML requires the runtime form definition. Use convertMicrosoftFormToQtiPackage() to fetch and convert it.');
+  throw new Error(
+    'Microsoft Forms HTML requires the runtime form definition. Use convertMicrosoftFormToQtiPackage() to fetch and convert it.'
+  );
 };
 
 export async function convertMicrosoftFormToQtiPackage(
   input: MicrosoftFormInput,
   options: ConvertMicrosoftFormToQtiOptions = {}
-): Promise<Pick<SpreadsheetToQtiResult, 'questions' | 'packageBlob' | 'packageName' | 'summary'> & { formTitle?: string; formDescription?: string }> {
-  const htmlOrJson = MICROSOFT_FORM_URL_RE.test(input) ? await (options.fetchFormHtml || defaultMicrosoftFormHtmlFetcher)(input) : input;
+): Promise<
+  Pick<SpreadsheetToQtiResult, 'questions' | 'packageBlob' | 'packageName' | 'summary'> & {
+    formTitle?: string;
+    formDescription?: string;
+  }
+> {
+  const htmlOrJson = MICROSOFT_FORM_URL_RE.test(input)
+    ? await (options.fetchFormHtml || defaultMicrosoftFormHtmlFetcher)(input)
+    : input;
 
   let parsed = htmlOrJson.trim().startsWith('{') ? parseRuntimeQuestions(JSON.parse(htmlOrJson) as unknown) : null;
   if (!parsed) {

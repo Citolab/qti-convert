@@ -22,7 +22,7 @@ function stubFetch(okUrls: string[]): { calls: string[] } {
     return {
       ok: okUrls.includes(url),
       status: okUrls.includes(url) ? 200 : 404,
-      headers: { get: () => '' },
+      headers: { get: () => '' }
     } as unknown as Response;
   });
   return { calls };

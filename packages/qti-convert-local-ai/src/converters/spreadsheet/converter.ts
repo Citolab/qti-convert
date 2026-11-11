@@ -1,10 +1,21 @@
 import type { DocumentConverter } from '../handler';
-import type { DatasetPreview, GenerateQtiPackageOptions, SpreadsheetData, SpreadsheetToQtiResult, StructuredQuestion } from '../../types';
+import type {
+  DatasetPreview,
+  GenerateQtiPackageOptions,
+  SpreadsheetData,
+  SpreadsheetToQtiResult,
+  StructuredQuestion
+} from '../../types';
 import type { SpreadsheetInput } from '../../utils/file-input';
 import { buildDatasetPreview, parseSpreadsheet } from './parser';
 import { convertSpreadsheetToQtiPackage } from './convert';
 
-export const spreadsheetConverter: DocumentConverter<SpreadsheetInput, SpreadsheetData, DatasetPreview, SpreadsheetToQtiResult> = {
+export const spreadsheetConverter: DocumentConverter<
+  SpreadsheetInput,
+  SpreadsheetData,
+  DatasetPreview,
+  SpreadsheetToQtiResult
+> = {
   name: 'Spreadsheet Converter',
   format: 'csv',
   supportedExtensions: ['csv', 'xlsx', 'xls'],
@@ -17,7 +28,10 @@ export const spreadsheetConverter: DocumentConverter<SpreadsheetInput, Spreadshe
     return buildDatasetPreview(document);
   },
 
-  async extractQuestions(_document: SpreadsheetData, _options?: GenerateQtiPackageOptions): Promise<StructuredQuestion[]> {
+  async extractQuestions(
+    _document: SpreadsheetData,
+    _options?: GenerateQtiPackageOptions
+  ): Promise<StructuredQuestion[]> {
     throw new Error('Spreadsheet extractQuestions requires raw input. Use convert() instead.');
   },
 
@@ -26,7 +40,12 @@ export const spreadsheetConverter: DocumentConverter<SpreadsheetInput, Spreadshe
   }
 };
 
-export const xlsxConverter: DocumentConverter<SpreadsheetInput, SpreadsheetData, DatasetPreview, SpreadsheetToQtiResult> = {
+export const xlsxConverter: DocumentConverter<
+  SpreadsheetInput,
+  SpreadsheetData,
+  DatasetPreview,
+  SpreadsheetToQtiResult
+> = {
   ...spreadsheetConverter,
   name: 'Excel Converter',
   format: 'xlsx',

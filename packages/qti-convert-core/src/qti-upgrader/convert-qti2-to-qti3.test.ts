@@ -22,7 +22,8 @@ const canonical = (xml: string): Canonical[] => {
   };
   const walk = (node: AnyNode): Canonical | null => {
     // CDATA and escaped text are equivalent (Saxon serializes CDATA sections as escaped text)
-    const text = node.type === 'text' ? node.data : node.type === 'cdata' ? ((node.children[0] as any)?.data ?? '') : null;
+    const text =
+      node.type === 'text' ? node.data : node.type === 'cdata' ? ((node.children[0] as any)?.data ?? '') : null;
     if (text !== null) return text.trim() ? text.replace(/\s+/g, ' ').trim() : null;
     if (node.type === 'directive' && !/^\?xml\s/.test(node.data)) return node.data.replace(/\s+/g, ' ');
     if (node.type === 'comment') return `<!--${node.data}-->`;
@@ -36,7 +37,11 @@ const canonical = (xml: string): Canonical[] => {
     }
     return { name: `{${ns(node, prefix)}}${local}`, attrs, children: node.children.map(walk).filter(c => c !== null) };
   };
-  return $.root().contents().toArray().map(walk).filter(c => c !== null);
+  return $.root()
+    .contents()
+    .toArray()
+    .map(walk)
+    .filter(c => c !== null);
 };
 
 describe('upgradeQti2toQti3 matches the qti2xTo30.xsl output', () => {

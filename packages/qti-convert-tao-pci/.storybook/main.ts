@@ -3,20 +3,14 @@ import path from 'node:path';
 import type { StorybookConfig } from '@storybook/web-components-vite';
 
 const packageRootDir = path.resolve(process.cwd(), '..', '..');
-const defaultComponentsCdnDir = path.resolve(
-  packageRootDir,
-  'node_modules/@citolab/qti-components/cdn',
-);
-const defaultComponentsDistDir = path.resolve(
-  packageRootDir,
-  'node_modules/@citolab/qti-components/dist',
-);
+const defaultComponentsCdnDir = path.resolve(packageRootDir, 'node_modules/@citolab/qti-components/cdn');
+const defaultComponentsDistDir = path.resolve(packageRootDir, 'node_modules/@citolab/qti-components/dist');
 const localComponentsCdnDir = process.env.QTI_COMPONENTS_CDN_DIR || defaultComponentsCdnDir;
 const localComponentsDistDir = process.env.QTI_COMPONENTS_DIST_DIR || defaultComponentsDistDir;
 
 const staticDirs: NonNullable<StorybookConfig['staticDirs']> = [
   { from: '../public', to: '/' },
-  { from: '../storybook-assets', to: '/external-pci' },
+  { from: '../storybook-assets', to: '/external-pci' }
 ];
 
 if (localComponentsCdnDir && fs.existsSync(localComponentsCdnDir)) {
@@ -31,20 +25,20 @@ const config: StorybookConfig = {
   addons: ['@storybook/addon-docs', '@storybook/addon-a11y', '@storybook/addon-vitest'],
   framework: {
     name: '@storybook/web-components-vite',
-    options: {},
+    options: {}
   },
   staticDirs,
   docs: {
-    defaultName: 'Docs',
+    defaultName: 'Docs'
   },
-  viteFinal: async (cfg) => {
+  viteFinal: async cfg => {
     cfg.resolve = cfg.resolve || {};
     cfg.resolve.alias = {
       ...(cfg.resolve.alias || {}),
-      path: path.resolve(process.cwd(), '../../node_modules/path-browserify/index.js'),
+      path: path.resolve(process.cwd(), '../../node_modules/path-browserify/index.js')
     };
     return cfg;
-  },
+  }
 };
 
 export default config;

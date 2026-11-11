@@ -1,12 +1,5 @@
 import JSZip from 'jszip';
-import {
-  guessContentType,
-  isRemoteUrl,
-  loadXml,
-  normalizePath,
-  resolveAssetRef,
-  textContent,
-} from './xml-utils.js';
+import { guessContentType, isRemoteUrl, loadXml, normalizePath, resolveAssetRef, textContent } from './xml-utils.js';
 import { parseItemXml } from './parse-item.js';
 import type { PaperAssessment, PaperAsset, PaperInteraction, PaperItem, PaperStimulus, ParseOptions } from './types.js';
 
@@ -15,9 +8,7 @@ export type PackageSource = ArrayBuffer | Uint8Array | Blob | string;
 async function toArrayBuffer(source: PackageSource): Promise<ArrayBuffer> {
   if (typeof source === 'string') {
     if (typeof window !== 'undefined') {
-      throw new Error(
-        'File path sources are only supported in Node.js. Pass a Blob or ArrayBuffer in the browser.'
-      );
+      throw new Error('File path sources are only supported in Node.js. Pass a Blob or ArrayBuffer in the browser.');
     }
     const { readFile } = await import(/* @vite-ignore */ 'node:fs/promises');
     const buf = await readFile(source);
@@ -159,8 +150,7 @@ function pickItemRefs(
   assessmentXml: string | undefined,
   assessmentHref: string | undefined
 ): ItemRef[] {
-  const fromAssessment =
-    assessmentXml && assessmentHref ? itemRefsFromAssessment(assessmentXml, assessmentHref) : [];
+  const fromAssessment = assessmentXml && assessmentHref ? itemRefsFromAssessment(assessmentXml, assessmentHref) : [];
   if (fromAssessment.length > 0) {
     const resolved = resolvableCount(files, fromAssessment);
     // Every reference accounted for: nothing the manifest could add.
@@ -310,8 +300,7 @@ async function fetchRemoteImage(url: string): Promise<PaperAsset | null> {
     }
     const bytes = new Uint8Array(await res.arrayBuffer());
     const headerType = (res.headers.get('content-type') || '').split(';')[0].trim();
-    const contentType =
-      headerType && headerType.startsWith('image/') ? headerType : guessContentType(url);
+    const contentType = headerType && headerType.startsWith('image/') ? headerType : guessContentType(url);
     if (!contentType.startsWith('image/') && bytes.length > 0) {
       // Some CDNs omit content-type; still try as jpeg/png from URL
       const guessed = guessContentType(url);
@@ -361,7 +350,7 @@ export async function hydrateImageAssets(
       paper.assets.set(ref, {
         path: ref,
         bytes,
-        contentType: guessContentType(ref),
+        contentType: guessContentType(ref)
       });
       continue;
     }
@@ -436,7 +425,7 @@ function buildPaper(
     author: authorFromFiles(files),
     items,
     stimuli,
-    assets,
+    assets
   };
 }
 
@@ -475,9 +464,7 @@ export async function loadPackageFromFiles(
   const manifestXml = decodeUtf8(normalized.get(manifestPath)!);
   const assessmentHref = assessmentHrefFromManifest(manifestXml);
   const assessmentXml =
-    assessmentHref && normalized.has(assessmentHref)
-      ? decodeUtf8(normalized.get(assessmentHref)!)
-      : undefined;
+    assessmentHref && normalized.has(assessmentHref) ? decodeUtf8(normalized.get(assessmentHref)!) : undefined;
 
   const refs = pickItemRefs(normalized, manifestXml, assessmentXml, assessmentHref);
 

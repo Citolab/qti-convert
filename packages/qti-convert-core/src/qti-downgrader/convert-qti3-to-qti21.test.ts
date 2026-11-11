@@ -102,7 +102,8 @@ describe('convertQti3toQti21', () => {
   });
 
   test('converts an image-only gap text to gapImg', () => {
-    const { xml, warnings } = convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="g" adaptive="false" time-dependent="false">
+    const { xml, warnings } =
+      convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="g" adaptive="false" time-dependent="false">
       <qti-item-body><qti-gap-match-interaction response-identifier="RESPONSE">
         <qti-gap-text identifier="W1" match-max="1"><img src="a.png" alt="A"/></qti-gap-text>
         <qti-gap-text identifier="W2" match-max="1">text</qti-gap-text>
@@ -117,7 +118,9 @@ describe('convertQti3toQti21', () => {
   });
 
   test('adds the shared vocabulary stylesheet when asked', () => {
-    const { xml, warnings } = convertQti3toQti21(qti3Choice, { sharedVocabularyStylesheetHref: '../qti3-shared-vocabulary.css' });
+    const { xml, warnings } = convertQti3toQti21(qti3Choice, {
+      sharedVocabularyStylesheetHref: '../qti3-shared-vocabulary.css'
+    });
     const $ = load(xml);
     expect($('stylesheet').attr('href')).toBe('../qti3-shared-vocabulary.css');
     expect($('stylesheet').attr('type')).toBe('text/css');
@@ -134,7 +137,8 @@ describe('convertQti3toQti21', () => {
   });
 
   test('maps irregular operator names', () => {
-    const { xml } = convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="x" adaptive="false" time-dependent="false">
+    const { xml } =
+      convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="x" adaptive="false" time-dependent="false">
       <qti-response-processing><qti-response-condition><qti-response-if>
         <qti-duration-lt><qti-variable identifier="duration"/><qti-base-value base-type="duration">10</qti-base-value></qti-duration-lt>
         <qti-set-outcome-value identifier="SCORE"><qti-base-value base-type="float">1</qti-base-value></qti-set-outcome-value>
@@ -167,14 +171,16 @@ describe('convertQti3toQti21', () => {
   });
 
   test('removes an unresolvable stimulus ref with a warning', () => {
-    const { xml, warnings } = convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i1" adaptive="false" time-dependent="false">
+    const { xml, warnings } =
+      convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i1" adaptive="false" time-dependent="false">
       <qti-assessment-stimulus-ref identifier="S1" href="s1.xml"/><qti-item-body/></qti-assessment-item>`);
     expect(xml).not.toContain('stimulus');
     expect(warnings.map(w => w.code)).toContain('stimulus-unresolved');
   });
 
   test('converts HTML5 media and graphic interaction images to object', () => {
-    const { xml, warnings } = convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="m" adaptive="false" time-dependent="false">
+    const { xml, warnings } =
+      convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="m" adaptive="false" time-dependent="false">
       <qti-item-body>
         <audio controls="controls"><source src="media/a.mp3" type="audio/mpeg"/>Audio</audio>
         <video src="media/v.mp4" width="320"/>
@@ -203,7 +209,8 @@ describe('convertQti3toQti21', () => {
   });
 
   test('wraps a PCI in a customInteraction', () => {
-    const { xml, warnings } = convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="p" adaptive="false" time-dependent="false">
+    const { xml, warnings } =
+      convertQti3toQti21(`<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="p" adaptive="false" time-dependent="false">
       <qti-item-body>
         <qti-portable-custom-interaction response-identifier="RESPONSE" custom-interaction-type-identifier="likert" module="likert">
           <qti-interaction-markup><div>markup</div></qti-interaction-markup>
@@ -285,8 +292,18 @@ describe('convertManifestToQti21', () => {
     const $ = load(convertManifestToQti21(manifest, new Set(['stimuli/s1.xml'])));
     expect($('resource[identifier="stim"]')).toHaveLength(0);
     const item = $('resource[identifier="item"]');
-    expect(item.find('dependency').toArray().map(d => d.attribs.identifierref)).toEqual(['img']);
-    expect(item.find('file').toArray().map(f => f.attribs.href)).toEqual(['items/item.xml', 'stimuli/style.css']);
+    expect(
+      item
+        .find('dependency')
+        .toArray()
+        .map(d => d.attribs.identifierref)
+    ).toEqual(['img']);
+    expect(
+      item
+        .find('file')
+        .toArray()
+        .map(f => f.attribs.href)
+    ).toEqual(['items/item.xml', 'stimuli/style.css']);
   });
 });
 
@@ -353,10 +370,11 @@ describe('package conversion', () => {
     const { zip: output, warnings } = await convertPackageToQti21(await zip.generateAsync({ type: 'uint8array' }));
     const result = await JSZip.loadAsync(output);
 
-    expect(Object.keys(result.files).filter(f => !result.files[f].dir).sort()).toEqual([
-      'imsmanifest.xml',
-      'items/item.xml'
-    ]);
+    expect(
+      Object.keys(result.files)
+        .filter(f => !result.files[f].dir)
+        .sort()
+    ).toEqual(['imsmanifest.xml', 'items/item.xml']);
     expect(await result.file('items/item.xml')!.async('string')).toContain(
       '<div class="qti-shared-stimulus"><p>Passage</p></div>'
     );
@@ -370,8 +388,14 @@ describe('package conversion', () => {
   test('uses the conversion callbacks when given', async () => {
     const files = new Map<string, string>([
       ['imsmanifest.xml', '<manifest xmlns="http://www.imsglobal.org/xsd/qti/qtiv3p0/imscp_v1p1" identifier="M"/>'],
-      ['item.xml', '<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i" adaptive="false" time-dependent="false"/>'],
-      ['test.xml', '<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="t" title="t"/>']
+      [
+        'item.xml',
+        '<qti-assessment-item xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="i" adaptive="false" time-dependent="false"/>'
+      ],
+      [
+        'test.xml',
+        '<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0" identifier="t" title="t"/>'
+      ]
     ]);
     const seen: string[] = [];
     const { files: converted } = await convertPackageFilesToQti21(files, {
@@ -392,7 +416,13 @@ describe('package conversion', () => {
   test('the shared vocabulary stylesheet has the 1EdTech utilities, a row-relative grid and no page rules', () => {
     const css = QTI3_SHARED_VOCABULARY_CSS;
     // 1EdTech utility classes
-    for (const rule of ['.qti-display-flex {', '.qti-margin-t-4 {', '.qti-align-center {', '.qti-list-style-type-lower-alpha {', '.qti-underline {']) {
+    for (const rule of [
+      '.qti-display-flex {',
+      '.qti-margin-t-4 {',
+      '.qti-align-center {',
+      '.qti-list-style-type-lower-alpha {',
+      '.qti-underline {'
+    ]) {
       expect(css, rule).toContain(rule);
     }
     // no rules for the page itself
@@ -423,7 +453,9 @@ describe('package conversion', () => {
 
     const { files: converted } = await convertPackageFilesToQti21(files);
     expect(converted.get('qti3-shared-vocabulary.css')).toBe(QTI3_SHARED_VOCABULARY_CSS);
-    expect(load(converted.get('items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3-shared-vocabulary.css');
+    expect(load(converted.get('items/a.xml') as string)('stylesheet').attr('href')).toBe(
+      '../qti3-shared-vocabulary.css'
+    );
     expect(converted.get('items/b.xml')).not.toContain('stylesheet');
     const $manifest = load(converted.get('imsmanifest.xml') as string);
     const css = $manifest('resource[href="qti3-shared-vocabulary.css"]');
@@ -436,8 +468,12 @@ describe('package conversion', () => {
     const nested = new Map([...files].map(([path, content]) => [`pkg/${path}`, content]));
     const { files: nestedConverted } = await convertPackageFilesToQti21(nested);
     expect(nestedConverted.has('pkg/qti3-shared-vocabulary.css')).toBe(true);
-    expect(load(nestedConverted.get('pkg/items/a.xml') as string)('stylesheet').attr('href')).toBe('../qti3-shared-vocabulary.css');
-    expect(load(nestedConverted.get('pkg/imsmanifest.xml') as string)('resource[href="qti3-shared-vocabulary.css"]')).toHaveLength(1);
+    expect(load(nestedConverted.get('pkg/items/a.xml') as string)('stylesheet').attr('href')).toBe(
+      '../qti3-shared-vocabulary.css'
+    );
+    expect(
+      load(nestedConverted.get('pkg/imsmanifest.xml') as string)('resource[href="qti3-shared-vocabulary.css"]')
+    ).toHaveLength(1);
 
     const { files: withoutCss } = await convertPackageFilesToQti21(files, { injectSharedVocabularyStylesheet: false });
     expect(withoutCss.has('qti3-shared-vocabulary.css')).toBe(false);

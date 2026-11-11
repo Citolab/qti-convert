@@ -260,7 +260,9 @@ export async function convertPackage(
   const finalFiles = options.extractSharedStimuli
     ? [
         ...extractSharedStimuliIfEnabled(
-          new Map(postProcessedFiles.map(({ path, content, type }) => [path, { content, type }])) as SharedStimulusPackageFiles,
+          new Map(
+            postProcessedFiles.map(({ path, content, type }) => [path, { content, type }])
+          ) as SharedStimulusPackageFiles,
           options
         )
       ].map(([path, file]) => ({ path, ...file }))

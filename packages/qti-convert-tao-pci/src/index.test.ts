@@ -20,9 +20,7 @@ const taoItem = `<?xml version="1.0" encoding="UTF-8"?>
 </qti-assessment-item>`;
 
 test('convert applies tao pci enhancements and injects proxy module file', async () => {
-  const files: ProcessedMap = new Map([
-    ['items/item1.xml', { type: 'item', content: taoItem }]
-  ]);
+  const files: ProcessedMap = new Map([['items/item1.xml', { type: 'item', content: taoItem }]]);
 
   const result = await convert(files);
 
@@ -36,8 +34,7 @@ test('convert applies tao pci enhancements and injects proxy module file', async
   expect(item).toContain('data-legacy-pci-source-module="textReaderInteraction"');
 
   const $ = cheerio.load(item, { xmlMode: true, xml: true });
-  const legacyConfigRaw =
-    $('qti-portable-custom-interaction').attr('data-legacy-pci-config') || '{}';
+  const legacyConfigRaw = $('qti-portable-custom-interaction').attr('data-legacy-pci-config') || '{}';
   const legacyConfig = JSON.parse(legacyConfigRaw) as {
     buttonLabels?: { prev?: string; next?: string };
     onePageNavigation?: string;
@@ -53,12 +50,9 @@ test('convert applies tao pci enhancements and injects proxy module file', async
   expect(result.has('items/modules/bootstrap/bootstrap.min.css')).toEqual(true);
 });
 
-
 test('convert does not inject bundled assets when item is not TAO', async () => {
   const nonTao = `<?xml version=\"1.0\"?><qti-assessment-item tool-name=\"CitoLab\"><qti-item-body><qti-portable-custom-interaction module=\"x\"></qti-portable-custom-interaction></qti-item-body></qti-assessment-item>`;
-  const files: ProcessedMap = new Map([
-    ['items/non-tao.xml', { type: 'item', content: nonTao }]
-  ]);
+  const files: ProcessedMap = new Map([['items/non-tao.xml', { type: 'item', content: nonTao }]]);
 
   const result = await convert(files);
   const item = String(result.get('items/non-tao.xml')?.content || '');
@@ -81,9 +75,7 @@ test('convert normalizes legacy bootstrap button classes', async () => {
   </qti-item-body>
 </qti-assessment-item>`;
 
-  const files: ProcessedMap = new Map([
-    ['items/legacy-buttons.xml', { type: 'item', content: legacyButtonItem }]
-  ]);
+  const files: ProcessedMap = new Map([['items/legacy-buttons.xml', { type: 'item', content: legacyButtonItem }]]);
 
   const result = await convert(files);
   const item = String(result.get('items/legacy-buttons.xml')?.content || '');
@@ -115,9 +107,7 @@ test('convert preserves nested handlebars property paths for runtime nested conf
   </qti-item-body>
 </qti-assessment-item>`;
 
-  const files: ProcessedMap = new Map([
-    ['items/handlebars.xml', { type: 'item', content: handlebarsItem }]
-  ]);
+  const files: ProcessedMap = new Map([['items/handlebars.xml', { type: 'item', content: handlebarsItem }]]);
 
   const result = await convert(files);
   const item = String(result.get('items/handlebars.xml')?.content || '');
@@ -145,15 +135,12 @@ test('convert runs upgradePci for TAO legacy portable custom interaction structu
   </qti-item-body>
 </qti-assessment-item>`;
 
-  const files: ProcessedMap = new Map([
-    ['items/legacy-upgrade.xml', { type: 'item', content: legacyWrappedItem }]
-  ]);
+  const files: ProcessedMap = new Map([['items/legacy-upgrade.xml', { type: 'item', content: legacyWrappedItem }]]);
 
   const result = await convert(files);
   const item = String(result.get('items/legacy-upgrade.xml')?.content || '');
   const $ = cheerio.load(item, { xmlMode: true, xml: true });
-  const legacyConfigRaw =
-    $('qti-portable-custom-interaction').attr('data-legacy-pci-config') || '{}';
+  const legacyConfigRaw = $('qti-portable-custom-interaction').attr('data-legacy-pci-config') || '{}';
   const legacyConfig = JSON.parse(legacyConfigRaw) as {
     buttonLabels?: { prev?: string; next?: string };
   };

@@ -53,9 +53,7 @@ export async function detectPciBaseUrl(options: DetectPciBaseUrlOptions): Promis
   const { packageRootUrl, itemDirUrl, itemStemDirUrl, xmlText } = options;
 
   // Prefer explicit conversion-provided baseUrl when present.
-  const explicitBaseMatch = xmlText.match(
-    /<qti-portable-custom-interaction\b[^>]*\bdata-base-url="([^"]+)"/i
-  );
+  const explicitBaseMatch = xmlText.match(/<qti-portable-custom-interaction\b[^>]*\bdata-base-url="([^"]+)"/i);
   const explicitBase = explicitBaseMatch?.[1]?.trim();
   if (explicitBase) return explicitBase.replace(/\/+$/, '');
 

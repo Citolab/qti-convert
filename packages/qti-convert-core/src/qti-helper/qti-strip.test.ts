@@ -66,10 +66,6 @@ import { expect, test } from 'vitest';
 //   { timeout: 100000 }
 // );
 
-test(
-  'test file to test',
-  { timeout: 100000 },
-  async () => {
-    expect(false).toEqual(false);
-  }
-);
+test('test file to test', { timeout: 100000 }, async () => {
+  expect(false).toEqual(false);
+});

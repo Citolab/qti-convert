@@ -4,14 +4,11 @@ import { defineConfig } from 'vite';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 
-const dirname =
-  typeof __dirname !== 'undefined'
-    ? __dirname
-    : path.dirname(fileURLToPath(import.meta.url));
+const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   optimizeDeps: {
-    include: ['storybook/test'],
+    include: ['storybook/test']
   },
   test: {
     projects: [
@@ -19,8 +16,8 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
-          include: ['src/index.test.ts'],
-        },
+          include: ['src/index.test.ts']
+        }
       },
       {
         extends: true,
@@ -30,9 +27,9 @@ export default defineConfig({
             tags: {
               include: ['test'],
               exclude: ['manual'],
-              skip: [],
-            },
-          }),
+              skip: []
+            }
+          })
         ],
         test: {
           name: 'storybook',
@@ -42,11 +39,11 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright({}),
-            instances: [{ browser: 'chromium' }],
+            instances: [{ browser: 'chromium' }]
           },
-          setupFiles: ['.storybook/vitest.setup.ts'],
-        },
-      },
-    ],
-  },
+          setupFiles: ['.storybook/vitest.setup.ts']
+        }
+      }
+    ]
+  }
 });

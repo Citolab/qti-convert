@@ -37,7 +37,6 @@ const defaultFetchRemote: RemoteSourceFetcher = (url, init) =>
 
 const responseContentToString = async (response: Response): Promise<string> => await response.text();
 
-
 const chooseAmbiguousMode = async (
   url: string,
   contentType: string,

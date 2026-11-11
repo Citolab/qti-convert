@@ -44,7 +44,11 @@ function stripLeadingPrefix(value: string, prefix: string): string {
   return value;
 }
 
-function normalizeModulePath(value: string | undefined, baseUrl: string, options: ConfigurePciOptions): string | undefined {
+function normalizeModulePath(
+  value: string | undefined,
+  baseUrl: string,
+  options: ConfigurePciOptions
+): string | undefined {
   if (!value) return value;
   if (/^(data:|blob:|https?:)/.test(value)) return value;
   if (value.startsWith('/assets/')) return value;

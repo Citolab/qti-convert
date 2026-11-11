@@ -1,13 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const requiredAssets = [
-  path.resolve(process.cwd(), 'storybook-assets/PCI.zip'),
-];
+const requiredAssets = [path.resolve(process.cwd(), 'storybook-assets/PCI.zip')];
 
 let missingAsset = false;
 
-requiredAssets.forEach((assetPath) => {
+requiredAssets.forEach(assetPath => {
   if (fs.existsSync(assetPath)) {
     console.info(`[storybook-assets] Found ${assetPath}`);
     return;

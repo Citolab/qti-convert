@@ -12,7 +12,7 @@ import {
   convertPackageToDocx,
   convertPackageToPdf,
   convertPackageToZip,
-  type ZipExportOptions,
+  type ZipExportOptions
 } from '@citolab/qti-convert-export';
 
 function usage(): never {
@@ -80,9 +80,7 @@ try {
     await writeFile(outPath, result.assessment);
     console.log(`Wrote ${outPath} (${result.paper.items.length} items)`);
     if (result.answerKey && result.answerKeyFileName) {
-      const keyPath = output
-        ? path.join(path.dirname(outPath), result.answerKeyFileName)
-        : result.answerKeyFileName;
+      const keyPath = output ? path.join(path.dirname(outPath), result.answerKeyFileName) : result.answerKeyFileName;
       await writeFile(keyPath, result.answerKey);
       console.log(`Wrote ${keyPath}`);
     }
@@ -92,9 +90,7 @@ try {
     await writeFile(outPath, result.assessment);
     console.log(`Wrote ${outPath} (${result.paper.items.length} items)`);
     if (result.answerKey && result.answerKeyFileName) {
-      const keyPath = output
-        ? path.join(path.dirname(outPath), result.answerKeyFileName)
-        : result.answerKeyFileName;
+      const keyPath = output ? path.join(path.dirname(outPath), result.answerKeyFileName) : result.answerKeyFileName;
       await writeFile(keyPath, result.answerKey);
       console.log(`Wrote ${keyPath}`);
     }

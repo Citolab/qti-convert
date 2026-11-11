@@ -18,7 +18,10 @@ export const docxConverter: DocumentConverter<BinaryInput, DocxDocumentData, Doc
     return buildDocxPreview(document);
   },
 
-  async extractQuestions(_document: DocxDocumentData, _options?: GenerateQtiPackageOptions): Promise<StructuredQuestion[]> {
+  async extractQuestions(
+    _document: DocxDocumentData,
+    _options?: GenerateQtiPackageOptions
+  ): Promise<StructuredQuestion[]> {
     throw new Error('DOCX extractQuestions requires the full conversion pipeline. Use convert() instead.');
   },
 

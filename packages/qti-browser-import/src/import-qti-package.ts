@@ -12,7 +12,7 @@ import {
   normalizeZipPath,
   putBlobFileInPackageCache,
   putTextFileInPackageCache,
-  QTI_PKG_URL_PREFIX,
+  QTI_PKG_URL_PREFIX
 } from './qti-package-cache';
 
 export interface ImportedItemInfo {
@@ -93,12 +93,10 @@ function rebaseToPackageRoot(path: string, packageRootDir: string): string {
 
 function pickAliasedModuleResolutionPath(
   paths: string[],
-  filename: 'module_resolution' | 'fallback_module_resolution',
+  filename: 'module_resolution' | 'fallback_module_resolution'
 ): string | null {
   const candidates = paths.filter(
-    (p) =>
-      p.endsWith(`/modules/${filename}.js`) ||
-      p.endsWith(`/modules/${filename}.json`),
+    p => p.endsWith(`/modules/${filename}.js`) || p.endsWith(`/modules/${filename}.json`)
   );
 
   if (candidates.length !== 1) return null;
@@ -106,32 +104,22 @@ function pickAliasedModuleResolutionPath(
 }
 
 function repairBareAttributesInXml(text: string): string {
-  return text.replace(/<[^>]+>/g, (tag) => {
-    if (
-      tag.startsWith('<!--') ||
-      tag.startsWith('<?') ||
-      tag.startsWith('<![CDATA[') ||
-      tag.startsWith('<!DOCTYPE')
-    ) {
+  return text.replace(/<[^>]+>/g, tag => {
+    if (tag.startsWith('<!--') || tag.startsWith('<?') || tag.startsWith('<![CDATA[') || tag.startsWith('<!DOCTYPE')) {
       return tag;
     }
 
-    return tag.replace(
-      /("[^"]*"|'[^']*')|(\s)([\w:-]+)(?!\s*=)(?=[\s/>])/g,
-      (match, quoted, space, attr) => (quoted !== undefined ? match : `${space}${attr}=""`),
+    return tag.replace(/("[^"]*"|'[^']*')|(\s)([\w:-]+)(?!\s*=)(?=[\s/>])/g, (match, quoted, space, attr) =>
+      quoted !== undefined ? match : `${space}${attr}=""`
     );
   });
 }
 
-const upsertPciAttribute = (
-  xmlString: string,
-  attributeName: string,
-  attributeValue: string,
-): string => {
+const upsertPciAttribute = (xmlString: string, attributeName: string, attributeValue: string): string => {
   const openTagRegex = /<qti-portable-custom-interaction\b[^>]*>/g;
   if (!openTagRegex.test(xmlString)) return xmlString;
 
-  return xmlString.replace(openTagRegex, (tag) => {
+  return xmlString.replace(openTagRegex, tag => {
     const attrRegex = new RegExp(`\\s${attributeName}="[^"]*"`, 'i');
     const nextAttr = ` ${attributeName}="${attributeValue}"`;
     if (attrRegex.test(tag)) {
@@ -200,26 +188,25 @@ const resolveHref = (baseFilePath: string, href: string | undefined) => {
  * Resolves custom response processing templates: files shipped inside the package are read from
  * the zip, absolute urls are fetched once here so scoring never needs a request per item.
  */
-const createResponseProcessingTemplateResolver = (
-  xmlContentsByPath: Map<string, string>,
-  baseFilePath: string,
-): ResponseProcessingTemplateResolver => async (url) => {
-  if (/^https?:\/\//i.test(url)) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) return null;
-      return await response.text();
-    } catch {
-      return null;
+const createResponseProcessingTemplateResolver =
+  (xmlContentsByPath: Map<string, string>, baseFilePath: string): ResponseProcessingTemplateResolver =>
+  async url => {
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        return await response.text();
+      } catch {
+        return null;
+      }
     }
-  }
 
-  const resolved = resolveHref(baseFilePath, url);
-  if (resolved && xmlContentsByPath.has(resolved)) {
-    return xmlContentsByPath.get(resolved)!;
-  }
-  return xmlContentsByPath.get(normalizeZipPath(url)) ?? null;
-};
+    const resolved = resolveHref(baseFilePath, url);
+    if (resolved && xmlContentsByPath.has(resolved)) {
+      return xmlContentsByPath.get(resolved)!;
+    }
+    return xmlContentsByPath.get(normalizeZipPath(url)) ?? null;
+  };
 
 type XmlKind = 'item' | 'test' | 'other';
 
@@ -267,7 +254,7 @@ export const __test__ = {
   repairBareAttributesInXml,
   isQti3Xml,
   resolveRuntimeAssetUrl,
-  resetRuntimeAssetUrlCache,
+  resetRuntimeAssetUrlCache
 };
 
 function getIdentifierFromItem(xml: string, fallback: string): string {
@@ -286,7 +273,7 @@ function extractItemRefs(testXml: string): { identifier: string; href: string }[
       .filter(el => el.localName === 'qti-assessment-item-ref' || el.localName === 'assessmentItemRef')
       .map(el => ({
         identifier: el.getAttribute('identifier') || '',
-        href: el.getAttribute('href') || '',
+        href: el.getAttribute('href') || ''
       }))
       .filter(el => Boolean(el.href));
   } catch {
@@ -297,7 +284,7 @@ function extractItemRefs(testXml: string): { identifier: string; href: string }[
 function normalizeTestItemRefIdentifiers(
   testXml: string,
   testPath: string,
-  convertedXmlByPath: Map<string, string>,
+  convertedXmlByPath: Map<string, string>
 ): string {
   try {
     const doc = new DOMParser().parseFromString(testXml, 'application/xml');
@@ -305,7 +292,7 @@ function normalizeTestItemRefIdentifiers(
     if (parseError) return testXml;
 
     const refs = Array.from(doc.getElementsByTagName('*')).filter(
-      el => el.localName === 'qti-assessment-item-ref' || el.localName === 'assessmentItemRef',
+      el => el.localName === 'qti-assessment-item-ref' || el.localName === 'assessmentItemRef'
     );
 
     let changed = false;
@@ -407,7 +394,7 @@ async function prepareItemXmlForRuntime(
   xmlString: string,
   itemPath: string,
   packageId: string,
-  options: Pick<PrepareQtiPackageOptions, 'componentsCdnUrl' | 'componentsCssUrl'> = {},
+  options: Pick<PrepareQtiPackageOptions, 'componentsCdnUrl' | 'componentsCssUrl'> = {}
 ): Promise<string> {
   const packageRootUrl = makePackageUrl(packageId, '');
   const itemDir = getDirPath(itemPath);
@@ -420,20 +407,20 @@ async function prepareItemXmlForRuntime(
       packageRootUrl,
       itemDirUrl,
       itemStemDirUrl,
-      xmlText: xmlString,
+      xmlText: xmlString
     });
     const getModuleResolutionConfig = createModuleResolutionFetcher({
       packageRootUrl,
       itemDirUrl,
-      itemStemDirUrl,
+      itemStemDirUrl
     });
 
     xmlString = (
-      await qtiTransform(xmlString).configurePciAsync(
-        pciBaseUrl,
-        getModuleResolutionConfig,
-        { packageRootUrl, itemDirUrl, itemStemDirUrl },
-      )
+      await qtiTransform(xmlString).configurePciAsync(pciBaseUrl, getModuleResolutionConfig, {
+        packageRootUrl,
+        itemDirUrl,
+        itemStemDirUrl
+      })
     ).xml();
   }
 
@@ -461,11 +448,11 @@ async function prepareItemXmlForRuntime(
 
   const all = Array.from(doc.getElementsByTagName('*'));
   const pcis = all.filter(
-    el => el.localName === 'qti-portable-custom-interaction' || el.localName === 'portableCustomInteraction',
+    el => el.localName === 'qti-portable-custom-interaction' || el.localName === 'portableCustomInteraction'
   );
   const interactionModules = all.filter(el => el.localName === 'qti-interaction-module' || el.localName === 'module');
   const interactionModuleContainers = all.filter(
-    el => el.localName === 'qti-interaction-modules' || el.localName === 'modules',
+    el => el.localName === 'qti-interaction-modules' || el.localName === 'modules'
   );
 
   for (const moduleEl of interactionModules) {
@@ -535,7 +522,7 @@ function extractPackagePathFromUrl(packageId: string, url: string): string | nul
 
 export async function prepareQtiPackage(
   file: File,
-  options: PrepareQtiPackageOptions = {},
+  options: PrepareQtiPackageOptions = {}
 ): Promise<PreparedQtiPackage> {
   await ensurePackageServiceWorkerReady();
 
@@ -558,7 +545,7 @@ export async function prepareQtiPackage(
     const xml = await response.text();
     const patched = await prepareItemXmlForRuntime(xml, relativePath, imported.packageId, {
       componentsCdnUrl: options.componentsCdnUrl,
-      componentsCssUrl: options.componentsCssUrl,
+      componentsCssUrl: options.componentsCssUrl
     });
     convertedXmlByPath.set(relativePath, patched);
     await putTextFileInPackageCache(imported.packageId, relativePath, patched, 'application/xml');
@@ -573,7 +560,7 @@ export async function prepareQtiPackage(
   const normalizedTestXml = normalizeTestItemRefIdentifiers(
     await testResponse.text(),
     testRelativePath,
-    convertedXmlByPath,
+    convertedXmlByPath
   );
   await putTextFileInPackageCache(imported.packageId, testRelativePath, normalizedTestXml, 'application/xml');
 
@@ -581,7 +568,7 @@ export async function prepareQtiPackage(
     const resolved = resolveHref(testRelativePath, ref.href) || ref.href;
     return {
       identifier: ref.identifier || resolved,
-      title: ref.identifier || resolved,
+      title: ref.identifier || resolved
     };
   });
 
@@ -598,11 +585,9 @@ export async function prepareQtiPackage(
   const updatedAssessments = imported.assessments.map(a => ({
     ...a,
     items: a.items.map(item => {
-      const normalizedId = item.originalHref
-        ? normalizedRefIdentifierByPath.get(item.originalHref)
-        : undefined;
+      const normalizedId = item.originalHref ? normalizedRefIdentifierByPath.get(item.originalHref) : undefined;
       return normalizedId ? { ...item, itemRefIdentifier: normalizedId } : item;
-    }),
+    })
   }));
 
   return {
@@ -612,13 +597,13 @@ export async function prepareQtiPackage(
     convertedItemCount: assessment.items.length,
     assessments: updatedAssessments,
     importErrors: imported.importErrors,
-    itemsPerAssessment: updatedAssessments.map(a => ({ assessmentId: a.id, items: a.items })),
+    itemsPerAssessment: updatedAssessments.map(a => ({ assessmentId: a.id, items: a.items }))
   };
 }
 
 export async function prepareQtiPackageFromUrl(
   packageUrl: string,
-  options: PrepareQtiPackageOptions = {},
+  options: PrepareQtiPackageOptions = {}
 ): Promise<PreparedQtiPackage> {
   const response = await fetch(packageUrl);
   if (!response.ok) {
@@ -633,7 +618,7 @@ export async function prepareQtiPackageFromUrl(
 
 export async function importQtiPackage(
   file: File,
-  options: ImportQtiPackageOptions = {},
+  options: ImportQtiPackageOptions = {}
 ): Promise<ImportQtiPackageResult> {
   if ('serviceWorker' in navigator) {
     try {
@@ -645,11 +630,7 @@ export async function importQtiPackage(
 
   try {
     const keys = await caches.keys();
-    await Promise.all(
-      keys
-        .filter((k) => k.startsWith('qti-pkg-'))
-        .map((k) => caches.delete(k)),
-    );
+    await Promise.all(keys.filter(k => k.startsWith('qti-pkg-')).map(k => caches.delete(k)));
   } catch {
     if (options.previousPackageId) {
       try {
@@ -672,10 +653,7 @@ export async function importQtiPackage(
   const zip = await JSZip.loadAsync(file);
 
   const zipFilePaths = Object.keys(zip.files).filter(
-    (p) =>
-      !p.includes('__MACOSX') &&
-      !p.includes('.DS_Store') &&
-      !zip.files[p].dir,
+    p => !p.includes('__MACOSX') && !p.includes('.DS_Store') && !zip.files[p].dir
   );
   const packageRootDir = detectPackageRootDir(zipFilePaths);
   const normalizedToZipKey = new Map<string, string>();
@@ -699,13 +677,10 @@ export async function importQtiPackage(
     }
   }
 
-  const ensureAliasedModuleResolution = async (
-    filename: 'module_resolution' | 'fallback_module_resolution',
-  ) => {
+  const ensureAliasedModuleResolution = async (filename: 'module_resolution' | 'fallback_module_resolution') => {
     const rootJs = `modules/${filename}.js`;
     const rootJson = `modules/${filename}.json`;
-    const hasRoot =
-      normalizedToZipKey.has(rootJs) || normalizedToZipKey.has(rootJson);
+    const hasRoot = normalizedToZipKey.has(rootJs) || normalizedToZipKey.has(rootJson);
     if (hasRoot) return;
 
     const pick = pickAliasedModuleResolutionPath(Array.from(normalizedToZipKey.keys()), filename);
@@ -718,12 +693,7 @@ export async function importQtiPackage(
       const ext = pick.endsWith('.json') ? 'json' : 'js';
       if (ext === 'json') {
         const text = await entry.async('string');
-        await putTextFileInPackageCache(
-          packageId,
-          rootJson,
-          text,
-          'application/json',
-        );
+        await putTextFileInPackageCache(packageId, rootJson, text, 'application/json');
       } else {
         const blob = await entry.async('blob');
         await putBlobFileInPackageCache(packageId, rootJs, blob);
@@ -750,8 +720,7 @@ export async function importQtiPackage(
     if (!skipValidation) {
       try {
         const doc = new DOMParser().parseFromString(content, 'text/xml');
-        const hasParseError =
-          doc.getElementsByTagName('parsererror').length > 0;
+        const hasParseError = doc.getElementsByTagName('parsererror').length > 0;
         if (hasParseError) {
           importErrors.push(`Invalid XML structure in ${relativePath}`);
         }
@@ -762,23 +731,14 @@ export async function importQtiPackage(
 
     const $ = cheerio3.load(content, { xmlMode: true, xml: true });
 
-    if (
-      $('qti-assessment-test').length > 0 ||
-      $('assessmentTest').length > 0
-    ) {
+    if ($('qti-assessment-test').length > 0 || $('assessmentTest').length > 0) {
       if (!testFilePath) {
         testFilePath = relativePath;
-        testIdentifier =
-          $('qti-assessment-test').attr('identifier') ||
-          $('assessmentTest').attr('identifier') ||
-          null;
+        testIdentifier = $('qti-assessment-test').attr('identifier') || $('assessmentTest').attr('identifier') || null;
       }
     }
 
-    if (
-      $('qti-assessment-item').length > 0 ||
-      $('assessmentItem').length > 0
-    ) {
+    if ($('qti-assessment-item').length > 0 || $('assessmentItem').length > 0) {
       const identifier =
         $('qti-assessment-item').attr('identifier') ||
         $('assessmentItem').attr('identifier') ||
@@ -801,11 +761,8 @@ export async function importQtiPackage(
     const originalContent = xmlContentsByPath.get(relativePath);
     if (!originalContent) continue;
 
-    let qti3Xml = isQti3Xml(originalContent)
-      ? originalContent
-      : await convertQti2toQti3(originalContent);
-    const folderPath =
-      relativePath.substring(0, relativePath.lastIndexOf('/') + 1) || '';
+    let qti3Xml = isQti3Xml(originalContent) ? originalContent : await convertQti2toQti3(originalContent);
+    const folderPath = relativePath.substring(0, relativePath.lastIndexOf('/') + 1) || '';
 
     let transformResult = await qtiTransform(qti3Xml)
       .objectToImg()
@@ -818,9 +775,7 @@ export async function importQtiPackage(
       .qbCleanup()
       .depConvert()
       .upgradePci()
-      .inlineResponseProcessingTemplate(
-        createResponseProcessingTemplateResolver(xmlContentsByPath, relativePath),
-      );
+      .inlineResponseProcessingTemplate(createResponseProcessingTemplateResolver(xmlContentsByPath, relativePath));
 
     if (removeStylesheets) {
       transformResult = transformResult.stripStylesheets();
@@ -834,7 +789,7 @@ export async function importQtiPackage(
       identifier,
       relativePath,
       content: qti3Xml,
-      type: qti3Xml.includes('interaction>') ? 'regular' : 'info',
+      type: qti3Xml.includes('interaction>') ? 'regular' : 'info'
     });
   }
 
@@ -845,9 +800,7 @@ export async function importQtiPackage(
 
   if (testFilePath && testIdentifier) {
     const originalContent = xmlContentsByPath.get(testFilePath) || '';
-    const qti3Xml = isQti3Xml(originalContent)
-      ? originalContent
-      : await convertQti2toQti3(originalContent);
+    const qti3Xml = isQti3Xml(originalContent) ? originalContent : await convertQti2toQti3(originalContent);
     const testBaseRef = `${QTI_PKG_URL_PREFIX}/${encodeURIComponent(packageId)}/`;
     let transformResult = await qtiTransform(qti3Xml)
       .objectToImg()
@@ -860,23 +813,17 @@ export async function importQtiPackage(
       .qbCleanup()
       .depConvert()
       .upgradePci()
-      .inlineResponseProcessingTemplate(
-        createResponseProcessingTemplateResolver(xmlContentsByPath, testFilePath),
-      );
+      .inlineResponseProcessingTemplate(createResponseProcessingTemplateResolver(xmlContentsByPath, testFilePath));
     if (removeStylesheets) {
       transformResult = transformResult.stripStylesheets();
     }
     convertedTestXml = forcePciIframeMode(transformResult.xml());
     convertedTestXml = ensurePciBaseUrlInXml(convertedTestXml, packageId, testFilePath);
-    await putTextFileInPackageCache(
-      packageId,
-      testFilePath,
-      convertedTestXml,
-    );
+    await putTextFileInPackageCache(packageId, testFilePath, convertedTestXml);
 
     const $ = cheerio3.load(originalContent, {
       xmlMode: true,
-      xml: true,
+      xml: true
     });
     const refs: { itemRefIdentifier?: string; identifier: string }[] = [];
     $('qti-assessment-item-ref, assessmentItemRef').each((_, el) => {
@@ -888,7 +835,7 @@ export async function importQtiPackage(
         if (itemPath === resolvedHref) {
           refs.push({
             itemRefIdentifier: itemRefIdentifierAttr,
-            identifier: itemIdentifier,
+            identifier: itemIdentifier
           });
         }
       });
@@ -897,9 +844,9 @@ export async function importQtiPackage(
   } else if (convertedItems.length > 0) {
     effectiveTestPath = 'all-items.xml';
     effectiveTestIdentifier = 'All';
-    itemRefs = convertedItems.map((it) => ({
+    itemRefs = convertedItems.map(it => ({
       itemRefIdentifier: it.identifier,
-      identifier: it.identifier,
+      identifier: it.identifier
     }));
 
     convertedTestXml = `<?xml version="1.0" encoding="utf-8"?>
@@ -915,8 +862,8 @@ export async function importQtiPackage(
     <qti-assessment-section identifier="section_1" title="section 1" visible="true" keep-together="false">
       ${convertedItems
         .map(
-          (item) =>
-            `<qti-assessment-item-ref identifier="${item.identifier}" href="${item.relativePath}"><qti-weight identifier="WEIGHT" value="1" /></qti-assessment-item-ref>`,
+          item =>
+            `<qti-assessment-item-ref identifier="${item.identifier}" href="${item.relativePath}"><qti-weight identifier="WEIGHT" value="1" /></qti-assessment-item-ref>`
         )
         .join('')}
     </qti-assessment-section>
@@ -930,27 +877,20 @@ export async function importQtiPackage(
   </qti-outcome-processing>
 </qti-assessment-test>`;
 
-    await putTextFileInPackageCache(
-      packageId,
-      effectiveTestPath,
-      convertedTestXml,
-    );
+    await putTextFileInPackageCache(packageId, effectiveTestPath, convertedTestXml);
   }
 
-  const taoConversionInput = new Map<
-    string,
-    { content: string; type: 'item' | 'test' | 'manifest' | 'other' }
-  >();
+  const taoConversionInput = new Map<string, { content: string; type: 'item' | 'test' | 'manifest' | 'other' }>();
   for (const item of convertedItems) {
     taoConversionInput.set(item.relativePath, {
       content: item.content,
-      type: 'item',
+      type: 'item'
     });
   }
   if (effectiveTestPath && convertedTestXml) {
     taoConversionInput.set(effectiveTestPath, {
       content: convertedTestXml,
-      type: 'test',
+      type: 'test'
     });
   }
 
@@ -958,7 +898,7 @@ export async function importQtiPackage(
   for (const [path, file] of taoConversionOutput.entries()) {
     if (file.type === 'item') {
       if (typeof file.content !== 'string') continue;
-      const item = convertedItems.find((candidate) => candidate.relativePath === path);
+      const item = convertedItems.find(candidate => candidate.relativePath === path);
       if (item) {
         item.content = file.content;
       }
@@ -976,8 +916,7 @@ export async function importQtiPackage(
     if (file.type === 'other') {
       const normalizedOutPath = normalizeZipPath(path);
       const modulesIdx = normalizedOutPath.indexOf('modules/');
-      const rootModuleAlias =
-        modulesIdx > 0 ? normalizedOutPath.slice(modulesIdx) : null;
+      const rootModuleAlias = modulesIdx > 0 ? normalizedOutPath.slice(modulesIdx) : null;
 
       if (typeof file.content === 'string') {
         const lowerPath = path.toLowerCase();
@@ -988,32 +927,14 @@ export async function importQtiPackage(
             : lowerPath.endsWith('.json')
               ? 'application/json'
               : 'application/octet-stream';
-        await putTextFileInPackageCache(
-          packageId,
-          path,
-          file.content,
-          contentType,
-        );
+        await putTextFileInPackageCache(packageId, path, file.content, contentType);
         if (rootModuleAlias) {
-          await putTextFileInPackageCache(
-            packageId,
-            rootModuleAlias,
-            file.content,
-            contentType,
-          );
+          await putTextFileInPackageCache(packageId, rootModuleAlias, file.content, contentType);
         }
       } else {
-        await putBlobFileInPackageCache(
-          packageId,
-          path,
-          new Blob([file.content as BlobPart]),
-        );
+        await putBlobFileInPackageCache(packageId, path, new Blob([file.content as BlobPart]));
         if (rootModuleAlias) {
-          await putBlobFileInPackageCache(
-            packageId,
-            rootModuleAlias,
-            new Blob([file.content as BlobPart]),
-          );
+          await putBlobFileInPackageCache(packageId, rootModuleAlias, new Blob([file.content as BlobPart]));
         }
       }
     }
@@ -1021,26 +942,20 @@ export async function importQtiPackage(
 
   if (effectiveTestPath && effectiveTestIdentifier) {
     const itemsWithRefs = itemRefs
-      .map((ref) => {
+      .map(ref => {
         const itemPath = itemPaths.get(ref.identifier);
         if (!itemPath) return null;
-        const originalHref = getRelativePath(
-          effectiveTestPath!,
-          itemPath,
-        );
-        const hrefResolved =
-          resolveHref(effectiveTestPath!, originalHref) || itemPath;
+        const originalHref = getRelativePath(effectiveTestPath!, itemPath);
+        const hrefResolved = resolveHref(effectiveTestPath!, originalHref) || itemPath;
         const itemUrl = makePackageUrl(packageId, hrefResolved);
         return {
           identifier: ref.identifier,
           itemRefIdentifier: ref.itemRefIdentifier || ref.identifier,
           title: ref.identifier,
-          type:
-            convertedItems.find((i) => i.identifier === ref.identifier)
-              ?.type || 'regular',
+          type: convertedItems.find(i => i.identifier === ref.identifier)?.type || 'regular',
           categories: [],
           href: itemUrl,
-          originalHref,
+          originalHref
         } as ImportedItemInfo;
       })
       .filter(Boolean) as ImportedItemInfo[];
@@ -1055,7 +970,7 @@ export async function importQtiPackage(
       createdAt: new Date().getTime(),
       updatedAt: new Date().getTime(),
       createdBy: 'user',
-      testUrl: makePackageUrl(packageId, effectiveTestPath),
+      testUrl: makePackageUrl(packageId, effectiveTestPath)
     });
   }
 
@@ -1063,9 +978,9 @@ export async function importQtiPackage(
     packageId,
     assessments,
     importErrors,
-    itemsPerAssessment: assessments.map((a) => ({
+    itemsPerAssessment: assessments.map(a => ({
       assessmentId: a.id,
-      items: a.items || [],
-    })),
+      items: a.items || []
+    }))
   };
 }

@@ -51,7 +51,8 @@ export const prepareQtiSchema = async (name: string, url: string): Promise<strin
   try {
     mkdirSync(CACHE_DIR, { recursive: true });
     let schema = await download(url);
-    if (!existsSync(path.join(CACHE_DIR, 'xml.xsd'))) writeFileSync(path.join(CACHE_DIR, 'xml.xsd'), await download(XML_XSD_URL));
+    if (!existsSync(path.join(CACHE_DIR, 'xml.xsd')))
+      writeFileSync(path.join(CACHE_DIR, 'xml.xsd'), await download(XML_XSD_URL));
 
     for (const match of schema.matchAll(/<xs:import\s+namespace="([^"]+)"\s+schemaLocation="([^"]+)"\s*\/>/g)) {
       const [, namespace, location] = match;
@@ -59,9 +60,13 @@ export const prepareQtiSchema = async (name: string, url: string): Promise<strin
         schema = schema.replace(location, 'xml.xsd');
       } else if (LAX_NAMESPACES.includes(namespace)) {
         // stub every element the QTI schema references in this namespace
-        const prefixes = [...schema.matchAll(/xmlns:([\w-]+)="([^"]+)"/g)].filter(m => m[2] === namespace).map(m => m[1]);
+        const prefixes = [...schema.matchAll(/xmlns:([\w-]+)="([^"]+)"/g)]
+          .filter(m => m[2] === namespace)
+          .map(m => m[1]);
         const elements = [
-          ...new Set(prefixes.flatMap(p => [...schema.matchAll(new RegExp(`ref="${p}:([\\w-]+)"`, 'g'))].map(m => m[1])))
+          ...new Set(
+            prefixes.flatMap(p => [...schema.matchAll(new RegExp(`ref="${p}:([\\w-]+)"`, 'g'))].map(m => m[1]))
+          )
         ];
         const stub = `${name}-stub-${LAX_NAMESPACES.indexOf(namespace)}.xsd`;
         writeFileSync(path.join(CACHE_DIR, stub), laxSchema(namespace, elements.length ? elements : ['unused']));

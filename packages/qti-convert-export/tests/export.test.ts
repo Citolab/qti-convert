@@ -15,7 +15,7 @@ import {
   renderPdfDocument,
   type LayoutBlock,
   type PaperInteraction,
-  type PaperItem,
+  type PaperItem
 } from '../src/index.js';
 import { sanitizePdfText } from '../src/render-pdf.js';
 
@@ -337,10 +337,8 @@ describe('image refs', () => {
   it('resolves relative paths against the item location', async () => {
     const { resolveAssetRef, decodeHtmlEntities } = await import('../src/xml-utils.js');
     expect(resolveAssetRef('../resources/atom.png', 'items/item01.xml')).toBe('resources/atom.png');
-    expect(resolveAssetRef('https://example.com/a.png', 'items/item01.xml')).toBe(
-      'https://example.com/a.png'
-    );
-    expect(decodeHtmlEntities('schema&#x2019;s 10&#xb0;C')).toBe("schema’s 10°C");
+    expect(resolveAssetRef('https://example.com/a.png', 'items/item01.xml')).toBe('https://example.com/a.png');
+    expect(decodeHtmlEntities('schema&#x2019;s 10&#xb0;C')).toBe('schema’s 10°C');
   });
 });
 
@@ -371,7 +369,7 @@ describe('convertPackageToDocx / Pdf', () => {
     const zip = await zipFixture();
     const result = await convertPackageToDocx(zip, {
       locale: 'nl',
-      fileNameBase: 'My Demo Toets',
+      fileNameBase: 'My Demo Toets'
     });
     expect(result.answerKey).toBeDefined();
     expect(result.fileName).toBe('My Demo Toets.docx');
@@ -383,7 +381,7 @@ describe('convertPackageToDocx / Pdf', () => {
     const result = await convertPackageToDocx(zip, {
       correctionInDocument: true,
       correctionSeparate: true,
-      fileNameBase: 'Both',
+      fileNameBase: 'Both'
     });
     expect(result.answerKey).toBeDefined();
     expect(result.assessment.byteLength).toBeGreaterThan(2000);
@@ -393,7 +391,7 @@ describe('convertPackageToDocx / Pdf', () => {
     const zip = await zipFixture();
     const result = await convertPackageToDocx(zip, {
       correctionInDocument: false,
-      correctionSeparate: false,
+      correctionSeparate: false
     });
     expect(result.answerKey).toBeUndefined();
   });
@@ -506,7 +504,9 @@ describe('sources document', () => {
     expect(sources).toMatch(/Bron 1: De vos/);
     expect(sources).toMatch(/De vos is een roofdier/);
 
-    const booklet = await docxText(await renderDocxDocument(paper, 'questions', { locale: 'nl', separateSources: true }));
+    const booklet = await docxText(
+      await renderDocxDocument(paper, 'questions', { locale: 'nl', separateSources: true })
+    );
     expect(booklet).not.toMatch(/De vos is een roofdier/);
     // Both questions about the text say where to find it
     expect(booklet.match(/Gebruik bron 1 \(De vos\) uit het bronnenboekje\./g)).toHaveLength(2);
@@ -548,7 +548,7 @@ describe('convertPackageToZip', () => {
       'Test - questions.pdf',
       'Test - sources.pdf',
       'Test - answer-sheet.pdf',
-      'Test - answer-key.pdf',
+      'Test - answer-key.pdf'
     ]);
     const pdf = result.files.find(f => f.name === 'Test - answer-key.pdf')!;
     expect(String.fromCharCode(...pdf.bytes.slice(0, 4))).toBe('%PDF');
