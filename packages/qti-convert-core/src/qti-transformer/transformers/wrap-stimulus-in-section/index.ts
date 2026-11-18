@@ -33,6 +33,7 @@ const TEST = ['qti-assessment-test', 'assessmentTest'];
 const TEST_PART = ['qti-test-part', 'testPart'];
 const SECTION = ['qti-assessment-section', 'assessmentSection'];
 const ITEM_REF = ['qti-assessment-item-ref', 'assessmentItemRef'];
+const SECTION_RULES = ['qti-selection', 'selection', 'qti-ordering', 'ordering'];
 const NAV_ENTITY_ATTR = 'data-navigation-entity';
 const LEGACY_NAV_ATTR = 'data-cito-navigate';
 
@@ -69,8 +70,9 @@ function descendantElems($: cheerio.CheerioAPI, parent: El, names: string[]): El
  * is marked with `data-navigation-entity="section"`.
  *
  * Test parts that already consist of a single wrapping section (containing the sub-structure)
- * are left untouched. The document is only mutated when at least one 2+ shared-stimulus cluster
- * is found. Returns whether the document was changed.
+ * are left untouched; a single flat section — the item-refs directly inside it, as most
+ * authoring tools export a test — is grouped like any other part. The document is only mutated
+ * when at least one 2+ shared-stimulus cluster is found. Returns whether the document was changed.
  */
 export async function wrapStimulusInSection(
   $: cheerio.CheerioAPI,
@@ -86,12 +88,7 @@ export async function wrapStimulusInSection(
 
   const allParts = childElems($, testEl, TEST_PART);
 
-  // A part with a single wrapping section (and no direct item-refs) is already section-shaped.
-  const parts = allParts.filter(part => {
-    const directSections = childElems($, part, SECTION);
-    const directRefs = childElems($, part, ITEM_REF);
-    return !(directSections.length === 1 && directRefs.length === 0);
-  });
+  const parts = allParts.filter(part => !isSingleWrappingSection($, part));
 
   // Pre-resolve metadata for every item-ref (async), then do the rewrite synchronously.
   const metaByEl = new Map<El, ResolvedMeta>();
@@ -128,6 +125,19 @@ export async function wrapStimulusInSection(
   }
 
   return true;
+}
+
+/**
+ * A part whose only child is one section is already section-shaped when that section holds the
+ * structure: nested sections, or selection / ordering rules, which the rewrite would drop. A
+ * flat section with only item-refs is not: it is the whole test in one section.
+ */
+function isSingleWrappingSection($: cheerio.CheerioAPI, part: El): boolean {
+  const directSections = childElems($, part, SECTION);
+  if (directSections.length !== 1 || childElems($, part, ITEM_REF).length > 0) return false;
+
+  const section = directSections[0];
+  return childElems($, section, SECTION).length > 0 || childElems($, section, SECTION_RULES).length > 0;
 }
 
 function buildClusters($metaRefs: El[], metaByEl: Map<El, ResolvedMeta>): El[][] {

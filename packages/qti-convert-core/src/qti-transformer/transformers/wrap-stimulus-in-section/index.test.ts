@@ -163,3 +163,74 @@ test('leaves a test part alone when it is a single wrapping section', async () =
   expect($('qti-assessment-section[identifier="SUB"]').length).toBe(1);
   expect($('qti-test-part').attr('data-navigation-entity')).toBeUndefined();
 });
+
+test('groups a single flat section, the shape authoring tools export', async () => {
+  const input = xml`<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0">
+  <qti-test-part identifier="TP" navigation-mode="nonlinear" submission-mode="simultaneous">
+    <qti-assessment-section identifier="S1" title="Section 1" visible="true">
+      <qti-assessment-item-ref identifier="ITM-1" href="items/1.xml" />
+      <qti-assessment-item-ref identifier="ITM-2" href="items/2.xml" />
+      <qti-assessment-item-ref identifier="ITM-3" href="items/3.xml" />
+      <qti-assessment-item-ref identifier="ITM-4" href="items/4.xml" />
+      <qti-assessment-item-ref identifier="ITM-5" href="items/5.xml" />
+    </qti-assessment-section>
+  </qti-test-part>
+</qti-assessment-test>`;
+
+  const assignmentsOut: Array<{ itemIdentifier: string; sectionIdentifier: string }> = [];
+  const out = await (
+    await qtiTransform(input).wrapStimulusInSection(
+      makeResolver({
+        'ITM-1': { stimulusIdentifier: 'STIM-A', title: 'Vraag 1' },
+        'ITM-2': { stimulusIdentifier: 'STIM-A', title: 'Vraag 2' },
+        'ITM-3': { stimulusIdentifier: 'STIM-B', title: 'Vraag 3' },
+        'ITM-4': { stimulusIdentifier: 'STIM-B', title: 'Vraag 4' },
+        'ITM-5': { stimulusIdentifier: null, title: 'Vraag 5' }
+      }),
+      { assignmentsOut }
+    )
+  ).xml();
+
+  const $ = load(out);
+  const sections = $('qti-assessment-section').toArray();
+  expect(sections.map(s => sectionItems($, s))).toEqual([['ITM-1', 'ITM-2'], ['ITM-3', 'ITM-4'], ['ITM-5']]);
+  expect(sections.map(s => $(s).attr('keep-together'))).toEqual(['true', 'true', undefined]);
+  expect($('qti-assessment-section[identifier="S1"]').length).toBe(0);
+  expect($('qti-test-part').attr('data-navigation-entity')).toBe('section');
+  expect(assignmentsOut).toEqual([
+    { itemIdentifier: 'ITM-1', sectionIdentifier: 'TP-SEC-1' },
+    { itemIdentifier: 'ITM-2', sectionIdentifier: 'TP-SEC-1' },
+    { itemIdentifier: 'ITM-3', sectionIdentifier: 'TP-SEC-2' },
+    { itemIdentifier: 'ITM-4', sectionIdentifier: 'TP-SEC-2' },
+    { itemIdentifier: 'ITM-5', sectionIdentifier: 'TP-SEC-3' }
+  ]);
+});
+
+test('leaves a single flat section alone when it has selection or ordering rules', async () => {
+  const input = xml`<qti-assessment-test xmlns="http://www.imsglobal.org/xsd/imsqtiasi_v3p0">
+  <qti-test-part identifier="TP">
+    <qti-assessment-section identifier="S1" visible="true">
+      <qti-ordering shuffle="true" />
+      <qti-assessment-item-ref identifier="ITM-1" href="items/1.xml" />
+      <qti-assessment-item-ref identifier="ITM-2" href="items/2.xml" />
+    </qti-assessment-section>
+  </qti-test-part>
+</qti-assessment-test>`;
+
+  const assignmentsOut: Array<{ itemIdentifier: string; sectionIdentifier: string }> = [];
+  const out = await (
+    await qtiTransform(input).wrapStimulusInSection(
+      makeResolver({
+        'ITM-1': { stimulusIdentifier: 'STIM-A' },
+        'ITM-2': { stimulusIdentifier: 'STIM-A' }
+      }),
+      { assignmentsOut }
+    )
+  ).xml();
+
+  const $ = load(out);
+  expect($('qti-assessment-section[identifier="S1"]').length).toBe(1);
+  expect($('qti-ordering').attr('shuffle')).toBe('true');
+  expect($('qti-test-part').attr('data-navigation-entity')).toBeUndefined();
+  expect(assignmentsOut).toEqual([]);
+});

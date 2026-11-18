@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`wrapStimulusInSection` groups a test that is one flat section.** A test part with a single section was always left alone, also when that section held the item-refs directly: the shape most authoring tools export ("Section 1" with every item). Items sharing a stimulus then never became one section. Now only a section that holds the structure is left alone: nested sections, or `qti-selection` / `qti-ordering` rules, which the rewrite would drop.
+
 ## 0.9.1
 
 ### Added
